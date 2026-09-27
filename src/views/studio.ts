@@ -25,6 +25,7 @@ import {
   SPLITTER_WIDTH,
   RADIUS_MAX,
   RADIUS_MIN,
+  scaleCardSize,
   studioFragment,
   studioSrcdoc,
   wrapText,
@@ -36,7 +37,19 @@ import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.25;
+const HISTORY_LIMIT = 40;
 let previewZoom = 1;
+let undoStack: StudioState[] = [];
+let redoStack: StudioState[] = [];
+let gesture: StudioState | null = null;
+
+function cloneStudio(state: StudioState): StudioState {
+  return { ...state };
+}
+
+function sameStudio(a: StudioState, b: StudioState): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 const imageCache = new Map<string, HTMLImageElement>();
 const dataUrlCache = new Map<string, Promise<string>>();
@@ -303,8 +316,12 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
       )
       .join("");
 
+  const undoIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
+  const redoIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>`;
+
   return `
     <section class="studio" style="--studio-controls-width:${state.controlsWidth}px">
+      <div class="studio__controls-wrap">
       <form class="studio__controls" id="studio-controls">
         <div class="studio__tabs" role="tablist" aria-label="컨트롤 패널">
           <button type="button" class="studio__tab" role="tab" id="studio-tab-design" aria-controls="studio-panel-design" aria-selected="${designSelected ? "true" : "false"}" tabindex="${designSelected ? "0" : "-1"}">Design</button>
@@ -315,6 +332,13 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <div class="studio__field">
             <label for="studio-preset">카드 크기 프리셋</label>
             <select id="studio-preset" class="studio__control">${options}</select>
+          </div>
+          <div class="studio__field">
+            <label for="studio-size">너비·높이 함께</label>
+            <div class="studio__radius">
+              <input id="studio-size" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" />
+              <input id="studio-size-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" aria-label="너비·높이 함께 수치" />
+            </div>
           </div>
           <div class="studio__field">
             <label for="studio-width">카드 너비</label>
@@ -413,6 +437,8 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <pre class="studio__export" id="studio-export"></pre>
         </div>
       </form>
+      <div class="studio__scroll-thumb" id="studio-scroll-thumb" hidden></div>
+      </div>
       <div class="studio__splitter" id="studio-splitter" role="separator" aria-orientation="vertical" aria-label="컨트롤 패널과 프리뷰 너비" aria-valuemin="${CONTROLS_MIN}" aria-valuenow="${state.controlsWidth}" tabindex="0"></div>
 
       <div class="studio__preview">
@@ -430,6 +456,10 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
         <div class="studio__bar">
           <p class="studio__meta" id="studio-meta" aria-live="polite"></p>
           <div class="studio__bar-actions">
+            <div class="studio__history" role="group" aria-label="편집 기록">
+              <button type="button" class="studio__zoom-btn" id="studio-undo" aria-label="이전 동작" disabled>${undoIcon}</button>
+              <button type="button" class="studio__zoom-btn" id="studio-redo" aria-label="원래대로" disabled>${redoIcon}</button>
+            </div>
             <div class="studio__zoom" role="group" aria-label="프리뷰 확대">
               <button type="button" class="studio__zoom-btn" id="studio-zoom-out" aria-label="축소">−</button>
               <span class="studio__zoom-label" id="studio-zoom-label">100%</span>
@@ -451,6 +481,8 @@ export function bindStudio(
 ): void {
   if (captures.length === 0) return;
   const presetSelect = root.querySelector<HTMLSelectElement>("#studio-preset");
+  const sizeRange = root.querySelector<HTMLInputElement>("#studio-size");
+  const sizeNumber = root.querySelector<HTMLInputElement>("#studio-size-number");
   const widthRange = root.querySelector<HTMLInputElement>("#studio-width");
   const widthNumber = root.querySelector<HTMLInputElement>("#studio-width-number");
   const heightRange = root.querySelector<HTMLInputElement>("#studio-height");
@@ -484,11 +516,17 @@ export function bindStudio(
   const zoomOut = root.querySelector<HTMLButtonElement>("#studio-zoom-out");
   const zoomIn = root.querySelector<HTMLButtonElement>("#studio-zoom-in");
   const zoomLabel = root.querySelector<HTMLElement>("#studio-zoom-label");
+  const undoButton = root.querySelector<HTMLButtonElement>("#studio-undo");
+  const redoButton = root.querySelector<HTMLButtonElement>("#studio-redo");
+  const scrollThumb = root.querySelector<HTMLElement>("#studio-scroll-thumb");
+  const controlsWrap = root.querySelector<HTMLElement>(".studio__controls-wrap");
   const exportCode = root.querySelector<HTMLElement>("#studio-export");
   const splitter = root.querySelector<HTMLElement>("#studio-splitter");
   const studio = root.querySelector<HTMLElement>(".studio");
   if (
     !presetSelect ||
+    !sizeRange ||
+    !sizeNumber ||
     !widthRange ||
     !widthNumber ||
     !heightRange ||
@@ -522,6 +560,10 @@ export function bindStudio(
     !zoomOut ||
     !zoomIn ||
     !zoomLabel ||
+    !undoButton ||
+    !redoButton ||
+    !scrollThumb ||
+    !controlsWrap ||
     !exportCode ||
     !splitter ||
     !studio
@@ -571,19 +613,66 @@ export function bindStudio(
 
   const controls = root.querySelector<HTMLElement>("#studio-controls");
   let hideScrollbar = 0;
-  let ignoreScroll = false;
+  const placeThumb = () => {
+    if (!controls) return;
+    const max = controls.scrollHeight - controls.clientHeight;
+    if (max <= 1) {
+      scrollThumb.hidden = true;
+      return;
+    }
+    scrollThumb.hidden = false;
+    const thumbHeight = Math.max(32, (controls.clientHeight / controls.scrollHeight) * controls.clientHeight);
+    const travel = Math.max(0, controls.clientHeight - thumbHeight);
+    scrollThumb.style.height = `${thumbHeight}px`;
+    scrollThumb.style.transform = `translateY(${(controls.scrollTop / max) * travel}px)`;
+  };
   controls?.addEventListener("scroll", () => {
-    if (ignoreScroll) return;
-    controls.classList.add("is-scrolling");
+    placeThumb();
+    controlsWrap.classList.add("is-scrolling");
     window.clearTimeout(hideScrollbar);
-    hideScrollbar = window.setTimeout(() => {
-      ignoreScroll = true;
-      controls.classList.remove("is-scrolling");
-      window.setTimeout(() => {
-        ignoreScroll = false;
-      }, 80);
-    }, 700);
+    hideScrollbar = window.setTimeout(() => controlsWrap.classList.remove("is-scrolling"), 700);
   });
+  placeThumb();
+
+  const syncHistoryButtons = () => {
+    const undo = document.querySelector<HTMLButtonElement>("#studio-undo");
+    const redo = document.querySelector<HTMLButtonElement>("#studio-redo");
+    if (undo) undo.disabled = undoStack.length === 0;
+    if (redo) redo.disabled = redoStack.length === 0;
+  };
+  let gestureOwner: EventTarget | null = null;
+  const finishGesture = (owner?: EventTarget) => {
+    if (owner && gestureOwner !== owner) return;
+    if (!gesture) {
+      gestureOwner = null;
+      return;
+    }
+    const before = gesture;
+    gesture = null;
+    gestureOwner = null;
+    if (sameStudio(before, state)) return;
+    undoStack.push(before);
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack = [];
+    syncHistoryButtons();
+  };
+  const beginGesture = (owner?: EventTarget) => {
+    if (owner && gestureOwner === owner && gesture) return;
+    finishGesture();
+    gesture = cloneStudio(state);
+    gestureOwner = owner ?? null;
+  };
+  const paintRangeFill = (range: HTMLInputElement) => {
+    const min = Number(range.min);
+    const max = Number(range.max);
+    const value = Number(range.value);
+    const pct = max > min ? ((value - min) / (max - min)) * 100 : 0;
+    range.style.setProperty("--range-fill", `${Math.min(100, Math.max(0, pct))}%`);
+  };
+  let sizeRatio = state.cardHeight / Math.max(1, state.cardWidth);
+  const captureSizeRatio = () => {
+    sizeRatio = state.cardHeight / Math.max(1, state.cardWidth);
+  };
 
   let themeImage: HTMLImageElement | null = null;
   let imageAspect = 1;
@@ -616,6 +705,7 @@ export function bindStudio(
       input.min = "5";
       input.max = fontMax;
     }
+    writeControl(sizeRange, sizeNumber, state.cardWidth);
     writeControl(widthRange, widthNumber, state.cardWidth);
     writeControl(heightRange, heightNumber, state.cardHeight);
     writeControl(titleSizeRange, titleSizeNumber, state.titleSize);
@@ -655,10 +745,38 @@ export function bindStudio(
     void redraw();
   };
 
+  const syncForm = () => {
+    presetSelect.value = state.presetId;
+    if (document.activeElement !== titleInput) titleInput.value = state.title;
+    if (document.activeElement !== bodyInput) bodyInput.value = state.body;
+    if (document.activeElement !== titleHexInput) {
+      titleColorInput.value = state.titleColor;
+      titleHexInput.value = state.titleColor;
+    }
+    if (document.activeElement !== bodyHexInput) {
+      bodyColorInput.value = state.bodyColor;
+      bodyHexInput.value = state.bodyColor;
+    }
+    if (document.activeElement !== hexInput) {
+      colorInput.value = state.color;
+      hexInput.value = state.color;
+    }
+    titleFontSelect.value = state.titleFontId;
+    bodyFontSelect.value = state.bodyFontId;
+    if (document.activeElement !== codeInput) codeInput.value = state.code;
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")) {
+      const selected = button.dataset.themeSlug === state.themeSlug;
+      button.setAttribute("aria-checked", selected ? "true" : "false");
+      button.tabIndex = selected ? 0 : -1;
+    }
+  };
+
   const redraw = async (): Promise<void> => {
     const token = ++drawToken;
     clampLayout();
+    syncForm();
     syncSizeControls();
+    root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
     const preset = presetById(state.presetId);
     const matchesPreset = state.cardWidth === preset.width && state.cardHeight === preset.height;
     const safeNote = matchesPreset && preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
@@ -725,6 +843,11 @@ export function bindStudio(
     apply: (value: number) => void,
     read: () => number,
   ) => {
+    range.addEventListener("pointerdown", () => beginGesture(range));
+    range.addEventListener("keydown", () => beginGesture(range));
+    range.addEventListener("pointerup", () => finishGesture(range));
+    range.addEventListener("pointercancel", () => finishGesture(range));
+    range.addEventListener("keyup", () => finishGesture(range));
     range.addEventListener("input", () => {
       apply(Number(range.value));
       void redraw();
@@ -732,7 +855,9 @@ export function bindStudio(
     const commitNumber = () => {
       clampLayout();
       number.value = String(read());
+      finishGesture(number);
     };
+    number.addEventListener("focus", () => beginGesture(number));
     number.addEventListener("input", () => {
       if (number.value.trim() === "") return;
       apply(Number(number.value));
@@ -742,13 +867,28 @@ export function bindStudio(
     number.addEventListener("blur", commitNumber);
   };
 
+  presetSelect.addEventListener("focus", () => beginGesture(presetSelect));
   presetSelect.addEventListener("change", () => {
     const preset = presetById(presetSelect.value);
     state.presetId = preset.id;
     state.cardWidth = preset.width;
     state.cardHeight = preset.height;
+    finishGesture(presetSelect);
     void redraw();
   });
+  presetSelect.addEventListener("blur", () => finishGesture(presetSelect));
+  sizeRange.addEventListener("pointerdown", captureSizeRatio);
+  sizeRange.addEventListener("keydown", captureSizeRatio);
+  sizeNumber.addEventListener("focus", captureSizeRatio);
+  bindPair(sizeRange, sizeNumber, (value) => {
+    const next = scaleCardSize(
+      Math.max(1, state.cardWidth),
+      Math.max(1, Math.round(state.cardWidth * sizeRatio)),
+      value,
+    );
+    state.cardWidth = next.cardWidth;
+    state.cardHeight = next.cardHeight;
+  }, () => state.cardWidth);
   bindPair(widthRange, widthNumber, (value) => {
     state.cardWidth = value;
   }, () => state.cardWidth);
@@ -764,31 +904,52 @@ export function bindStudio(
   bindPair(imageRange, imageNumber, (value) => {
     state.imageWidth = value;
   }, () => state.imageWidth);
-  titleFontSelect.addEventListener("change", () => {
+  const bindSelect = (select: HTMLSelectElement, apply: () => void) => {
+    select.addEventListener("focus", () => beginGesture(select));
+    select.addEventListener("change", () => {
+      apply();
+      finishGesture(select);
+      void redraw();
+    });
+    select.addEventListener("blur", () => finishGesture(select));
+  };
+  bindSelect(titleFontSelect, () => {
     state.titleFontId = titleFontSelect.value;
-    void redraw();
   });
-  bodyFontSelect.addEventListener("change", () => {
+  bindSelect(bodyFontSelect, () => {
     state.bodyFontId = bodyFontSelect.value;
-    void redraw();
   });
   root.querySelector("#studio-reset")?.addEventListener("click", () => {
+    finishGesture();
+    const before = cloneStudio(state);
     onReset();
+    if (!sameStudio(before, state)) {
+      undoStack.push(before);
+      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      redoStack = [];
+    }
+    syncHistoryButtons();
   });
+  titleInput.addEventListener("focus", () => beginGesture(titleInput));
   titleInput.addEventListener("input", () => {
     state.title = titleInput.value;
     void redraw();
   });
+  titleInput.addEventListener("blur", () => finishGesture(titleInput));
+  bodyInput.addEventListener("focus", () => beginGesture(bodyInput));
   bodyInput.addEventListener("input", () => {
     state.body = bodyInput.value;
     void redraw();
   });
+  bodyInput.addEventListener("blur", () => finishGesture(bodyInput));
   const bindColor = (
     picker: HTMLInputElement,
     hexField: HTMLInputElement,
     apply: (hex: string) => void,
     read: () => string,
   ) => {
+    picker.addEventListener("pointerdown", () => beginGesture(picker));
+    picker.addEventListener("change", () => finishGesture(picker));
     picker.addEventListener("input", () => {
       const hex = normalizeHex(picker.value);
       if (!hex) return;
@@ -796,6 +957,7 @@ export function bindStudio(
       hexField.value = hex;
       void redraw();
     });
+    hexField.addEventListener("focus", () => beginGesture(hexField));
     hexField.addEventListener("input", () => {
       const hex = normalizeHex(hexField.value);
       if (!hex) return;
@@ -805,6 +967,7 @@ export function bindStudio(
     });
     hexField.addEventListener("blur", () => {
       if (!normalizeHex(hexField.value)) hexField.value = read();
+      finishGesture(hexField);
     });
   };
   bindColor(colorInput, hexInput, (hex) => {
@@ -821,13 +984,50 @@ export function bindStudio(
     syncRadiusControls();
     void redraw();
   };
+  radiusRange.addEventListener("pointerdown", () => beginGesture(radiusRange));
+  radiusRange.addEventListener("keydown", () => beginGesture(radiusRange));
+  radiusRange.addEventListener("pointerup", () => finishGesture(radiusRange));
+  radiusRange.addEventListener("pointercancel", () => finishGesture(radiusRange));
+  radiusRange.addEventListener("keyup", () => finishGesture(radiusRange));
   radiusRange.addEventListener("input", () => applyRadius(radiusRange.value));
+  radiusNumber.addEventListener("focus", () => beginGesture(radiusNumber));
   radiusNumber.addEventListener("input", () => applyRadius(radiusNumber.value));
+  radiusNumber.addEventListener("blur", () => finishGesture(radiusNumber));
+  radiusNumber.addEventListener("change", () => finishGesture(radiusNumber));
 
+  codeInput.addEventListener("focus", () => beginGesture(codeInput));
   codeInput.addEventListener("input", () => {
     state.code = codeInput.value;
     void redraw();
   });
+  codeInput.addEventListener("blur", () => finishGesture(codeInput));
+
+  const applyHistory = (next: StudioState) => {
+    Object.assign(state, next);
+    syncHistoryButtons();
+    void redraw();
+  };
+  undoButton.addEventListener("click", () => {
+    finishGesture();
+    const prev = undoStack.pop();
+    if (!prev) {
+      syncHistoryButtons();
+      return;
+    }
+    redoStack.push(cloneStudio(state));
+    applyHistory(prev);
+  });
+  redoButton.addEventListener("click", () => {
+    finishGesture();
+    const next = redoStack.pop();
+    if (!next) {
+      syncHistoryButtons();
+      return;
+    }
+    undoStack.push(cloneStudio(state));
+    applyHistory(next);
+  });
+  syncHistoryButtons();
 
   root.querySelector("#studio-tab-design")?.addEventListener("click", () => showPanel("design"));
   root.querySelector("#studio-tab-code")?.addEventListener("click", () => showPanel("code"));
@@ -844,7 +1044,10 @@ export function bindStudio(
   for (const button of themes) {
     button.addEventListener("click", () => {
       const slug = button.dataset.themeSlug;
-      if (slug) selectTheme(slug, false);
+      if (!slug || slug === state.themeSlug) return;
+      beginGesture(button);
+      selectTheme(slug, false);
+      finishGesture(button);
     });
   }
   root.querySelector(".studio__themes")?.addEventListener("keydown", (event) => {
@@ -856,7 +1059,10 @@ export function bindStudio(
     const delta = key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1;
     const next = themes[(index + delta + themes.length) % themes.length];
     const slug = next?.dataset.themeSlug;
-    if (slug) selectTheme(slug, true);
+    if (!slug || slug === state.themeSlug) return;
+    beginGesture(next);
+    selectTheme(slug, true);
+    finishGesture(next);
   });
 
   root.querySelector("#studio-copy")?.addEventListener("click", async () => {
@@ -920,6 +1126,28 @@ export function bindStudio(
     return null;
   };
 
+  const strokeDragBox = (box: HitBox) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const display = canvas.getBoundingClientRect().width;
+    const unit = display > 0 ? state.cardWidth / display : 1;
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
+    ctx.lineWidth = unit * 3;
+    ctx.strokeRect(box.x, box.y, Math.max(unit, box.w), Math.max(unit, box.h));
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.lineWidth = unit * 1.5;
+    ctx.strokeRect(box.x, box.y, Math.max(unit, box.w), Math.max(unit, box.h));
+    ctx.restore();
+  };
+  const paintDragStroke = () => {
+    if (!drag) return;
+    const box = hits.find((hit) => hit.kind === drag?.kind);
+    if (box) strokeDragBox(box);
+  };
+
   let drag: { kind: HitBox["kind"]; dx: number; dy: number; pointerId: number } | null = null;
   canvas.addEventListener("pointerdown", (event) => {
     if (state.code.trim()) return;
@@ -931,8 +1159,10 @@ export function bindStudio(
     } catch {
       /* the pointer can already be inactive */
     }
+    beginGesture(canvas);
     drag = { kind: hit.kind, dx: point.x - hit.x, dy: point.y - hit.y, pointerId: event.pointerId };
     canvas.dataset.dragging = "true";
+    paintDragStroke();
   });
   canvas.addEventListener("pointermove", (event) => {
     const point = cardPoint(event);
@@ -953,11 +1183,14 @@ export function bindStudio(
       state.imageY = clampImageOffset(y, state.cardHeight, imageDrawHeight());
     }
     hits = drawCard(canvas, state, themeImage);
+    paintDragStroke();
   });
   const endDrag = (event: PointerEvent) => {
     if (!drag || drag.pointerId !== event.pointerId) return;
     drag = null;
     delete canvas.dataset.dragging;
+    finishGesture(canvas);
+    hits = drawCard(canvas, state, themeImage);
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);

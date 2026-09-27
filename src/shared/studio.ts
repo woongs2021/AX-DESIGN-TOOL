@@ -13,8 +13,8 @@ export const CONTROLS_MIN = 240;
 export const CONTROLS_DEFAULT = 360;
 export const PREVIEW_MIN = 280;
 export const SPLITTER_WIDTH = 6;
-export const DEFAULT_TITLE = "빛을 담은 표면";
-export const DEFAULT_BODY = "고요한 원과 따뜻한 색이 만나는 자리. 브랜드의 첫 인상을 한 장으로 전합니다.";
+export const DEFAULT_TITLE = "시즌";
+export const DEFAULT_BODY = "새로운 컬렉션\n브랜드의 첫 인상을 한 장으로 전합니다.";
 
 export const BUILTIN_FONTS = [
   { id: "pretendard", label: "Pretendard", stack: '"Pretendard Variable", Pretendard, system-ui, sans-serif' },
@@ -62,6 +62,25 @@ export function clampRadius(value: number): number {
 export function clampCardSize(value: number): number {
   if (!Number.isFinite(value)) return CARD_MIN;
   return Math.min(CARD_MAX, Math.max(CARD_MIN, Math.round(value)));
+}
+
+/** Change width and height together, keeping their ratio inside the card limits. */
+export function scaleCardSize(
+  width: number,
+  height: number,
+  nextWidth: number,
+): { cardWidth: number; cardHeight: number } {
+  const baseWidth = Math.max(1, Math.round(width));
+  const baseHeight = Math.max(1, Math.round(height));
+  const ratio = baseHeight / baseWidth;
+  let cardWidth = clampCardSize(nextWidth);
+  const rawHeight = Math.round(cardWidth * ratio);
+  let cardHeight = clampCardSize(rawHeight);
+  if (rawHeight !== cardHeight) {
+    cardWidth = clampCardSize(Math.round(cardHeight / ratio));
+    cardHeight = clampCardSize(Math.round(cardWidth * ratio));
+  }
+  return { cardWidth, cardHeight };
 }
 
 /** Largest font that still keeps 10px clear on the left and right of the card. */

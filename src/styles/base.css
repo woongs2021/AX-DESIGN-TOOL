@@ -927,7 +927,15 @@ html[data-mode="dark"] .spider-callout {
   color: var(--fg);
 }
 
+.studio__controls-wrap {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
 .studio__controls {
+  height: 100%;
   min-height: 0;
   overflow: auto;
   padding: 20px 20px 32px;
@@ -935,28 +943,24 @@ html[data-mode="dark"] .spider-callout {
   scrollbar-width: none;
 }
 
-.studio__controls.is-scrolling {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--fg) 30%, transparent) transparent;
-}
-
 .studio__controls::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
 
-.studio__controls.is-scrolling::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.studio__controls::-webkit-scrollbar-thumb {
-  background: transparent;
+.studio__scroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  width: 6px;
   border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 30%, transparent);
+  pointer-events: none;
+  opacity: 0;
 }
 
-.studio__controls.is-scrolling::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--fg) 30%, transparent);
+.studio__controls-wrap.is-scrolling .studio__scroll-thumb {
+  opacity: 1;
 }
 
 .studio__splitter {
@@ -1084,7 +1088,53 @@ html[data-mode="dark"] .spider-callout {
 
 .studio__radius input[type="range"] {
   flex: 1;
-  accent-color: var(--primary);
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.studio__radius input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--primary) var(--range-fill, 0%),
+    color-mix(in srgb, white 40%, transparent) var(--range-fill, 0%)
+  );
+}
+
+.studio__radius input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--primary);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.studio__radius input[type="range"]::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, white 40%, transparent);
+}
+
+.studio__radius input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.studio__radius input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--primary);
 }
 
 .studio__control--number {
@@ -1220,6 +1270,7 @@ html[data-mode="dark"] .spider-callout {
   gap: 12px;
 }
 
+.studio__history,
 .studio__zoom {
   display: flex;
   align-items: center;
@@ -1227,6 +1278,9 @@ html[data-mode="dark"] .spider-callout {
 }
 
 .studio__zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
   padding: 0;
@@ -1242,6 +1296,20 @@ html[data-mode="dark"] .spider-callout {
 .studio__zoom-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.studio__icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.studio__icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .studio__zoom-label {

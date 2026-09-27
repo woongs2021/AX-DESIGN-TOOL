@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
   clampCardSize,
+  scaleCardSize,
   createStudioState,
   DEFAULT_BODY,
   DEFAULT_TITLE,
@@ -36,6 +37,10 @@ assert.equal(clampRadius(-3), 0);
 assert.equal(clampRadius(Number.NaN), 0);
 
 assert.equal(clampCardSize(50), 100);
+assert.deepEqual(scaleCardSize(1080, 1080, 540), { cardWidth: 540, cardHeight: 540 });
+assert.deepEqual(scaleCardSize(1080, 1920, 540), { cardWidth: 540, cardHeight: 960 });
+assert.deepEqual(scaleCardSize(1080, 1920, 3000), { cardWidth: 2250, cardHeight: 4000 });
+assert.deepEqual(scaleCardSize(1080, 1080, 50), { cardWidth: 100, cardHeight: 100 });
 assert.equal(clampCardSize(1080), 1080);
 assert.equal(clampCardSize(9000), 4000);
 assert.equal(clampImageWidth(10), 100);
