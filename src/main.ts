@@ -3,13 +3,12 @@ import "./styles/base.css";
 import type { FilterState } from "./shared/filter.ts";
 import type { SiteIndex } from "./shared/index-types.ts";
 import {
+  createStudioState,
   normalizeHex,
   parseRgb,
-  RADIUS_DEFAULT,
   rgbToHex,
   type StudioState,
 } from "./shared/studio.ts";
-import { DEFAULT_PRESET_ID } from "./shared/studio-presets.ts";
 import { readPins, togglePin } from "./pins.ts";
 import { hrefFor, isLegacyStudioHash, onRouteChange, parseHash, type Route } from "./router.ts";
 import {
@@ -87,16 +86,7 @@ function defaultStudioColor(): string {
 function ensureStudio(theme: string | null, captures: SiteIndex["captures"]): StudioState {
   const valid = theme && captures.some((capture) => capture.slug === theme) ? theme : null;
   if (!studioState) {
-    studioState = {
-      presetId: DEFAULT_PRESET_ID,
-      title: "",
-      body: "",
-      themeSlug: valid ?? captures[0]?.slug ?? "",
-      color: defaultStudioColor(),
-      radius: RADIUS_DEFAULT,
-      code: "",
-      panel: "design",
-    };
+    studioState = createStudioState(valid ?? captures[0]?.slug ?? "", defaultStudioColor());
     appliedTheme = theme;
     return studioState;
   }

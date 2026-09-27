@@ -1,0 +1,2 @@
+Place .woff2, .woff, .ttf, or .otf files in this folder.
+Restart the dev server or rebuild so the studio font list picks them up.

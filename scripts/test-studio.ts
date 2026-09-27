@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
+  clampCardSize,
+  clampFontSize,
+  clampImageWidth,
   clampRadius,
   designToCode,
+  fontLabelFromPath,
   inkContrast,
+  maxFontSize,
   pickInk,
   sanitizeStudioCode,
   substituteStudioCode,
@@ -25,6 +30,19 @@ assert.equal(clampRadius(28), 28);
 assert.equal(clampRadius(150), 120);
 assert.equal(clampRadius(-3), 0);
 assert.equal(clampRadius(Number.NaN), 0);
+
+assert.equal(clampCardSize(50), 100);
+assert.equal(clampCardSize(1080), 1080);
+assert.equal(clampCardSize(9000), 4000);
+assert.equal(clampImageWidth(10), 100);
+assert.equal(clampImageWidth(4001), 4000);
+assert.equal(maxFontSize(1080), 1060);
+assert.equal(maxFontSize(100), 80);
+assert.equal(clampFontSize(4, 1080), 5);
+assert.equal(clampFontSize(2000, 1080), 1060);
+assert.equal(clampFontSize(40, 100), 40);
+assert.equal(fontLabelFromPath("fonts/Noto_Sans.woff2"), "Noto Sans");
+assert.equal(fontLabelFromPath("fonts/Pretendard.ttf"), "Pretendard");
 
 const widthOf = (line: string) => line.length * 10;
 assert.deepEqual(wrapText("hello world", 50, widthOf), ["hello", "world"]);
@@ -67,4 +85,4 @@ assert.equal(isLegacyStudioHash("#/intake"), true);
 assert.equal(isLegacyStudioHash("#/studio"), false);
 assert.equal(hrefFor({ name: "studio", theme: "warm-earth-oval" }), "#/studio?theme=warm-earth-oval");
 
-console.log("OK: studio preset, radius, wrap, ink, code, and route checks");
+console.log("OK: studio preset, size, font, radius, wrap, ink, code, and route checks");

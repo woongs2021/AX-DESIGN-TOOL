@@ -1,16 +1,33 @@
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
 import type { CaptureRecord } from "../shared/index-types.ts";
 import {
+  BUILTIN_FONTS,
+  CARD_MAX,
+  CARD_MIN,
+  clampCardSize,
+  clampControlsWidth,
+  clampFontSize,
+  clampImageOffset,
+  clampImageWidth,
   clampRadius,
-  coverRect,
+  clampTextOffset,
+  CONTROLS_MIN,
   designToCode,
+  fontLabelFromPath,
+  fontStack,
+  FONT_SIDE_MARGIN,
+  IMAGE_MAX,
+  inkHex,
+  IMAGE_MIN,
+  maxFontSize,
   normalizeHex,
-  pickInk,
+  PREVIEW_MIN,
   RADIUS_MAX,
   RADIUS_MIN,
   studioFragment,
   studioSrcdoc,
   wrapText,
+  type StudioDocumentInput,
   type StudioState,
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
@@ -53,6 +70,51 @@ function themeDataUrl(url: string): Promise<string> {
   return pending;
 }
 
+const localFontUrls = import.meta.glob("../../fonts/*.{woff2,woff,ttf,otf}", {
+  eager: true,
+  import: "default",
+  query: "?url",
+}) as Record<string, string>;
+
+type FontChoice = { id: string; label: string; stack: string };
+type HitBox = { kind: "title" | "body" | "image"; x: number; y: number; w: number; h: number };
+
+const installedFonts = new Set<string>();
+
+function fontFormat(url: string): string {
+  if (url.includes(".woff2")) return "woff2";
+  if (url.includes(".woff")) return "woff";
+  if (url.includes(".otf")) return "opentype";
+  return "truetype";
+}
+
+function extraFonts(): FontChoice[] {
+  const builtins = new Set(BUILTIN_FONTS.map((font) => font.label.toLowerCase()));
+  const extras: FontChoice[] = [];
+  for (const [path, url] of Object.entries(localFontUrls)) {
+    const label = fontLabelFromPath(path);
+    if (!label || builtins.has(label.toLowerCase())) continue;
+    const id = `local:${label}`;
+    if (extras.some((font) => font.id === id)) continue;
+    if (!installedFonts.has(label)) {
+      installedFonts.add(label);
+      const style = document.createElement("style");
+      style.textContent = `@font-face{font-family:${JSON.stringify(label)};src:url("${url}") format("${fontFormat(url)}");font-display:swap;}`;
+      document.head.append(style);
+    }
+    extras.push({
+      id,
+      label,
+      stack: `${JSON.stringify(label)}, system-ui, sans-serif`,
+    });
+  }
+  return extras;
+}
+
+function fontChoices(): FontChoice[] {
+  return [...BUILTIN_FONTS, ...extraFonts()];
+}
+
 function roundedPath(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -64,52 +126,87 @@ function roundedPath(
   ctx.roundRect(0, 0, width, height, r);
 }
 
+function documentInput(state: StudioState, themeImage: string): StudioDocumentInput {
+  return {
+    title: state.title,
+    body: state.body,
+    themeImage,
+    color: state.color,
+    radius: state.radius,
+    width: state.cardWidth,
+    height: state.cardHeight,
+    code: state.code,
+    fontStack: fontStack(state.fontId, extraFonts()),
+    titleSize: state.titleSize,
+    bodySize: state.bodySize,
+    titleX: state.titleX,
+    titleY: state.titleY,
+    bodyX: state.bodyX,
+    bodyY: state.bodyY,
+    imageWidth: state.imageWidth,
+    imageX: state.imageX,
+    imageY: state.imageY,
+    titleColor: state.titleColor,
+    bodyColor: state.bodyColor,
+  };
+}
+
 function drawCard(
   canvas: HTMLCanvasElement,
   state: StudioState,
   image: HTMLImageElement | null,
-): void {
-  const preset = presetById(state.presetId);
+): HitBox[] {
   const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  canvas.width = preset.width;
-  canvas.height = preset.height;
-  ctx.clearRect(0, 0, preset.width, preset.height);
+  if (!ctx) return [];
+  const width = state.cardWidth;
+  const height = state.cardHeight;
+  canvas.width = width;
+  canvas.height = height;
+  ctx.clearRect(0, 0, width, height);
   ctx.save();
-  roundedPath(ctx, preset.width, preset.height, state.radius);
+  roundedPath(ctx, width, height, state.radius);
   ctx.clip();
   ctx.fillStyle = state.color;
-  ctx.fillRect(0, 0, preset.width, preset.height);
+  ctx.fillRect(0, 0, width, height);
 
-  const band = Math.round(preset.height * 0.28);
-  const imageHeight = preset.height - band;
+  const hits: HitBox[] = [];
   if (image && image.naturalWidth > 0) {
-    const dest = coverRect(image.naturalWidth, image.naturalHeight, preset.width, imageHeight);
-    ctx.drawImage(image, dest.x, dest.y, dest.w, dest.h);
+    const drawWidth = state.imageWidth;
+    const drawHeight = drawWidth * (image.naturalHeight / image.naturalWidth);
+    ctx.drawImage(image, state.imageX, state.imageY, drawWidth, drawHeight);
+    hits.push({ kind: "image", x: state.imageX, y: state.imageY, w: drawWidth, h: drawHeight });
   }
 
-  const ink = pickInk(state.color);
-  const pad = Math.round(preset.width * 0.05);
-  const maxText = preset.width - pad * 2;
-  let y = imageHeight + pad;
-  ctx.fillStyle = ink;
+  const stack = fontStack(state.fontId, extraFonts());
+  const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
   ctx.textBaseline = "top";
 
-  const drawLines = (text: string, size: number, weight: number, gap: number) => {
-    if (!text.trim() || maxText <= 0) return;
-    ctx.font = `${weight} ${size}px "Pretendard Variable", Pretendard, system-ui, sans-serif`;
+  const paintText = (
+    kind: "title" | "body",
+    text: string,
+    x: number,
+    y: number,
+    size: number,
+    weight: number,
+    color: string,
+  ): void => {
+    if (!text.trim()) return;
+    ctx.fillStyle = color;
+    ctx.font = `${weight} ${size}px ${stack}`;
+    const lines = wrapText(text.trim(), maxText, (value) => ctx.measureText(value).width);
     const lineHeight = Math.round(size * 1.25);
-    for (const line of wrapText(text.trim(), maxText, (value) => ctx.measureText(value).width)) {
-      if (y + lineHeight > preset.height - pad / 2) break;
-      ctx.fillText(line, pad, y);
-      y += lineHeight;
-    }
-    y += gap;
+    let widest = 0;
+    lines.forEach((line, index) => {
+      ctx.fillText(line, x, y + index * lineHeight);
+      widest = Math.max(widest, ctx.measureText(line).width);
+    });
+    hits.push({ kind, x, y, w: Math.max(widest, size), h: Math.max(lines.length, 1) * lineHeight });
   };
 
-  drawLines(state.title, Math.max(16, Math.round(preset.width * 0.046)), 600, Math.round(preset.width * 0.012));
-  drawLines(state.body, Math.max(14, Math.round(preset.width * 0.026)), 400, 0);
+  paintText("body", state.body, state.bodyX, state.bodyY, state.bodySize, 400, state.bodyColor);
+  paintText("title", state.title, state.titleX, state.titleY, state.titleSize, 600, state.titleColor);
   ctx.restore();
+  return hits;
 }
 
 function downloadCanvas(canvas: HTMLCanvasElement, filename: string): void {
@@ -159,6 +256,9 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
     `;
   }
 
+  const ink = inkHex(state.color);
+  state.titleColor = normalizeHex(String(state.titleColor ?? "")) ?? ink;
+  state.bodyColor = normalizeHex(String(state.bodyColor ?? "")) ?? ink;
   const preset = presetById(state.presetId);
   const options = STUDIO_PRESETS.map(
     (item) =>
@@ -182,9 +282,17 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
     })
     .join("");
   const designSelected = state.panel === "design";
+  const fonts = fontChoices();
+  const fontMax = maxFontSize(state.cardWidth);
+  const fontOptions = fonts
+    .map(
+      (font) =>
+        `<option value="${escapeHtml(font.id)}"${font.id === state.fontId ? " selected" : ""}>${escapeHtml(font.label)}</option>`,
+    )
+    .join("");
 
   return `
-    <section class="studio">
+    <section class="studio" style="--studio-controls-width:${state.controlsWidth}px">
       <form class="studio__controls" id="studio-controls">
         <div class="studio__tabs" role="tablist" aria-label="컨트롤 패널">
           <button type="button" class="studio__tab" role="tab" id="studio-tab-design" aria-controls="studio-panel-design" aria-selected="${designSelected ? "true" : "false"}" tabindex="${designSelected ? "0" : "-1"}">Design</button>
@@ -193,21 +301,76 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
 
         <div id="studio-panel-design" role="tabpanel" aria-labelledby="studio-tab-design"${designSelected ? "" : " hidden"}>
           <div class="studio__field">
-            <label for="studio-preset">카드 크기</label>
+            <label for="studio-preset">카드 크기 프리셋</label>
             <select id="studio-preset" class="studio__control">${options}</select>
+          </div>
+          <div class="studio__field">
+            <label for="studio-width">카드 너비</label>
+            <div class="studio__radius">
+              <input id="studio-width" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" />
+              <input id="studio-width-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" aria-label="카드 너비 수치" />
+            </div>
+          </div>
+          <div class="studio__field">
+            <label for="studio-height">카드 높이</label>
+            <div class="studio__radius">
+              <input id="studio-height" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardHeight}" />
+              <input id="studio-height-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardHeight}" aria-label="카드 높이 수치" />
+            </div>
           </div>
           <div class="studio__field">
             <label for="studio-title">카드 타이틀</label>
             <input id="studio-title" class="studio__control" type="text" value="${escapeHtml(state.title)}" placeholder="타이틀" />
           </div>
           <div class="studio__field">
+            <label for="studio-title-color">타이틀 컬러</label>
+            <div class="studio__color">
+              <input id="studio-title-color" class="studio__color-picker" type="color" value="${escapeHtml(state.titleColor)}" aria-label="타이틀 컬러 피커" />
+              <input id="studio-title-hex" class="studio__control" type="text" value="${escapeHtml(state.titleColor)}" spellcheck="false" aria-label="타이틀 컬러 hex" />
+            </div>
+          </div>
+          <div class="studio__field">
+            <label for="studio-title-size">타이틀 폰트 크기</label>
+            <div class="studio__radius">
+              <input id="studio-title-size" type="range" min="5" max="${fontMax}" step="1" value="${state.titleSize}" />
+              <input id="studio-title-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${state.titleSize}" aria-label="타이틀 폰트 크기 수치" />
+            </div>
+          </div>
+          <div class="studio__field">
             <label for="studio-body">본문</label>
             <textarea id="studio-body" class="studio__control studio__control--area" placeholder="본문">${escapeHtml(state.body)}</textarea>
+          </div>
+          <div class="studio__field">
+            <label for="studio-body-color">본문 컬러</label>
+            <div class="studio__color">
+              <input id="studio-body-color" class="studio__color-picker" type="color" value="${escapeHtml(state.bodyColor)}" aria-label="본문 컬러 피커" />
+              <input id="studio-body-hex" class="studio__control" type="text" value="${escapeHtml(state.bodyColor)}" spellcheck="false" aria-label="본문 컬러 hex" />
+            </div>
+          </div>
+          <div class="studio__field">
+            <label for="studio-body-size">본문 폰트 크기</label>
+            <div class="studio__radius">
+              <input id="studio-body-size" type="range" min="5" max="${fontMax}" step="1" value="${state.bodySize}" />
+              <input id="studio-body-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${state.bodySize}" aria-label="본문 폰트 크기 수치" />
+            </div>
+          </div>
+          <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮길 수 있습니다.</p>
+          <div class="studio__field">
+            <label for="studio-font">폰트</label>
+            <select id="studio-font" class="studio__control">${fontOptions}</select>
           </div>
           <div class="studio__field">
             <span id="studio-theme-label">아카이브 테마</span>
             <div class="studio__themes" role="radiogroup" aria-labelledby="studio-theme-label">${themes}</div>
           </div>
+          <div class="studio__field">
+            <label for="studio-image-width">카드 이미지 크기</label>
+            <div class="studio__radius">
+              <input id="studio-image-width" type="range" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${state.imageWidth}" />
+              <input id="studio-image-width-number" class="studio__control studio__control--number" type="number" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${state.imageWidth}" aria-label="카드 이미지 크기 수치" />
+            </div>
+          </div>
+          <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮길 수 있습니다.</p>
           <div class="studio__field">
             <label for="studio-color">카드 컬러</label>
             <div class="studio__color">
@@ -233,6 +396,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <pre class="studio__export" id="studio-export"></pre>
         </div>
       </form>
+      <div class="studio__splitter" id="studio-splitter" role="separator" aria-orientation="vertical" aria-label="컨트롤 패널과 프리뷰 너비" aria-valuemin="${CONTROLS_MIN}" aria-valuenow="${state.controlsWidth}" tabindex="0"></div>
 
       <div class="studio__preview">
         <div class="studio__stage" id="studio-stage">
@@ -260,8 +424,23 @@ export function bindStudio(
 ): void {
   if (captures.length === 0) return;
   const presetSelect = root.querySelector<HTMLSelectElement>("#studio-preset");
+  const widthRange = root.querySelector<HTMLInputElement>("#studio-width");
+  const widthNumber = root.querySelector<HTMLInputElement>("#studio-width-number");
+  const heightRange = root.querySelector<HTMLInputElement>("#studio-height");
+  const heightNumber = root.querySelector<HTMLInputElement>("#studio-height-number");
   const titleInput = root.querySelector<HTMLInputElement>("#studio-title");
+  const titleColorInput = root.querySelector<HTMLInputElement>("#studio-title-color");
+  const titleHexInput = root.querySelector<HTMLInputElement>("#studio-title-hex");
+  const titleSizeRange = root.querySelector<HTMLInputElement>("#studio-title-size");
+  const titleSizeNumber = root.querySelector<HTMLInputElement>("#studio-title-size-number");
   const bodyInput = root.querySelector<HTMLTextAreaElement>("#studio-body");
+  const bodyColorInput = root.querySelector<HTMLInputElement>("#studio-body-color");
+  const bodyHexInput = root.querySelector<HTMLInputElement>("#studio-body-hex");
+  const bodySizeRange = root.querySelector<HTMLInputElement>("#studio-body-size");
+  const bodySizeNumber = root.querySelector<HTMLInputElement>("#studio-body-size-number");
+  const fontSelect = root.querySelector<HTMLSelectElement>("#studio-font");
+  const imageRange = root.querySelector<HTMLInputElement>("#studio-image-width");
+  const imageNumber = root.querySelector<HTMLInputElement>("#studio-image-width-number");
   const colorInput = root.querySelector<HTMLInputElement>("#studio-color");
   const hexInput = root.querySelector<HTMLInputElement>("#studio-hex");
   const radiusRange = root.querySelector<HTMLInputElement>("#studio-radius");
@@ -275,10 +454,27 @@ export function bindStudio(
   const fit = root.querySelector<HTMLElement>("#studio-fit");
   const stage = root.querySelector<HTMLElement>("#studio-stage");
   const exportCode = root.querySelector<HTMLElement>("#studio-export");
+  const splitter = root.querySelector<HTMLElement>("#studio-splitter");
+  const studio = root.querySelector<HTMLElement>(".studio");
   if (
     !presetSelect ||
+    !widthRange ||
+    !widthNumber ||
+    !heightRange ||
+    !heightNumber ||
     !titleInput ||
+    !titleColorInput ||
+    !titleHexInput ||
+    !titleSizeRange ||
+    !titleSizeNumber ||
     !bodyInput ||
+    !bodyColorInput ||
+    !bodyHexInput ||
+    !bodySizeRange ||
+    !bodySizeNumber ||
+    !fontSelect ||
+    !imageRange ||
+    !imageNumber ||
     !colorInput ||
     !hexInput ||
     !radiusRange ||
@@ -291,7 +487,9 @@ export function bindStudio(
     !scaler ||
     !fit ||
     !stage ||
-    !exportCode
+    !exportCode ||
+    !splitter ||
+    !studio
   ) {
     return;
   }
@@ -304,19 +502,56 @@ export function bindStudio(
   let drawToken = 0;
 
   const updateScale = () => {
-    const preset = presetById(state.presetId);
     const bounds = stage.getBoundingClientRect();
     const pad = 48;
     const scale = Math.min(
-      Math.max(bounds.width - pad, 1) / preset.width,
-      Math.max(bounds.height - pad, 1) / preset.height,
+      Math.max(bounds.width - pad, 1) / state.cardWidth,
+      Math.max(bounds.height - pad, 1) / state.cardHeight,
     );
     const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-    fit.style.width = `${preset.width * safeScale}px`;
-    fit.style.height = `${preset.height * safeScale}px`;
-    scaler.style.width = `${preset.width}px`;
-    scaler.style.height = `${preset.height}px`;
+    fit.style.width = `${state.cardWidth * safeScale}px`;
+    fit.style.height = `${state.cardHeight * safeScale}px`;
+    scaler.style.width = `${state.cardWidth}px`;
+    scaler.style.height = `${state.cardHeight}px`;
     scaler.style.transform = `scale(${safeScale})`;
+  };
+
+  let themeImage: HTMLImageElement | null = null;
+  let imageAspect = 1;
+  let hits: HitBox[] = [];
+
+  const imageDrawHeight = () => state.imageWidth * imageAspect;
+
+  const clampLayout = () => {
+    state.cardWidth = clampCardSize(state.cardWidth);
+    state.cardHeight = clampCardSize(state.cardHeight);
+    state.titleSize = clampFontSize(state.titleSize, state.cardWidth);
+    state.bodySize = clampFontSize(state.bodySize, state.cardWidth);
+    state.imageWidth = clampImageWidth(state.imageWidth);
+    state.titleX = clampTextOffset(state.titleX, state.cardWidth, state.titleSize);
+    state.titleY = clampTextOffset(state.titleY, state.cardHeight, state.titleSize);
+    state.bodyX = clampTextOffset(state.bodyX, state.cardWidth, state.bodySize);
+    state.bodyY = clampTextOffset(state.bodyY, state.cardHeight, state.bodySize);
+    state.imageX = clampImageOffset(state.imageX, state.cardWidth, state.imageWidth);
+    state.imageY = clampImageOffset(state.imageY, state.cardHeight, imageDrawHeight());
+  };
+
+  const writeControl = (range: HTMLInputElement, number: HTMLInputElement, value: number) => {
+    range.value = String(value);
+    if (document.activeElement !== number) number.value = String(value);
+  };
+
+  const syncSizeControls = () => {
+    const fontMax = String(maxFontSize(state.cardWidth));
+    for (const input of [titleSizeRange, titleSizeNumber, bodySizeRange, bodySizeNumber]) {
+      input.min = "5";
+      input.max = fontMax;
+    }
+    writeControl(widthRange, widthNumber, state.cardWidth);
+    writeControl(heightRange, heightNumber, state.cardHeight);
+    writeControl(titleSizeRange, titleSizeNumber, state.titleSize);
+    writeControl(bodySizeRange, bodySizeNumber, state.bodySize);
+    writeControl(imageRange, imageNumber, state.imageWidth);
   };
 
   const syncRadiusControls = () => {
@@ -353,14 +588,17 @@ export function bindStudio(
 
   const redraw = async (): Promise<void> => {
     const token = ++drawToken;
+    clampLayout();
+    syncSizeControls();
     const preset = presetById(state.presetId);
-    const safeNote = preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
-    meta.textContent = `${preset.width} × ${preset.height} · ${preset.name}${safeNote}`;
+    const matchesPreset = state.cardWidth === preset.width && state.cardHeight === preset.height;
+    const safeNote = matchesPreset && preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
+    meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}${safeNote}`;
     exportCode.textContent = designToCode();
     syncRadiusControls();
     updateScale();
 
-    if (preset.safe) {
+    if (matchesPreset && preset.safe) {
       safe.hidden = false;
       safe.style.width = `${preset.safe.width}px`;
       safe.style.height = `${preset.safe.height}px`;
@@ -368,41 +606,95 @@ export function bindStudio(
       safe.hidden = true;
     }
 
+    const family = fontStack(state.fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
+    if (family) {
+      try {
+        await Promise.all([
+          document.fonts.load(`600 ${state.titleSize}px "${family}"`),
+          document.fonts.load(`400 ${state.bodySize}px "${family}"`),
+        ]);
+      } catch {
+        /* the canvas stack falls through to the next family */
+      }
+    }
+    if (token !== drawToken) return;
+
     const url = themeUrl();
     if (state.code.trim()) {
       canvas.hidden = true;
       iframe.hidden = false;
-      const themeImage = url ? await themeDataUrl(url) : "";
+      const themeData = url ? await themeDataUrl(url) : "";
       if (token !== drawToken) return;
-      iframe.srcdoc = studioSrcdoc({
-        title: state.title,
-        body: state.body,
-        themeImage,
-        color: state.color,
-        radius: state.radius,
-        width: preset.width,
-        height: preset.height,
-        code: state.code,
-      });
+      iframe.srcdoc = studioSrcdoc(documentInput(state, themeData));
       return;
     }
 
     iframe.hidden = true;
     canvas.hidden = false;
-    let image: HTMLImageElement | null = null;
     if (url) {
       try {
-        image = await loadImage(url);
+        themeImage = await loadImage(url);
+        if (themeImage.naturalWidth > 0) imageAspect = themeImage.naturalHeight / themeImage.naturalWidth;
       } catch {
-        image = null;
+        themeImage = null;
+        imageAspect = 1;
       }
+    } else {
+      themeImage = null;
+      imageAspect = 1;
     }
     if (token !== drawToken) return;
-    drawCard(canvas, state, image);
-  }
+    clampLayout();
+    hits = drawCard(canvas, state, themeImage);
+  };
+
+  const bindPair = (
+    range: HTMLInputElement,
+    number: HTMLInputElement,
+    apply: (value: number) => void,
+    read: () => number,
+  ) => {
+    range.addEventListener("input", () => {
+      apply(Number(range.value));
+      void redraw();
+    });
+    const commitNumber = () => {
+      clampLayout();
+      number.value = String(read());
+    };
+    number.addEventListener("input", () => {
+      if (number.value.trim() === "") return;
+      apply(Number(number.value));
+      void redraw();
+    });
+    number.addEventListener("change", commitNumber);
+    number.addEventListener("blur", commitNumber);
+  };
 
   presetSelect.addEventListener("change", () => {
-    state.presetId = presetSelect.value;
+    const preset = presetById(presetSelect.value);
+    state.presetId = preset.id;
+    state.cardWidth = preset.width;
+    state.cardHeight = preset.height;
+    void redraw();
+  });
+  bindPair(widthRange, widthNumber, (value) => {
+    state.cardWidth = value;
+  }, () => state.cardWidth);
+  bindPair(heightRange, heightNumber, (value) => {
+    state.cardHeight = value;
+  }, () => state.cardHeight);
+  bindPair(titleSizeRange, titleSizeNumber, (value) => {
+    state.titleSize = value;
+  }, () => state.titleSize);
+  bindPair(bodySizeRange, bodySizeNumber, (value) => {
+    state.bodySize = value;
+  }, () => state.bodySize);
+  bindPair(imageRange, imageNumber, (value) => {
+    state.imageWidth = value;
+  }, () => state.imageWidth);
+  fontSelect.addEventListener("change", () => {
+    state.fontId = fontSelect.value;
     void redraw();
   });
   titleInput.addEventListener("input", () => {
@@ -413,23 +705,39 @@ export function bindStudio(
     state.body = bodyInput.value;
     void redraw();
   });
-  colorInput.addEventListener("input", () => {
-    const hex = normalizeHex(colorInput.value);
-    if (!hex) return;
+  const bindColor = (
+    picker: HTMLInputElement,
+    hexField: HTMLInputElement,
+    apply: (hex: string) => void,
+    read: () => string,
+  ) => {
+    picker.addEventListener("input", () => {
+      const hex = normalizeHex(picker.value);
+      if (!hex) return;
+      apply(hex);
+      hexField.value = hex;
+      void redraw();
+    });
+    hexField.addEventListener("input", () => {
+      const hex = normalizeHex(hexField.value);
+      if (!hex) return;
+      apply(hex);
+      picker.value = hex;
+      void redraw();
+    });
+    hexField.addEventListener("blur", () => {
+      if (!normalizeHex(hexField.value)) hexField.value = read();
+    });
+  };
+  bindColor(colorInput, hexInput, (hex) => {
     state.color = hex;
-    hexInput.value = hex;
-    void redraw();
-  });
-  hexInput.addEventListener("input", () => {
-    const hex = normalizeHex(hexInput.value);
-    if (!hex) return;
-    state.color = hex;
-    colorInput.value = hex;
-    void redraw();
-  });
-  hexInput.addEventListener("blur", () => {
-    if (!normalizeHex(hexInput.value)) hexInput.value = state.color;
-  });
+  }, () => state.color);
+  bindColor(titleColorInput, titleHexInput, (hex) => {
+    state.titleColor = hex;
+  }, () => state.titleColor);
+  bindColor(bodyColorInput, bodyHexInput, (hex) => {
+    state.bodyColor = hex;
+  }, () => state.bodyColor);
   const applyRadius = (raw: string) => {
     state.radius = clampRadius(Number(raw));
     syncRadiusControls();
@@ -496,32 +804,131 @@ export function bindStudio(
 
   root.querySelector("#studio-download")?.addEventListener("click", () => {
     void (async () => {
-      const preset = presetById(state.presetId);
-      const filename = `ax-studio-${preset.id}-${state.themeSlug || "theme"}.png`;
+      const filename = `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}.png`;
       if (!state.code.trim()) {
         downloadCanvas(canvas, filename);
         return;
       }
       const url = themeUrl();
-      const themeImage = url ? await themeDataUrl(url) : "";
+      const themeData = url ? await themeDataUrl(url) : "";
       const offscreen = document.createElement("canvas");
       await paintForeignObject(
         offscreen,
-        studioFragment({
-          title: state.title,
-          body: state.body,
-          themeImage,
-          color: state.color,
-          radius: state.radius,
-          width: preset.width,
-          height: preset.height,
-          code: state.code,
-        }),
-        preset.width,
-        preset.height,
+        studioFragment(documentInput(state, themeData)),
+        state.cardWidth,
+        state.cardHeight,
       );
       downloadCanvas(offscreen, filename);
     })();
+  });
+
+  const cardPoint = (event: PointerEvent) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: rect.width > 0 ? ((event.clientX - rect.left) / rect.width) * state.cardWidth : 0,
+      y: rect.height > 0 ? ((event.clientY - rect.top) / rect.height) * state.cardHeight : 0,
+    };
+  };
+
+  const hitAt = (x: number, y: number): HitBox | null => {
+    const pad = 8;
+    for (let index = hits.length - 1; index >= 0; index -= 1) {
+      const box = hits[index];
+      if (!box) continue;
+      if (x >= box.x - pad && y >= box.y - pad && x <= box.x + box.w + pad && y <= box.y + box.h + pad) {
+        return box;
+      }
+    }
+    return null;
+  };
+
+  let drag: { kind: HitBox["kind"]; dx: number; dy: number; pointerId: number } | null = null;
+  canvas.addEventListener("pointerdown", (event) => {
+    if (state.code.trim()) return;
+    const point = cardPoint(event);
+    const hit = hitAt(point.x, point.y);
+    if (!hit) return;
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* the pointer can already be inactive */
+    }
+    drag = { kind: hit.kind, dx: point.x - hit.x, dy: point.y - hit.y, pointerId: event.pointerId };
+    canvas.dataset.dragging = "true";
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    const point = cardPoint(event);
+    if (!drag || drag.pointerId !== event.pointerId) {
+      canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
+      return;
+    }
+    const x = point.x - drag.dx;
+    const y = point.y - drag.dy;
+    if (drag.kind === "title") {
+      state.titleX = clampTextOffset(x, state.cardWidth, state.titleSize);
+      state.titleY = clampTextOffset(y, state.cardHeight, state.titleSize);
+    } else if (drag.kind === "body") {
+      state.bodyX = clampTextOffset(x, state.cardWidth, state.bodySize);
+      state.bodyY = clampTextOffset(y, state.cardHeight, state.bodySize);
+    } else {
+      state.imageX = clampImageOffset(x, state.cardWidth, state.imageWidth);
+      state.imageY = clampImageOffset(y, state.cardHeight, imageDrawHeight());
+    }
+    hits = drawCard(canvas, state, themeImage);
+  });
+  const endDrag = (event: PointerEvent) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag = null;
+    delete canvas.dataset.dragging;
+  };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  const applyControlsWidth = (value: number) => {
+    const studioWidth = studio.getBoundingClientRect().width;
+    const room = CONTROLS_MIN + PREVIEW_MIN + 10;
+    const requested = Number.isFinite(value) ? value : state.controlsWidth;
+    state.controlsWidth = studioWidth >= room
+      ? clampControlsWidth(requested, studioWidth)
+      : Math.max(CONTROLS_MIN, Math.round(requested));
+    studio.style.setProperty("--studio-controls-width", `${state.controlsWidth}px`);
+    splitter.setAttribute("aria-valuenow", String(state.controlsWidth));
+    splitter.setAttribute(
+      "aria-valuemax",
+      String(studioWidth >= room ? Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - 10) : state.controlsWidth),
+    );
+    updateScale();
+  };
+  applyControlsWidth(state.controlsWidth);
+
+  splitter.addEventListener("pointerdown", (event) => {
+    if (window.matchMedia("(max-width: 1023px)").matches) return;
+    try {
+      splitter.setPointerCapture(event.pointerId);
+    } catch {
+      /* the pointer can already be inactive */
+    }
+    const originX = event.clientX;
+    const originWidth = state.controlsWidth;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      applyControlsWidth(originWidth + ev.clientX - originX);
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      splitter.removeEventListener("pointermove", move);
+      splitter.removeEventListener("pointerup", end);
+      splitter.removeEventListener("pointercancel", end);
+    };
+    splitter.addEventListener("pointermove", move);
+    splitter.addEventListener("pointerup", end);
+    splitter.addEventListener("pointercancel", end);
+  });
+  splitter.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const step = event.shiftKey ? 48 : 16;
+    applyControlsWidth(state.controlsWidth + (event.key === "ArrowRight" ? step : -step));
   });
 
   root.querySelector("#studio-controls")?.addEventListener("submit", (event) => {

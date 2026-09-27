@@ -1,11 +1,28 @@
-import { presetById } from "./studio-presets.ts";
+import { DEFAULT_PRESET_ID, presetById } from "./studio-presets.ts";
 
 export const RADIUS_MIN = 0;
 export const RADIUS_MAX = 120;
 export const RADIUS_DEFAULT = 28;
+export const CARD_MIN = 100;
+export const CARD_MAX = 4000;
+export const FONT_MIN = 5;
+export const FONT_SIDE_MARGIN = 10;
+export const IMAGE_MIN = 100;
+export const IMAGE_MAX = 4000;
+export const CONTROLS_MIN = 240;
+export const CONTROLS_DEFAULT = 360;
+export const PREVIEW_MIN = 280;
+
+export const BUILTIN_FONTS = [
+  { id: "pretendard", label: "Pretendard", stack: '"Pretendard Variable", Pretendard, system-ui, sans-serif' },
+  { id: "roboto", label: "Roboto", stack: "Roboto, system-ui, sans-serif" },
+  { id: "montserrat", label: "Montserrat", stack: "Montserrat, system-ui, sans-serif" },
+] as const;
 
 export type StudioState = {
   presetId: string;
+  cardWidth: number;
+  cardHeight: number;
   title: string;
   body: string;
   themeSlug: string;
@@ -13,6 +30,19 @@ export type StudioState = {
   radius: number;
   code: string;
   panel: "design" | "code";
+  controlsWidth: number;
+  titleSize: number;
+  bodySize: number;
+  titleX: number;
+  titleY: number;
+  bodyX: number;
+  bodyY: number;
+  fontId: string;
+  titleColor: string;
+  bodyColor: string;
+  imageWidth: number;
+  imageX: number;
+  imageY: number;
 };
 
 export type Rgb = { r: number; g: number; b: number };
@@ -23,6 +53,91 @@ const INK_LIGHT = "rgb(255, 255, 255)";
 export function clampRadius(value: number): number {
   if (!Number.isFinite(value)) return RADIUS_MIN;
   return Math.min(RADIUS_MAX, Math.max(RADIUS_MIN, Math.round(value)));
+}
+
+export function clampCardSize(value: number): number {
+  if (!Number.isFinite(value)) return CARD_MIN;
+  return Math.min(CARD_MAX, Math.max(CARD_MIN, Math.round(value)));
+}
+
+/** Largest font that still keeps 10px clear on the left and right of the card. */
+export function maxFontSize(cardWidth: number): number {
+  return Math.max(FONT_MIN, clampCardSize(cardWidth) - FONT_SIDE_MARGIN * 2);
+}
+
+export function clampFontSize(value: number, cardWidth: number): number {
+  const max = maxFontSize(cardWidth);
+  if (!Number.isFinite(value)) return FONT_MIN;
+  return Math.min(max, Math.max(FONT_MIN, Math.round(value)));
+}
+
+export function clampImageWidth(value: number): number {
+  if (!Number.isFinite(value)) return IMAGE_MIN;
+  return Math.min(IMAGE_MAX, Math.max(IMAGE_MIN, Math.round(value)));
+}
+
+export function clampTextOffset(value: number, limit: number, size: number): number {
+  const max = Math.max(0, Math.round(limit) - Math.min(Math.max(size, 0), Math.round(limit)));
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(max, Math.max(0, Math.round(value)));
+}
+
+/** Keep at least 40px of the image on the card so it can slide past the edges. */
+export function clampImageOffset(value: number, card: number, image: number): number {
+  const lo = Math.round(-image + 40);
+  const hi = Math.round(card - 40);
+  if (!Number.isFinite(value)) return 0;
+  if (lo > hi) return Math.round((card - image) / 2);
+  return Math.min(hi, Math.max(lo, Math.round(value)));
+}
+
+export function clampControlsWidth(value: number, studioWidth: number): number {
+  const max = Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - 10);
+  if (!Number.isFinite(value)) return CONTROLS_DEFAULT;
+  return Math.min(max, Math.max(CONTROLS_MIN, Math.round(value)));
+}
+
+export function fontLabelFromPath(path: string): string {
+  const base = path.split(/[/\\]/).pop() ?? path;
+  return base.replace(/\.(woff2|woff|ttf|otf)$/i, "").replace(/[-_]+/g, " ").trim();
+}
+
+export function fontStack(fontId: string, extras: { id: string; stack: string }[] = []): string {
+  const builtin = BUILTIN_FONTS.find((font) => font.id === fontId);
+  if (builtin) return builtin.stack;
+  return extras.find((font) => font.id === fontId)?.stack ?? BUILTIN_FONTS[0].stack;
+}
+
+export function createStudioState(themeSlug: string, color: string): StudioState {
+  const preset = presetById(DEFAULT_PRESET_ID);
+  const titleSize = clampFontSize(Math.round(preset.width * 0.046), preset.width);
+  const bodySize = clampFontSize(Math.round(preset.width * 0.026), preset.width);
+  const titleY = Math.round(preset.height * 0.7);
+  return {
+    presetId: preset.id,
+    cardWidth: preset.width,
+    cardHeight: preset.height,
+    title: "",
+    body: "",
+    themeSlug,
+    color,
+    radius: RADIUS_DEFAULT,
+    code: "",
+    panel: "design",
+    controlsWidth: CONTROLS_DEFAULT,
+    titleSize,
+    bodySize,
+    titleX: clampTextOffset(Math.round(preset.width * 0.06), preset.width, titleSize),
+    titleY: clampTextOffset(titleY, preset.height, titleSize),
+    bodyX: clampTextOffset(Math.round(preset.width * 0.06), preset.width, bodySize),
+    bodyY: clampTextOffset(titleY + Math.round(titleSize * 1.6), preset.height, bodySize),
+    fontId: "pretendard",
+    titleColor: inkHex(color),
+    bodyColor: inkHex(color),
+    imageWidth: clampImageWidth(preset.width),
+    imageX: 0,
+    imageY: 0,
+  };
 }
 
 export function normalizeHex(value: string): string | null {
@@ -70,6 +185,13 @@ function contrastAgainst(ink: Rgb, background: Rgb): number {
   const lighter = Math.max(l1, l2);
   const darker = Math.min(l1, l2);
   return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** Black or white hex for the starting title and body color. */
+export function inkHex(background: string): string {
+  const parsed = parseRgb(pickInk(background));
+  if (!parsed) return rgbToHex(0, 0, 0);
+  return rgbToHex(parsed.r, parsed.g, parsed.b);
 }
 
 /** Black or white, whichever clears 4.5:1. Ties prefer the higher ratio. */
@@ -183,13 +305,12 @@ export function substituteStudioCode(code: string, values: StudioSubstitution): 
 export function designToCode(): string {
   return `<article class="studio-card">
   <img src="{{themeImage}}" alt="" />
-  <div class="studio-card__copy">
-    <h1>{{title}}</h1>
-    <p>{{body}}</p>
-  </div>
+  <h1>{{title}}</h1>
+  <p>{{body}}</p>
 </article>
 <style>
   .studio-card {
+    position: relative;
     box-sizing: border-box;
     width: var(--studio-width);
     height: var(--studio-height);
@@ -197,27 +318,31 @@ export function designToCode(): string {
     overflow: hidden;
     background: var(--studio-color);
     border-radius: var(--studio-radius);
-    font-family: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+    font-family: var(--studio-font);
     color: var(--studio-ink);
   }
   .studio-card img {
-    display: block;
-    width: 100%;
-    height: 72%;
-    object-fit: cover;
+    position: absolute;
+    left: var(--studio-image-x);
+    top: var(--studio-image-y);
+    width: var(--studio-image-width);
+    height: auto;
   }
-  .studio-card__copy { padding: 4% 5% 0; }
   .studio-card h1:empty, .studio-card p:empty { display: none; }
+  .studio-card h1, .studio-card p { position: absolute; margin: 0; line-height: 1.25; }
   .studio-card h1 {
-    margin: 0 0 0.35em;
-    font-size: calc(var(--studio-width) * 0.046);
+    left: var(--studio-title-x);
+    top: var(--studio-title-y);
+    font-size: var(--studio-title-size);
     font-weight: 600;
-    line-height: 1.15;
+    color: var(--studio-title-color);
   }
   .studio-card p {
-    margin: 0;
-    font-size: calc(var(--studio-width) * 0.026);
-    line-height: 1.4;
+    left: var(--studio-body-x);
+    top: var(--studio-body-y);
+    font-size: var(--studio-body-size);
+    font-weight: 400;
+    color: var(--studio-body-color);
   }
 </style>`;
 }
@@ -228,17 +353,51 @@ export type StudioDocumentInput = StudioSubstitution & {
   width: number;
   height: number;
   code: string;
+  fontStack: string;
+  titleSize: number;
+  bodySize: number;
+  titleX: number;
+  titleY: number;
+  bodyX: number;
+  bodyY: number;
+  imageWidth: number;
+  imageX: number;
+  imageY: number;
+  titleColor: string;
+  bodyColor: string;
 };
 
 export function studioFragment(input: StudioDocumentInput): string {
   const color = normalizeHex(input.color) ?? input.color;
   const ink = pickInk(color);
+  const titleColor = normalizeHex(input.titleColor) ?? inkHex(color);
+  const bodyColor = normalizeHex(input.bodyColor) ?? inkHex(color);
   const radius = clampRadius(input.radius);
   const preset = presetById("ig-feed-square");
   const width = input.width > 0 ? input.width : preset.width;
   const height = input.height > 0 ? input.height : preset.height;
+  const font = input.fontStack.replaceAll(";", "");
   const body = substituteStudioCode(input.code.trim() || designToCode(), input);
-  return `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;margin:0;background:transparent;--studio-color:${color};--studio-ink:${ink};--studio-radius:${radius}px;--studio-width:${width}px;--studio-height:${height}px">${body}</div>`;
+  const vars = [
+    `--studio-color:${color}`,
+    `--studio-ink:${ink}`,
+    `--studio-radius:${radius}px`,
+    `--studio-width:${width}px`,
+    `--studio-height:${height}px`,
+    `--studio-font:${font}`,
+    `--studio-title-size:${clampFontSize(input.titleSize, width)}px`,
+    `--studio-body-size:${clampFontSize(input.bodySize, width)}px`,
+    `--studio-title-x:${Math.round(input.titleX)}px`,
+    `--studio-title-y:${Math.round(input.titleY)}px`,
+    `--studio-body-x:${Math.round(input.bodyX)}px`,
+    `--studio-body-y:${Math.round(input.bodyY)}px`,
+    `--studio-image-width:${clampImageWidth(input.imageWidth)}px`,
+    `--studio-image-x:${Math.round(input.imageX)}px`,
+    `--studio-image-y:${Math.round(input.imageY)}px`,
+    `--studio-title-color:${titleColor}`,
+    `--studio-body-color:${bodyColor}`,
+  ].join(";");
+  return `<div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;margin:0;background:transparent;${vars}">${body}</div>`;
 }
 
 export function studioSrcdoc(input: StudioDocumentInput): string {
@@ -247,6 +406,8 @@ export function studioSrcdoc(input: StudioDocumentInput): string {
 <html>
 <head>
 <meta charset="utf-8" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Roboto:wght@400;600&display=swap" />
 <style>
   html, body { margin: 0; width: 100%; height: 100%; background: transparent; }
 </style>
