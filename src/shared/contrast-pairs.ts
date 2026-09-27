@@ -193,4 +193,20 @@ export const CONTRAST_PAIRS: ContrastPair[] = [
     mode: "dark",
     note: "Link text (soft) on dark canvas",
   },
+  {
+    id: "studio-ink-dark-on-light",
+    foreground: "--studio-ink-dark",
+    background: "--studio-ink-light",
+    criterion: "body",
+    mode: "any",
+    note: "Studio card ink candidate: black on white",
+  },
+  {
+    id: "studio-ink-light-on-dark",
+    foreground: "--studio-ink-light",
+    background: "--studio-ink-dark",
+    criterion: "body",
+    mode: "any",
+    note: "Studio card ink candidate: white on black",
+  },
 ];

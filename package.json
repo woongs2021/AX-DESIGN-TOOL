@@ -15,6 +15,7 @@
     "validate": "tsx scripts/validate.ts",
     "test:filter": "tsx scripts/test-filter.ts",
     "test:phase4": "tsx scripts/test-phase4.ts",
+    "test:studio": "tsx scripts/test-studio.ts",
     "report": "tsx scripts/build-index.ts --target=internal",
     "build:site": "tsx scripts/build-site.ts",
     "audit": "tsx scripts/audit.ts",

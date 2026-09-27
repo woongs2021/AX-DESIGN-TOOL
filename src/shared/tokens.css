@@ -30,6 +30,8 @@ html[data-theme="cool"] {
   --on-deep: #fcfcff;
   --on-mid: #fcfcff;
   --on-warning: #fcfcff;
+  --studio-ink-dark: #000000;
+  --studio-ink-light: #ffffff;
 }
 
 html[data-mode="light"],

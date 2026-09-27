@@ -1,21 +1,26 @@
 import "./shared/tokens.css";
 import "./styles/base.css";
-import { computeFacetCounts, type FilterState } from "./shared/filter.ts";
+import type { FilterState } from "./shared/filter.ts";
 import type { SiteIndex } from "./shared/index-types.ts";
-import { analyzeLocalFile } from "./local-intake.ts";
+import {
+  normalizeHex,
+  parseRgb,
+  RADIUS_DEFAULT,
+  rgbToHex,
+  type StudioState,
+} from "./shared/studio.ts";
+import { DEFAULT_PRESET_ID } from "./shared/studio-presets.ts";
 import { readPins, togglePin } from "./pins.ts";
-import { hrefFor, onRouteChange, parseHash, type Route } from "./router.ts";
+import { hrefFor, isLegacyStudioHash, onRouteChange, parseHash, type Route } from "./router.ts";
 import {
   bindArchive,
   renderArchive,
   type ArchiveTab,
 } from "./views/archive.ts";
 import { bindCaptureDetail, renderCaptureDetail } from "./views/capture.ts";
-import { renderDesignSystem } from "./views/design-system.ts";
 import { renderHistory } from "./views/history.ts";
-import { bindIntake, renderIntake } from "./views/intake.ts";
 import { renderNotFound } from "./views/placeholders.ts";
-import { renderStats } from "./views/stats.ts";
+import { bindStudio, renderStudio } from "./views/studio.ts";
 
 const MODE_KEY = "design-llm-wiki-mode";
 const DATA_URL = "./data/index.json";
@@ -37,8 +42,8 @@ let filters: FilterState = {
 };
 let pinnedSlugs = readPins();
 let archiveTab: ArchiveTab = "all";
-let localCaptures: SiteIndex["captures"] = [];
-let intakeStatus = "";
+let studioState: StudioState | null = null;
+let appliedTheme: string | null = null;
 let route: Route = parseHash();
 
 function readStoredMode(): Mode {
@@ -71,17 +76,47 @@ function modeToggleIcon(mode: Mode): string {
   `;
 }
 
+function defaultStudioColor(): string {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--soft").trim();
+  const parsed = parseRgb(raw);
+  if (parsed) return rgbToHex(parsed.r, parsed.g, parsed.b);
+  const fallback = normalizeHex(raw);
+  return fallback ?? rgbToHex(216, 241, 255);
+}
+
+function ensureStudio(theme: string | null, captures: SiteIndex["captures"]): StudioState {
+  const valid = theme && captures.some((capture) => capture.slug === theme) ? theme : null;
+  if (!studioState) {
+    studioState = {
+      presetId: DEFAULT_PRESET_ID,
+      title: "",
+      body: "",
+      themeSlug: valid ?? captures[0]?.slug ?? "",
+      color: defaultStudioColor(),
+      radius: RADIUS_DEFAULT,
+      code: "",
+      panel: "design",
+    };
+    appliedTheme = theme;
+    return studioState;
+  }
+  if (theme && theme !== appliedTheme && valid) {
+    studioState.themeSlug = valid;
+    appliedTheme = theme;
+  }
+  return studioState;
+}
+
 function shell(mainHtml: string): string {
   const mode = readStoredMode();
   const nextModeLabel = mode === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환";
+  const studio = route.name === "studio";
   return `
     <header class="top-nav">
       <a class="wordmark" href="#/">AX Design Studio</a>
       <nav class="nav-menu" aria-label="Primary">
         ${navLink("Archive", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
-        ${navLink("Intake", hrefFor({ name: "intake" }), route.name === "intake")}
-        ${navLink("Design System", hrefFor({ name: "designSystem" }), route.name === "designSystem")}
-        ${navLink("Stats", hrefFor({ name: "stats" }), route.name === "stats")}
+        ${navLink("Online Marketing Studio", hrefFor({ name: "studio", theme: null }), route.name === "studio")}
         ${navLink("History", hrefFor({ name: "history" }), route.name === "history")}
       </nav>
       <div class="nav-actions">
@@ -90,25 +125,8 @@ function shell(mainHtml: string): string {
         </button>
       </div>
     </header>
-    <main class="shell" id="main">${mainHtml}</main>
+    <main class="shell${studio ? " shell--studio" : ""}" id="main">${mainHtml}</main>
   `;
-}
-
-function withLocalCaptures(index: SiteIndex): SiteIndex {
-  const captures = [...localCaptures, ...index.captures];
-  return {
-    ...index,
-    target: localCaptures.length > 0 ? `${index.target}+local` : index.target,
-    captures,
-    facets: computeFacetCounts(captures, {
-      query: "",
-      platforms: [],
-      screenTypes: [],
-      uiPatterns: [],
-      tags: [],
-      tones: [],
-    }),
-  };
 }
 
 function renderMain(): string {
@@ -130,22 +148,14 @@ function renderMain(): string {
     `;
   }
 
-  const index = withLocalCaptures(loadState.index);
+  const index = loadState.index;
   switch (route.name) {
     case "archive":
       return renderArchive(index, filters, pinnedSlugs, archiveTab);
     case "capture":
-      return renderCaptureDetail(
-        index,
-        route.slug,
-        pinnedSlugs,
-      );
-    case "stats":
-      return renderStats(index);
-    case "designSystem":
-      return renderDesignSystem(index, filters, archiveTab, pinnedSlugs);
-    case "intake":
-      return renderIntake(intakeStatus);
+      return renderCaptureDetail(index, route.slug, pinnedSlugs);
+    case "studio":
+      return renderStudio(ensureStudio(route.theme, index.captures), index.captures);
     case "history":
       return renderHistory(index);
     case "notfound":
@@ -205,40 +215,14 @@ function render(): void {
   }
 
   if (route.name === "capture") {
-    bindCaptureDetail(
-      app,
-      (slug) => {
-        pinnedSlugs = togglePin(slug);
-        render();
-      },
-    );
+    bindCaptureDetail(app, (slug) => {
+      pinnedSlugs = togglePin(slug);
+      render();
+    });
   }
 
-  if (route.name === "intake") {
-    bindIntake(app, {
-      onAnalyzeFiles: (files) => {
-        void (async () => {
-          intakeStatus = `${files.length}개 파일 분석 중...`;
-          render();
-          try {
-            const captures = await Promise.all(files.map(analyzeLocalFile));
-            localCaptures = [...captures, ...localCaptures];
-            pinnedSlugs = captures.reduce((pins, capture) => {
-              if (pins.includes(capture.slug)) return pins;
-              return togglePin(capture.slug);
-            }, pinnedSlugs);
-            intakeStatus = `${captures.length}개 카드가 Archive에 추가되었습니다.`;
-            window.location.hash = hrefFor({ name: "archive" }).replace(/^#/, "");
-            route = { name: "archive" };
-            render();
-          } catch (error) {
-            intakeStatus =
-              error instanceof Error ? error.message : String(error);
-            render();
-          }
-        })();
-      },
-    });
+  if (route.name === "studio" && loadState.status === "ready" && studioState) {
+    bindStudio(app, studioState, loadState.index.captures);
   }
 }
 
@@ -265,6 +249,10 @@ async function loadIndex(): Promise<void> {
 }
 
 onRouteChange((next) => {
+  if (isLegacyStudioHash(window.location.hash)) {
+    window.location.replace(hrefFor({ name: "studio", theme: null }));
+    return;
+  }
   route = next;
   render();
 });

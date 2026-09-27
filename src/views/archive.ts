@@ -209,7 +209,7 @@ export function renderArchive(
     return `
       <section class="state-panel state-panel--soft" aria-live="polite">
         <h1 class="state-panel__title">Archive is empty</h1>
-        <p class="state-panel__text">이 번들에 캡처가 없습니다. <a href="#/intake">Intake</a>에서 넣는 방법을 확인하세요.</p>
+        <p class="state-panel__text">이 번들에 캡처가 없습니다.</p>
       </section>
     `;
   }

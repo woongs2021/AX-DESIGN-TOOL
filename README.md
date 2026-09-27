@@ -4,14 +4,14 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 0 완료, Phase 1 계획 단계**. 지금 배포된 UI는 Archive / Intake / Design System / Stats / History 네비를 갖고 있고, Phase 1에서 Archive / Online Marketing Studio / History로 바뀐다.
+현재 상태: **Phase 1 Online Marketing Studio 구현**. 네비는 **Archive / Online Marketing Studio / History**. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
 | Phase | 목표 | 상태 | 문서 |
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
-| 1 Online Marketing Studio | 16개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 계획 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
+| 1 Online Marketing Studio | 16개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
 
 ## Phase 1 — Online Marketing Studio 계획 요약
 

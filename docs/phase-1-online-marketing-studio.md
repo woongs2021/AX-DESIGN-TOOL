@@ -4,7 +4,7 @@
 
 참조 결정: `D-01`, `D-03`, `D-04`, `D-11`, `D-12`, `D-14` / 기반: [Phase 0 Archive Foundation](phase-0-foundation.md)
 
-> 상태: **계획. 아직 구현하지 않았다.**
+> 상태: **구현됨** (`src/views/studio.ts`, `src/shared/studio.ts`, `src/shared/studio-presets.ts`). 코드 영역은 HTML + CSS 조각이다.
 
 ## 범위
 
