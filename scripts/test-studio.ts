@@ -16,6 +16,7 @@ import {
   maxFontSize,
   pickInk,
   sanitizeStudioCode,
+  scaleImageAround,
   substituteStudioCode,
   wrapText,
 } from "../src/shared/studio.ts";
@@ -46,6 +47,9 @@ assert.equal(clampCardSize(9000), 4000);
 assert.equal(clampImageWidth(10), 100);
 assert.equal(clampImageWidth(4001), 4000);
 assert.equal(maxFontSize(1080), 1060);
+assert.deepEqual(scaleImageAround({ x: 0, y: 0, width: 1000 }, 500, 0, 0), { x: 0, y: 0, width: 500 });
+assert.deepEqual(scaleImageAround({ x: 0, y: 0, width: 1000 }, 500, 1000, 400), { x: 500, y: 200, width: 500 });
+assert.deepEqual(scaleImageAround({ x: 100, y: 100, width: 200 }, 50, 200, 200), { x: 150, y: 150, width: 100 });
 assert.equal(maxFontSize(100), 80);
 assert.equal(clampFontSize(4, 1080), 5);
 assert.equal(clampFontSize(2000, 1080), 1060);

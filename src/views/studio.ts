@@ -26,6 +26,7 @@ import {
   RADIUS_MAX,
   RADIUS_MIN,
   scaleCardSize,
+  scaleImageAround,
   studioFragment,
   studioSrcdoc,
   wrapText,
@@ -45,6 +46,43 @@ let undoZoom: number[] = [];
 let redoZoom: number[] = [];
 let gesture: StudioState | null = null;
 let gestureZoom = 1;
+
+type Device = "mobile" | "tablet" | "desktop";
+const DEVICES: { id: Device; label: string; icon: string }[] = [
+  {
+    id: "mobile",
+    label: "모바일 뷰",
+    icon: `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2.5h8a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5Z"/><path d="M11 18.5h2"/></svg>`,
+  },
+  {
+    id: "tablet",
+    label: "타블렛 뷰",
+    icon: `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 2.5h13A1.5 1.5 0 0 1 20 4v16a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20V4a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M10.5 18.5h3"/></svg>`,
+  },
+  {
+    id: "desktop",
+    label: "데스크탑 뷰",
+    icon: `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 4h17A1.5 1.5 0 0 1 22 5.5v10a1.5 1.5 0 0 1-1.5 1.5h-17A1.5 1.5 0 0 1 2 15.5v-10A1.5 1.5 0 0 1 3.5 4Z"/><path d="M8.5 21h7M12 17v4"/></svg>`,
+  },
+];
+const TABLET_QUERY = "(min-width: 768px)";
+const DESKTOP_QUERY = "(min-width: 1025px)";
+let studioDevice: Device | null = null;
+let stopDeviceWatch: (() => void) | null = null;
+
+function largestDevice(): Device {
+  if (window.matchMedia(DESKTOP_QUERY).matches) return "desktop";
+  if (window.matchMedia(TABLET_QUERY).matches) return "tablet";
+  return "mobile";
+}
+
+/** The chosen device, stepped down when the window is too narrow to show it. */
+function activeDevice(): Device {
+  const order: Device[] = ["mobile", "tablet", "desktop"];
+  const max = largestDevice();
+  if (!studioDevice) return max;
+  return order.indexOf(studioDevice) <= order.indexOf(max) ? studioDevice : max;
+}
 
 function cloneStudio(state: StudioState): StudioState {
   return { ...state };
@@ -178,6 +216,7 @@ function drawCard(
   canvas: HTMLCanvasElement,
   state: StudioState,
   image: HTMLImageElement | null,
+  hidden?: HitBox["kind"],
 ): HitBox[] {
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
@@ -220,7 +259,7 @@ function drawCard(
     const lineHeight = Math.round(size * 1.25);
     let widest = 0;
     lines.forEach((line, index) => {
-      ctx.fillText(line, x, y + index * lineHeight);
+      if (kind !== hidden) ctx.fillText(line, x, y + index * lineHeight);
       widest = Math.max(widest, ctx.measureText(line).width);
     });
     hits.push({ kind, x, y, w: Math.max(widest, size), h: Math.max(lines.length, 1) * lineHeight });
@@ -269,6 +308,31 @@ async function paintForeignObject(
 }
 
 let previewObserver: ResizeObserver | null = null;
+
+/** A scrollbar that floats over the content and shows only while scrolling. Returns its re-place function. */
+function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLElement): () => void {
+  let hideTimer = 0;
+  const place = () => {
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    if (max <= 1) {
+      thumb.hidden = true;
+      return;
+    }
+    thumb.hidden = false;
+    const thumbHeight = Math.max(32, (scroller.clientHeight / scroller.scrollHeight) * scroller.clientHeight);
+    const travel = Math.max(0, scroller.clientHeight - thumbHeight);
+    thumb.style.height = `${thumbHeight}px`;
+    thumb.style.transform = `translateY(${(scroller.scrollTop / max) * travel}px)`;
+  };
+  scroller.addEventListener("scroll", () => {
+    place();
+    host.classList.add("is-scrolling");
+    window.clearTimeout(hideTimer);
+    hideTimer = window.setTimeout(() => host.classList.remove("is-scrolling"), 700);
+  });
+  place();
+  return place;
+}
 
 export function renderStudio(state: StudioState, captures: CaptureRecord[]): string {
   if (captures.length === 0) {
@@ -322,7 +386,17 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
   const undoIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
   const redoIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>`;
 
+  const device = activeDevice();
+  const deviceButtons = DEVICES.map(
+    (item) =>
+      `<button type="button" class="studio__zoom-btn studio-devices__btn" data-device="${item.id}" aria-label="${item.label}" title="${item.label}" aria-pressed="${item.id === device ? "true" : "false"}">${item.icon}</button>`,
+  ).join("");
+
   return `
+    <div class="studio-view">
+    <div class="studio-devices" role="group" aria-label="디바이스 뷰">${deviceButtons}</div>
+    <div class="studio-device-frame">
+    <div class="studio-device" id="studio-device" data-device="${device}" data-framed="${device === largestDevice() ? "false" : "true"}">
     <section class="studio" style="--studio-controls-width:${state.controlsWidth}px">
       <div class="studio__controls-wrap">
       <form class="studio__controls" id="studio-controls">
@@ -401,7 +475,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-body-font">본문 폰트</label>
             <select id="studio-body-font" class="studio__control">${fontOptions(state.bodyFontId)}</select>
           </div>
-          <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮길 수 있습니다.</p>
+          <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮기고, 더블 클릭(탭)해 바로 수정할 수 있습니다.</p>
           <div class="studio__field">
             <span id="studio-theme-label">아카이브 테마</span>
             <div class="studio__themes" role="radiogroup" aria-labelledby="studio-theme-label">${themes}</div>
@@ -413,7 +487,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <input id="studio-image-width-number" class="studio__control studio__control--number" type="number" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${state.imageWidth}" aria-label="카드 이미지 크기 수치" />
             </div>
           </div>
-          <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮길 수 있습니다.</p>
+          <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮기고, 핀치하거나 클릭 후 가장자리 핸들을 끌어 크기를 조절할 수 있습니다.</p>
           <div class="studio__field">
             <label for="studio-color">카드 컬러</label>
             <div class="studio__color">
@@ -453,6 +527,14 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
                 <iframe id="studio-iframe" title="카드 코드 프리뷰" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
                 <div class="studio__safe" id="studio-safe" hidden></div>
               </div>
+              <div class="studio__overlay">
+                <div class="studio__image-frame" id="studio-image-frame" hidden></div>
+                <span class="studio__handle" data-handle="top" hidden></span>
+                <span class="studio__handle" data-handle="right" hidden></span>
+                <span class="studio__handle" data-handle="bottom" hidden></span>
+                <span class="studio__handle" data-handle="left" hidden></span>
+                <textarea class="studio__editor" id="studio-editor" rows="1" spellcheck="false" aria-label="텍스트 편집" hidden></textarea>
+              </div>
             </div>
           </div>
         </div>
@@ -474,6 +556,10 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
         </div>
       </div>
     </section>
+    </div>
+    <div class="studio__scroll-thumb studio-device__thumb" id="studio-device-thumb" hidden></div>
+    </div>
+    </div>
   `;
 }
 
@@ -527,7 +613,12 @@ export function bindStudio(
   const exportCode = root.querySelector<HTMLElement>("#studio-export");
   const splitter = root.querySelector<HTMLElement>("#studio-splitter");
   const studio = root.querySelector<HTMLElement>(".studio");
+  const imageFrame = root.querySelector<HTMLElement>("#studio-image-frame");
+  const editor = root.querySelector<HTMLTextAreaElement>("#studio-editor");
+  const handles = [...root.querySelectorAll<HTMLElement>(".studio__handle")];
   if (
+    !imageFrame ||
+    !editor ||
     !presetSelect ||
     !sizeRange ||
     !sizeNumber ||
@@ -581,6 +672,11 @@ export function bindStudio(
   };
 
   let drawToken = 0;
+  let viewScale = 1;
+  let imageSelected = false;
+  let editing: { kind: "title" | "body"; original: string } | null = null;
+  let paint = () => {};
+  let syncOverlay = () => {};
 
   const syncZoom = () => {
     if (!Number.isFinite(previewZoom) || previewZoom <= 0) previewZoom = 1;
@@ -608,6 +704,8 @@ export function bindStudio(
     scaler.style.width = `${state.cardWidth}px`;
     scaler.style.height = `${state.cardHeight}px`;
     scaler.style.transform = `scale(${safeScale})`;
+    viewScale = safeScale;
+    syncOverlay();
   };
 
   zoomOut.addEventListener("click", () => {
@@ -625,27 +723,7 @@ export function bindStudio(
   });
 
   const controls = root.querySelector<HTMLElement>("#studio-controls");
-  let hideScrollbar = 0;
-  const placeThumb = () => {
-    if (!controls) return;
-    const max = controls.scrollHeight - controls.clientHeight;
-    if (max <= 1) {
-      scrollThumb.hidden = true;
-      return;
-    }
-    scrollThumb.hidden = false;
-    const thumbHeight = Math.max(32, (controls.clientHeight / controls.scrollHeight) * controls.clientHeight);
-    const travel = Math.max(0, controls.clientHeight - thumbHeight);
-    scrollThumb.style.height = `${thumbHeight}px`;
-    scrollThumb.style.transform = `translateY(${(controls.scrollTop / max) * travel}px)`;
-  };
-  controls?.addEventListener("scroll", () => {
-    placeThumb();
-    controlsWrap.classList.add("is-scrolling");
-    window.clearTimeout(hideScrollbar);
-    hideScrollbar = window.setTimeout(() => controlsWrap.classList.remove("is-scrolling"), 700);
-  });
-  placeThumb();
+  if (controls) overlayScrollbar(controls, scrollThumb, controlsWrap);
 
   const syncHistoryButtons = () => {
     const undo = document.querySelector<HTMLButtonElement>("#studio-undo");
@@ -835,6 +913,7 @@ export function bindStudio(
       const themeData = url ? await themeDataUrl(url) : "";
       if (token !== drawToken) return;
       iframe.srcdoc = studioSrcdoc(documentInput(state, themeData));
+      syncOverlay();
       return;
     }
 
@@ -854,7 +933,7 @@ export function bindStudio(
     }
     if (token !== drawToken) return;
     clampLayout();
-    hits = drawCard(canvas, state, themeImage);
+    paint();
   };
 
   const bindPair = (
@@ -1147,7 +1226,7 @@ export function bindStudio(
     })();
   });
 
-  const cardPoint = (event: PointerEvent) => {
+  const cardPoint = (event: { clientX: number; clientY: number }) => {
     const rect = canvas.getBoundingClientRect();
     return {
       x: rect.width > 0 ? ((event.clientX - rect.left) / rect.width) * state.cardWidth : 0,
@@ -1189,11 +1268,209 @@ export function bindStudio(
     if (box) strokeDragBox(box);
   };
 
+  type ImageBox = { x: number; y: number; width: number };
   let drag: { kind: HitBox["kind"]; dx: number; dy: number; pointerId: number } | null = null;
+  let tapStart: { x: number; y: number; moved: boolean } | null = null;
+  let lastTap: { kind: HitBox["kind"]; time: number; x: number; y: number } | null = null;
+  const touches = new Map<number, { x: number; y: number }>();
+  let pinch: { distance: number; mid: { x: number; y: number }; image: ImageBox } | null = null;
+
+  const imageBox = (): ImageBox => ({ x: state.imageX, y: state.imageY, width: state.imageWidth });
+  const applyImage = (next: ImageBox) => {
+    state.imageWidth = next.width;
+    state.imageX = clampImageOffset(next.x, state.cardWidth, state.imageWidth);
+    state.imageY = clampImageOffset(next.y, state.cardHeight, imageDrawHeight());
+  };
+  paint = () => {
+    hits = drawCard(canvas, state, themeImage, editing?.kind);
+    paintDragStroke();
+    syncOverlay();
+  };
+
+  const placeAt = (element: HTMLElement, x: number, y: number) => {
+    element.style.left = `${x * viewScale}px`;
+    element.style.top = `${y * viewScale}px`;
+  };
+  const placeEditor = () => {
+    if (!editing) return;
+    const title = editing.kind === "title";
+    const size = title ? state.titleSize : state.bodySize;
+    const fontPx = size * viewScale;
+    // iOS zooms the page when a focused field is under 16px, so render at 16px+ and scale down.
+    const base = Math.max(16, fontPx);
+    const shrink = fontPx / base;
+    placeAt(editor, title ? state.titleX : state.bodyX, title ? state.titleY : state.bodyY);
+    editor.style.font = `${title ? 600 : 400} ${base}px ${fontStack(title ? state.titleFontId : state.bodyFontId, extraFonts())}`;
+    editor.style.lineHeight = `${(Math.round(size * 1.25) * viewScale) / shrink}px`;
+    editor.style.color = title ? state.titleColor : state.bodyColor;
+    editor.style.width = `${(Math.max(1, state.cardWidth - FONT_SIDE_MARGIN * 2) * viewScale) / shrink}px`;
+    editor.style.transform = `scale(${shrink})`;
+    editor.style.height = "auto";
+    editor.style.height = `${editor.scrollHeight}px`;
+  };
+  syncOverlay = () => {
+    const box = hits.find((hit) => hit.kind === "image");
+    const show = imageSelected && !editing && !state.code.trim() && Boolean(box);
+    imageFrame.hidden = !show;
+    for (const handle of handles) handle.hidden = !show;
+    if (show && box) {
+      placeAt(imageFrame, box.x, box.y);
+      imageFrame.style.width = `${box.w * viewScale}px`;
+      imageFrame.style.height = `${box.h * viewScale}px`;
+      const inset = 12 / Math.max(viewScale, 0.001);
+      const clampX = (value: number) => Math.min(state.cardWidth - inset, Math.max(inset, value));
+      const clampY = (value: number) => Math.min(state.cardHeight - inset, Math.max(inset, value));
+      const cx = clampX(box.x + box.w / 2);
+      const cy = clampY(box.y + box.h / 2);
+      for (const handle of handles) {
+        const edge = handle.dataset.handle;
+        if (edge === "top") placeAt(handle, cx, clampY(box.y));
+        else if (edge === "bottom") placeAt(handle, cx, clampY(box.y + box.h));
+        else if (edge === "left") placeAt(handle, clampX(box.x), cy);
+        else placeAt(handle, clampX(box.x + box.w), cy);
+      }
+    }
+    placeEditor();
+  };
+
+  for (const handle of handles) {
+    handle.addEventListener("pointerdown", (event) => {
+      const box = hits.find((hit) => hit.kind === "image");
+      if (!box) return;
+      event.preventDefault();
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+      beginGesture(handle);
+      const edge = handle.dataset.handle;
+      const start = imageBox();
+      const anchor =
+        edge === "right" ? { x: box.x, y: box.y + box.h / 2 }
+        : edge === "left" ? { x: box.x + box.w, y: box.y + box.h / 2 }
+        : edge === "bottom" ? { x: box.x + box.w / 2, y: box.y }
+        : { x: box.x + box.w / 2, y: box.y + box.h };
+      const origin = cardPoint(event);
+      const move = (ev: PointerEvent) => {
+        if (ev.pointerId !== event.pointerId) return;
+        const point = cardPoint(ev);
+        const dx = point.x - origin.x;
+        const dy = point.y - origin.y;
+        const width =
+          edge === "right" ? box.w + dx
+          : edge === "left" ? box.w - dx
+          : edge === "bottom" ? (box.h + dy) / imageAspect
+          : (box.h - dy) / imageAspect;
+        applyImage(scaleImageAround(start, width, anchor.x, anchor.y));
+        paint();
+      };
+      const end = (ev: PointerEvent) => {
+        if (ev.pointerId !== event.pointerId) return;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", end);
+        handle.removeEventListener("pointercancel", end);
+        finishGesture(handle);
+        void redraw();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", end);
+      handle.addEventListener("pointercancel", end);
+    });
+  }
+
+  const openEditor = (kind: "title" | "body") => {
+    if (state.code.trim()) return;
+    editing = { kind, original: state[kind] };
+    imageSelected = false;
+    beginGesture(editor);
+    editor.value = state[kind];
+    editor.hidden = false;
+    paint();
+    editor.focus();
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+  };
+  const closeEditor = (commit: boolean) => {
+    if (!editing) return;
+    if (!commit) state[editing.kind] = editing.original;
+    editing = null;
+    editor.hidden = true;
+    paint();
+    finishGesture(editor);
+    void redraw();
+  };
+  editor.addEventListener("input", () => {
+    if (!editing) return;
+    state[editing.kind] = editing.kind === "title" ? editor.value.replace(/\n/g, " ") : editor.value;
+    paint();
+    syncForm();
+  });
+  editor.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeEditor(false);
+    } else if (event.key === "Enter" && (editing?.kind === "title" || event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      closeEditor(true);
+    }
+  });
+  editor.addEventListener("blur", () => closeEditor(true));
+
+  const registerTap = (kind: HitBox["kind"], event: PointerEvent) => {
+    const repeat =
+      lastTap &&
+      lastTap.kind === kind &&
+      event.timeStamp - lastTap.time < 400 &&
+      Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) < 24;
+    if (repeat && kind !== "image") {
+      lastTap = null;
+      openEditor(kind);
+      return;
+    }
+    lastTap = { kind, time: event.timeStamp, x: event.clientX, y: event.clientY };
+  };
+
+  const pinchMetrics = () => {
+    const [a, b] = [...touches.values()];
+    if (!a || !b) return null;
+    return {
+      distance: Math.hypot(b.x - a.x, b.y - a.y),
+      mid: cardPoint({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 }),
+    };
+  };
+  const startPinch = () => {
+    const metrics = pinchMetrics();
+    if (!metrics) return;
+    drag = null;
+    tapStart = null;
+    delete canvas.dataset.dragging;
+    beginGesture(canvas);
+    pinch = { ...metrics, image: imageBox() };
+    paint();
+  };
+
   canvas.addEventListener("pointerdown", (event) => {
     if (state.code.trim()) return;
+    if (editing) closeEditor(true);
+    if (event.pointerType === "touch") {
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+      if (touches.size === 2 && themeImage) {
+        startPinch();
+        return;
+      }
+      if (touches.size > 1) return;
+    }
     const point = cardPoint(event);
     const hit = hitAt(point.x, point.y);
+    imageSelected = event.pointerType === "mouse" && hit?.kind === "image";
+    tapStart = hit ? { x: event.clientX, y: event.clientY, moved: false } : null;
+    syncOverlay();
     if (!hit) return;
     try {
       canvas.setPointerCapture(event.pointerId);
@@ -1206,6 +1483,21 @@ export function bindStudio(
     paintDragStroke();
   });
   canvas.addEventListener("pointermove", (event) => {
+    if (touches.has(event.pointerId)) touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinch) {
+      const metrics = touches.has(event.pointerId) ? pinchMetrics() : null;
+      if (!metrics) return;
+      const factor = metrics.distance / Math.max(1, pinch.distance);
+      const scaled = scaleImageAround(pinch.image, pinch.image.width * factor, pinch.mid.x, pinch.mid.y);
+      applyImage({
+        x: scaled.x + metrics.mid.x - pinch.mid.x,
+        y: scaled.y + metrics.mid.y - pinch.mid.y,
+        width: scaled.width,
+      });
+      paint();
+      return;
+    }
+    if (tapStart && Math.hypot(event.clientX - tapStart.x, event.clientY - tapStart.y) > 6) tapStart.moved = true;
     const point = cardPoint(event);
     if (!drag || drag.pointerId !== event.pointerId) {
       canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
@@ -1223,18 +1515,81 @@ export function bindStudio(
       state.imageX = clampImageOffset(x, state.cardWidth, state.imageWidth);
       state.imageY = clampImageOffset(y, state.cardHeight, imageDrawHeight());
     }
-    hits = drawCard(canvas, state, themeImage);
-    paintDragStroke();
+    paint();
   });
   const endDrag = (event: PointerEvent) => {
+    touches.delete(event.pointerId);
+    if (pinch) {
+      if (touches.size < 2) {
+        pinch = null;
+        finishGesture(canvas);
+        void redraw();
+      }
+      return;
+    }
     if (!drag || drag.pointerId !== event.pointerId) return;
+    const kind = drag.kind;
     drag = null;
     delete canvas.dataset.dragging;
     finishGesture(canvas);
-    hits = drawCard(canvas, state, themeImage);
+    paint();
+    if (event.type === "pointerup" && tapStart && !tapStart.moved) registerTap(kind, event);
+    tapStart = null;
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
+
+  const wheelOwner = new EventTarget();
+  let wheelTimer = 0;
+  canvas.addEventListener(
+    "wheel",
+    (event) => {
+      // Trackpad pinch arrives as a ctrl+wheel event in Chromium and Firefox.
+      if (!event.ctrlKey || state.code.trim() || !themeImage) return;
+      event.preventDefault();
+      beginGesture(wheelOwner);
+      const point = cardPoint(event);
+      applyImage(scaleImageAround(imageBox(), state.imageWidth * Math.exp(-event.deltaY * 0.01), point.x, point.y));
+      paint();
+      window.clearTimeout(wheelTimer);
+      wheelTimer = window.setTimeout(() => {
+        finishGesture(wheelOwner);
+        void redraw();
+      }, 250);
+    },
+    { passive: false },
+  );
+
+  type SafariGesture = Event & { scale: number; clientX: number; clientY: number };
+  const safariOwner = new EventTarget();
+  let safariPinch: { image: ImageBox; anchor: { x: number; y: number } } | null = null;
+  canvas.addEventListener("gesturestart", (event) => {
+    event.preventDefault();
+    if (pinch || state.code.trim() || !themeImage) return;
+    beginGesture(safariOwner);
+    safariPinch = { image: imageBox(), anchor: cardPoint(event as SafariGesture) };
+  });
+  canvas.addEventListener("gesturechange", (event) => {
+    event.preventDefault();
+    if (!safariPinch || pinch) return;
+    const { image, anchor } = safariPinch;
+    applyImage(scaleImageAround(image, image.width * (event as SafariGesture).scale, anchor.x, anchor.y));
+    paint();
+  });
+  canvas.addEventListener("gestureend", (event) => {
+    event.preventDefault();
+    if (!safariPinch) return;
+    safariPinch = null;
+    finishGesture(safariOwner);
+    void redraw();
+  });
+
+  stage.addEventListener("pointerdown", (event) => {
+    if (event.target === canvas || !imageSelected) return;
+    if (event.target instanceof Element && event.target.closest(".studio__handle")) return;
+    imageSelected = false;
+    syncOverlay();
+  });
 
   const applyControlsWidth = (value: number) => {
     const studioWidth = studio.getBoundingClientRect().width;
@@ -1253,8 +1608,39 @@ export function bindStudio(
   };
   applyControlsWidth(state.controlsWidth);
 
+  const deviceBox = root.querySelector<HTMLElement>("#studio-device");
+  const deviceButtons = [...root.querySelectorAll<HTMLButtonElement>(".studio-devices__btn")];
+  const deviceThumb = root.querySelector<HTMLElement>("#studio-device-thumb");
+  const deviceFrame = deviceBox?.parentElement;
+  const placeDeviceThumb =
+    deviceBox && deviceThumb && deviceFrame ? overlayScrollbar(deviceBox, deviceThumb, deviceFrame) : null;
+  const syncDevice = () => {
+    if (!deviceBox) return;
+    const device = activeDevice();
+    deviceBox.dataset.device = device;
+    deviceBox.dataset.framed = device === largestDevice() ? "false" : "true";
+    for (const button of deviceButtons) {
+      button.setAttribute("aria-pressed", button.dataset.device === device ? "true" : "false");
+    }
+    applyControlsWidth(state.controlsWidth);
+    placeDeviceThumb?.();
+  };
+  syncDevice();
+  for (const button of deviceButtons) {
+    button.addEventListener("click", () => {
+      studioDevice = button.dataset.device as Device;
+      syncDevice();
+    });
+  }
+  stopDeviceWatch?.();
+  const deviceQueries = [window.matchMedia(TABLET_QUERY), window.matchMedia(DESKTOP_QUERY)];
+  for (const query of deviceQueries) query.addEventListener("change", syncDevice);
+  stopDeviceWatch = () => {
+    for (const query of deviceQueries) query.removeEventListener("change", syncDevice);
+  };
+
   splitter.addEventListener("pointerdown", (event) => {
-    if (window.matchMedia("(max-width: 767px)").matches) return;
+    if (studio.getBoundingClientRect().width < 768) return;
     try {
       splitter.setPointerCapture(event.pointerId);
     } catch {
