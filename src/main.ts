@@ -99,7 +99,7 @@ function shell(mainHtml: string): string {
     <header class="top-nav">
       <a class="wordmark" href="#/">AX Design Studio</a>
       <nav class="nav-menu" aria-label="Primary">
-        ${navLink("Archive", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
+        ${navLink("Graphic Library", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
         ${navLink("Online Marketing Studio", hrefFor({ name: "studio", theme: null }), route.name === "studio")}
         ${navLink("History", hrefFor({ name: "history" }), route.name === "history")}
       </nav>

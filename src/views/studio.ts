@@ -41,7 +41,10 @@ const HISTORY_LIMIT = 40;
 let previewZoom = 1;
 let undoStack: StudioState[] = [];
 let redoStack: StudioState[] = [];
+let undoZoom: number[] = [];
+let redoZoom: number[] = [];
 let gesture: StudioState | null = null;
+let gestureZoom = 1;
 
 function cloneStudio(state: StudioState): StudioState {
   return { ...state };
@@ -579,20 +582,24 @@ export function bindStudio(
   let drawToken = 0;
 
   const syncZoom = () => {
-    previewZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(previewZoom * 4) / 4));
-    zoomOut.disabled = previewZoom <= ZOOM_MIN;
-    zoomIn.disabled = previewZoom >= ZOOM_MAX;
+    if (!Number.isFinite(previewZoom) || previewZoom <= 0) previewZoom = 1;
+    zoomOut.disabled = previewZoom <= ZOOM_MIN + 0.001;
+    zoomIn.disabled = previewZoom >= ZOOM_MAX - 0.001;
     zoomLabel.textContent = `${Math.round(previewZoom * 100)}%`;
   };
 
-  const updateScale = () => {
+  const fitScaleFor = (cardWidth: number, cardHeight: number) => {
     const bounds = stage.getBoundingClientRect();
     const pad = 48;
     const fitScale = Math.min(
-      Math.max(bounds.width - pad, 1) / state.cardWidth,
-      Math.max(bounds.height - pad, 1) / state.cardHeight,
+      Math.max(bounds.width - pad, 1) / cardWidth,
+      Math.max(bounds.height - pad, 1) / cardHeight,
     );
-    const base = Number.isFinite(fitScale) && fitScale > 0 ? fitScale : 1;
+    return Number.isFinite(fitScale) && fitScale > 0 ? fitScale : 1;
+  };
+
+  const updateScale = () => {
+    const base = fitScaleFor(state.cardWidth, state.cardHeight);
     syncZoom();
     const safeScale = base * previewZoom;
     fit.style.width = `${state.cardWidth * safeScale}px`;
@@ -603,11 +610,11 @@ export function bindStudio(
   };
 
   zoomOut.addEventListener("click", () => {
-    previewZoom -= ZOOM_STEP;
+    previewZoom = Math.max(ZOOM_MIN, previewZoom - ZOOM_STEP);
     updateScale();
   });
   zoomIn.addEventListener("click", () => {
-    previewZoom += ZOOM_STEP;
+    previewZoom = Math.min(ZOOM_MAX, previewZoom + ZOOM_STEP);
     updateScale();
   });
 
@@ -648,18 +655,25 @@ export function bindStudio(
       return;
     }
     const before = gesture;
+    const beforeZoom = gestureZoom;
     gesture = null;
     gestureOwner = null;
-    if (sameStudio(before, state)) return;
+    if (sameStudio(before, state) && beforeZoom === previewZoom) return;
     undoStack.push(before);
-    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    undoZoom.push(beforeZoom);
+    if (undoStack.length > HISTORY_LIMIT) {
+      undoStack.shift();
+      undoZoom.shift();
+    }
     redoStack = [];
+    redoZoom = [];
     syncHistoryButtons();
   };
   const beginGesture = (owner?: EventTarget) => {
     if (owner && gestureOwner === owner && gesture) return;
     finishGesture();
     gesture = cloneStudio(state);
+    gestureZoom = previewZoom;
     gestureOwner = owner ?? null;
   };
   const paintRangeFill = (range: HTMLInputElement) => {
@@ -683,15 +697,7 @@ export function bindStudio(
   const clampLayout = () => {
     state.cardWidth = clampCardSize(state.cardWidth);
     state.cardHeight = clampCardSize(state.cardHeight);
-    state.titleSize = clampFontSize(state.titleSize, state.cardWidth);
-    state.bodySize = clampFontSize(state.bodySize, state.cardWidth);
     state.imageWidth = clampImageWidth(state.imageWidth);
-    state.titleX = clampTextOffset(state.titleX, state.cardWidth, state.titleSize);
-    state.titleY = clampTextOffset(state.titleY, state.cardHeight, state.titleSize);
-    state.bodyX = clampTextOffset(state.bodyX, state.cardWidth, state.bodySize);
-    state.bodyY = clampTextOffset(state.bodyY, state.cardHeight, state.bodySize);
-    state.imageX = clampImageOffset(state.imageX, state.cardWidth, state.imageWidth);
-    state.imageY = clampImageOffset(state.imageY, state.cardHeight, imageDrawHeight());
   };
 
   const writeControl = (range: HTMLInputElement, number: HTMLInputElement, value: number) => {
@@ -700,10 +706,16 @@ export function bindStudio(
   };
 
   const syncSizeControls = () => {
-    const fontMax = String(maxFontSize(state.cardWidth));
-    for (const input of [titleSizeRange, titleSizeNumber, bodySizeRange, bodySizeNumber]) {
+    const fontCap = maxFontSize(state.cardWidth);
+    const titleMax = String(Math.max(fontCap, state.titleSize));
+    const bodyMax = String(Math.max(fontCap, state.bodySize));
+    for (const input of [titleSizeRange, titleSizeNumber]) {
       input.min = "5";
-      input.max = fontMax;
+      input.max = titleMax;
+    }
+    for (const input of [bodySizeRange, bodySizeNumber]) {
+      input.min = "5";
+      input.max = bodyMax;
     }
     writeControl(sizeRange, sizeNumber, state.cardWidth);
     writeControl(widthRange, widthNumber, state.cardWidth);
@@ -881,6 +893,7 @@ export function bindStudio(
   sizeRange.addEventListener("keydown", captureSizeRatio);
   sizeNumber.addEventListener("focus", captureSizeRatio);
   bindPair(sizeRange, sizeNumber, (value) => {
+    const screen = fitScaleFor(state.cardWidth, state.cardHeight) * previewZoom;
     const next = scaleCardSize(
       Math.max(1, state.cardWidth),
       Math.max(1, Math.round(state.cardWidth * sizeRatio)),
@@ -888,18 +901,22 @@ export function bindStudio(
     );
     state.cardWidth = next.cardWidth;
     state.cardHeight = next.cardHeight;
+    const nextFit = fitScaleFor(state.cardWidth, state.cardHeight);
+    if (nextFit > 0 && Number.isFinite(screen) && screen > 0) previewZoom = screen / nextFit;
   }, () => state.cardWidth);
   bindPair(widthRange, widthNumber, (value) => {
-    state.cardWidth = value;
+    state.cardWidth = clampCardSize(value);
+    state.titleSize = clampFontSize(state.titleSize, state.cardWidth);
+    state.bodySize = clampFontSize(state.bodySize, state.cardWidth);
   }, () => state.cardWidth);
   bindPair(heightRange, heightNumber, (value) => {
     state.cardHeight = value;
   }, () => state.cardHeight);
   bindPair(titleSizeRange, titleSizeNumber, (value) => {
-    state.titleSize = value;
+    state.titleSize = clampFontSize(value, state.cardWidth);
   }, () => state.titleSize);
   bindPair(bodySizeRange, bodySizeNumber, (value) => {
-    state.bodySize = value;
+    state.bodySize = clampFontSize(value, state.cardWidth);
   }, () => state.bodySize);
   bindPair(imageRange, imageNumber, (value) => {
     state.imageWidth = value;
@@ -922,11 +939,17 @@ export function bindStudio(
   root.querySelector("#studio-reset")?.addEventListener("click", () => {
     finishGesture();
     const before = cloneStudio(state);
+    const beforeZoom = previewZoom;
     onReset();
-    if (!sameStudio(before, state)) {
+    if (!sameStudio(before, state) || beforeZoom !== previewZoom) {
       undoStack.push(before);
-      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      undoZoom.push(beforeZoom);
+      if (undoStack.length > HISTORY_LIMIT) {
+        undoStack.shift();
+        undoZoom.shift();
+      }
       redoStack = [];
+      redoZoom = [];
     }
     syncHistoryButtons();
   });
@@ -1002,30 +1025,35 @@ export function bindStudio(
   });
   codeInput.addEventListener("blur", () => finishGesture(codeInput));
 
-  const applyHistory = (next: StudioState) => {
+  const applyHistory = (next: StudioState, zoom: number) => {
     Object.assign(state, next);
+    previewZoom = zoom;
     syncHistoryButtons();
     void redraw();
   };
   undoButton.addEventListener("click", () => {
     finishGesture();
     const prev = undoStack.pop();
-    if (!prev) {
+    const zoom = undoZoom.pop();
+    if (!prev || zoom === undefined) {
       syncHistoryButtons();
       return;
     }
     redoStack.push(cloneStudio(state));
-    applyHistory(prev);
+    redoZoom.push(previewZoom);
+    applyHistory(prev, zoom);
   });
   redoButton.addEventListener("click", () => {
     finishGesture();
     const next = redoStack.pop();
-    if (!next) {
+    const zoom = redoZoom.pop();
+    if (!next || zoom === undefined) {
       syncHistoryButtons();
       return;
     }
     undoStack.push(cloneStudio(state));
-    applyHistory(next);
+    undoZoom.push(previewZoom);
+    applyHistory(next, zoom);
   });
   syncHistoryButtons();
 

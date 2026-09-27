@@ -17,7 +17,7 @@
 
 | 현재 | Phase 1 이후 |
 |---|---|
-| Archive / Intake / Design System / Stats / History | **Archive / Online Marketing Studio / History** |
+| Archive / Intake / Design System / Stats / History | **Graphic Library / Online Marketing Studio / History** |
 | `#/intake`, `#/design-system`, `#/stats` | 세 라우트는 `#/studio`로 리다이렉트한다. 예전 북마크가 새 툴로 이어진다. |
 | — | `#/studio` = Online Marketing Studio 진입점 |
 
@@ -59,7 +59,7 @@
 |---|---|---|
 | 카드 크기 | 프리셋 select | SNS 기본 규격을 목록으로 제공하고, 진입 시 `Instagram Feed 1:1`을 자동 선택한다. 프리셋을 바꾸면 너비와 높이를 그 규격으로 맞춘다. |
 | 카드 너비 / 높이 | range 바 + number 입력 | 각각 100~4000px. 바와 수치를 동기화하고, 범위 밖 입력은 경계값으로 맞춘다. 프리셋과 다른 크기로 직접 조절할 수 있다. |
-| 너비·높이 함께 | range 바 + number 입력 | 현재 비율을 유지한 채 너비와 높이를 같이 바꾼다. 한쪽이 100~4000px 한계에 닿으면 다른 쪽도 그 비율에 맞춘다. |
+| 너비·높이 함께 | range 바 + number 입력 | 현재 비율을 유지한 채 카드 프레임만 바꾼다. 폰트 크기·위치와 이미지 크기·위치는 유지하고, 프리뷰에서도 그 화면 크기가 유지된다. 한쪽이 100~4000px 한계에 닿으면 다른 쪽도 그 비율에 맞춘다. |
 | 카드 타이틀 | 한 줄 텍스트 input | 시작값은 `시즌`. 입력 즉시 프리뷰 반영. 빈 값이면 타이틀을 그리지 않는다. 프리뷰에서 드래그해 위치를 옮긴다. |
 | 타이틀 컬러 | 원형 컬러 피커 + hex 입력 | 타이틀 글자색. 시작값은 카드 컬러와 대비 4.5:1을 넘는 흑 또는 백. 원 테두리는 현재 모드의 글자색을 약 30% 투명도로 그린다. |
 | 타이틀 폰트 크기 | range 바 + number 입력 | 최소 5px, 최대는 카드 너비에서 좌우 10px씩 뺀 값(`너비 - 20`). 너비가 줄면 크기도 그 상한으로 맞춘다. |
@@ -128,7 +128,7 @@ flowchart LR
 
 | 작업 | 계획 | 검증 |
 |---|---|---|
-| IA 정리 | 네비를 Archive / Online Marketing Studio / History로 바꾸고 `#/studio` 라우트를 추가한다. `#/intake`·`#/design-system`·`#/stats`는 `#/studio`로 리다이렉트한다. Intake·Design System·Stats 뷰와 CSS를 제거한다. | 상단 네비에 세 탭만 보인다. 예전 세 URL이 스튜디오로 열린다. `npm run audit` 통과. |
+| IA 정리 | 네비를 Graphic Library / Online Marketing Studio / History로 바꾸고 `#/studio` 라우트를 추가한다. `#/intake`·`#/design-system`·`#/stats`는 `#/studio`로 리다이렉트한다. Intake·Design System·Stats 뷰와 CSS를 제거한다. | 상단 네비에 세 탭만 보인다. 예전 세 URL이 스튜디오로 열린다. `npm run audit` 통과. |
 | 레이아웃 셸 | 좌측 컨트롤 패널 + 분할 바 + 우측 프리뷰. 1024px 이상에서 바를 드래그하거나 화살표 키로 너비를 조절한다. 1023px 이하는 세로로 쌓고 바를 숨긴다. | 1440px에서 2단, 분할 드래그가 프리뷰 맞춤을 다시 계산한다. 375px에서 1단이고 바가 없다. |
 | 상태 모델 | `StudioState`에 프리셋, 카드 너비·높이, 타이틀·본문과 각각의 크기·위치, 폰트, 이미지 너비·위치, 테마, 컬러, radius, 코드, 패널, 컨트롤 너비를 둔다. URL 쿼리(`?theme=`)로 테마 초기값을 받는다. | 컨트롤을 바꿀 때마다 프리뷰가 한 번 다시 그려진다. 새로고침하면 기본값으로 돌아온다. |
 | 카드 크기 프리셋 | `studio-presets.ts`에 위 8개 규격을 데이터로 둔다. 기본값 `ig-feed-square`. 너비·높이 바로 100~4000px을 직접 지정할 수 있다. | 진입 시 1080 × 1080이 선택되어 있다. 프리셋은 너비와 높이를 함께 바꾼다. 99는 100, 4001은 4000이 된다. |
@@ -149,7 +149,7 @@ flowchart LR
 
 ## 통과 기준
 
-- 네비는 Archive / Online Marketing Studio / History 세 탭이다.
+- 네비는 Graphic Library / Online Marketing Studio / History 세 탭이다.
 - 스튜디오 진입 시 Instagram Feed 1080 × 1080이 기본으로 선택되어 있고, 8개 SNS 규격으로 바꿀 수 있다. 너비와 높이는 100~4000px 범위에서 바로도 조절된다.
 - 1024px 이상에서 컨트롤 패널과 프리뷰 사이 바를 드래그하면 두 영역의 비율이 바뀐다.
 - 16개 아카이브 작업물 중 하나를 테마로 골라 카드 비주얼에 쓸 수 있다. 이미지 너비와 위치도 조절된다.

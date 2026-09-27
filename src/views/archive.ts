@@ -127,7 +127,8 @@ export function renderArchive(
     <section class="gallery archive">
       <header class="gallery__header archive__header">
         <div>
-          <h1 class="gallery__title">Archive</h1>
+          <h1 class="gallery__title">Graphic Library</h1>
+          <p class="gallery__lede">모든 마케팅 비주얼의 출발점이 되는 그래픽 라이브러리입니다. 브랜드 톤에 맞춰 선별한 에셋을 <span class="gallery__nowrap">형태·색·질감</span> 기준으로 탐색하고, Online Marketing Studio에서 채널별 규격에 맞는 카드로 바로 완성할 수 있습니다.</p>
           <p class="gallery__meta">Target ${escapeHtml(index.target)} · ${filtered.length} · ${pinnedSlugs.length} pinned</p>
         </div>
       </header>

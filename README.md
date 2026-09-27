@@ -4,7 +4,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 1 Online Marketing Studio 구현**. 네비는 **Archive / Online Marketing Studio / History**. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 1 Online Marketing Studio 구현**. 네비는 **Graphic Library / Online Marketing Studio / History**. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -18,7 +18,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 **목표**: 지금 아카이브된 이미지를 기반으로 온라인 마케팅 브랜드 에셋을 제작하는 툴을 만든다. 산출물은 인스타그램, 페이스북, 유튜브 커버, 쇼츠 등 여러 규격으로 만들 수 있다.
 
 **IA 변경**
-- Intake, Design System, Stats 탭을 없애고 **Online Marketing Studio** 한 탭(`#/studio`)으로 정리한다. 네비는 Archive / Online Marketing Studio / History가 된다.
+- Intake, Design System, Stats 탭을 없애고 **Online Marketing Studio** 한 탭(`#/studio`)으로 정리한다. 네비는 Graphic Library / Online Marketing Studio / History가 된다.
 - 예전 `#/intake`, `#/design-system`, `#/stats` 주소는 `#/studio`로 리다이렉트한다.
 - `npm run ingest`, `npm run design-system` CLI는 탭과 별개로 유지한다.
 - 상세 뷰에 `이 테마로 만들기` 링크를 두어 해당 작업물을 테마로 선택한 채 스튜디오로 들어간다.
@@ -31,7 +31,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 컨트롤 | 형태 |
 |---|---|
-| 카드 크기 | SNS 기본 규격 프리셋. 진입 시 Instagram Feed 1080 × 1080 자동 선택. 너비·높이는 바 + 수치로 100~4000px 직접 조절. 둘을 한 번에 조절하는 바도 있다 |
+| 카드 크기 | SNS 기본 규격 프리셋. 진입 시 Instagram Feed 1080 × 1080 자동 선택. 너비·높이는 바 + 수치로 100~4000px 직접 조절. 둘을 한 번에 조절하는 바는 비율을 유지한 채 프레임만 바꾸고, 폰트와 이미지는 그대로 둔다 |
 | 카드 타이틀 / 본문 | 텍스트 input / textarea. 시작값은 `시즌`과 짧은 본문 초안. 입력 즉시 프리뷰 반영. 프리뷰에서 드래그해 위치 이동. 글자색은 각각 원형 컬러 피커(모드에 맞는 30% 테두리) |
 | 폰트 크기 | 타이틀·본문 각각 range 바 + 수치. 최소 5px, 최대는 카드 너비 − 20px |
 | 폰트 | 타이틀·본문 각각 선택. Roboto, Pretendard, Montserrat. `fonts/`에 폰트 파일을 넣고 다시 빌드하면 목록에 추가 |

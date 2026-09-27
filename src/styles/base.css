@@ -272,6 +272,19 @@ code {
   letter-spacing: -0.01em;
 }
 
+.gallery__lede {
+  max-width: 720px;
+  margin: 0 0 12px;
+  color: var(--fg);
+  font-size: 18px;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.gallery__nowrap {
+  white-space: nowrap;
+}
+
 .gallery__meta {
   margin: 0;
   color: var(--fg-muted);
