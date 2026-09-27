@@ -22,6 +22,7 @@ import {
   maxFontSize,
   normalizeHex,
   PREVIEW_MIN,
+  SPLITTER_WIDTH,
   RADIUS_MAX,
   RADIUS_MIN,
   studioFragment,
@@ -31,6 +32,11 @@ import {
   type StudioState,
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.25;
+let previewZoom = 1;
 
 const imageCache = new Map<string, HTMLImageElement>();
 const dataUrlCache = new Map<string, Promise<string>>();
@@ -331,7 +337,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <div class="studio__field">
             <label for="studio-title-color">타이틀 컬러</label>
             <div class="studio__color">
-              <input id="studio-title-color" class="studio__color-picker" type="color" value="${escapeHtml(state.titleColor)}" aria-label="타이틀 컬러 피커" />
+              <input id="studio-title-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(state.titleColor)}" aria-label="타이틀 컬러 피커" />
               <input id="studio-title-hex" class="studio__control" type="text" value="${escapeHtml(state.titleColor)}" spellcheck="false" aria-label="타이틀 컬러 hex" />
             </div>
           </div>
@@ -353,7 +359,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <div class="studio__field">
             <label for="studio-body-color">본문 컬러</label>
             <div class="studio__color">
-              <input id="studio-body-color" class="studio__color-picker" type="color" value="${escapeHtml(state.bodyColor)}" aria-label="본문 컬러 피커" />
+              <input id="studio-body-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(state.bodyColor)}" aria-label="본문 컬러 피커" />
               <input id="studio-body-hex" class="studio__control" type="text" value="${escapeHtml(state.bodyColor)}" spellcheck="false" aria-label="본문 컬러 hex" />
             </div>
           </div>
@@ -411,17 +417,26 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
 
       <div class="studio__preview">
         <div class="studio__stage" id="studio-stage">
-          <div class="studio__fit" id="studio-fit">
-            <div class="studio__scaler" id="studio-scaler">
-              <canvas id="studio-canvas" aria-label="카드 프리뷰"></canvas>
-              <iframe id="studio-iframe" title="카드 코드 프리뷰" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
-              <div class="studio__safe" id="studio-safe" hidden></div>
+          <div class="studio__stage-frame">
+            <div class="studio__fit" id="studio-fit">
+              <div class="studio__scaler" id="studio-scaler">
+                <canvas id="studio-canvas" aria-label="카드 프리뷰"></canvas>
+                <iframe id="studio-iframe" title="카드 코드 프리뷰" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
+                <div class="studio__safe" id="studio-safe" hidden></div>
+              </div>
             </div>
           </div>
         </div>
         <div class="studio__bar">
           <p class="studio__meta" id="studio-meta" aria-live="polite"></p>
-          <button type="button" class="button" id="studio-download">PNG 다운로드</button>
+          <div class="studio__bar-actions">
+            <div class="studio__zoom" role="group" aria-label="프리뷰 확대">
+              <button type="button" class="studio__zoom-btn" id="studio-zoom-out" aria-label="축소">−</button>
+              <span class="studio__zoom-label" id="studio-zoom-label">100%</span>
+              <button type="button" class="studio__zoom-btn" id="studio-zoom-in" aria-label="확대">+</button>
+            </div>
+            <button type="button" class="button" id="studio-download">PNG 다운로드</button>
+          </div>
         </div>
       </div>
     </section>
@@ -466,6 +481,9 @@ export function bindStudio(
   const scaler = root.querySelector<HTMLElement>("#studio-scaler");
   const fit = root.querySelector<HTMLElement>("#studio-fit");
   const stage = root.querySelector<HTMLElement>("#studio-stage");
+  const zoomOut = root.querySelector<HTMLButtonElement>("#studio-zoom-out");
+  const zoomIn = root.querySelector<HTMLButtonElement>("#studio-zoom-in");
+  const zoomLabel = root.querySelector<HTMLElement>("#studio-zoom-label");
   const exportCode = root.querySelector<HTMLElement>("#studio-export");
   const splitter = root.querySelector<HTMLElement>("#studio-splitter");
   const studio = root.querySelector<HTMLElement>(".studio");
@@ -501,6 +519,9 @@ export function bindStudio(
     !scaler ||
     !fit ||
     !stage ||
+    !zoomOut ||
+    !zoomIn ||
+    !zoomLabel ||
     !exportCode ||
     !splitter ||
     !studio
@@ -515,20 +536,54 @@ export function bindStudio(
 
   let drawToken = 0;
 
+  const syncZoom = () => {
+    previewZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(previewZoom * 4) / 4));
+    zoomOut.disabled = previewZoom <= ZOOM_MIN;
+    zoomIn.disabled = previewZoom >= ZOOM_MAX;
+    zoomLabel.textContent = `${Math.round(previewZoom * 100)}%`;
+  };
+
   const updateScale = () => {
     const bounds = stage.getBoundingClientRect();
     const pad = 48;
-    const scale = Math.min(
+    const fitScale = Math.min(
       Math.max(bounds.width - pad, 1) / state.cardWidth,
       Math.max(bounds.height - pad, 1) / state.cardHeight,
     );
-    const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    const base = Number.isFinite(fitScale) && fitScale > 0 ? fitScale : 1;
+    syncZoom();
+    const safeScale = base * previewZoom;
     fit.style.width = `${state.cardWidth * safeScale}px`;
     fit.style.height = `${state.cardHeight * safeScale}px`;
     scaler.style.width = `${state.cardWidth}px`;
     scaler.style.height = `${state.cardHeight}px`;
     scaler.style.transform = `scale(${safeScale})`;
   };
+
+  zoomOut.addEventListener("click", () => {
+    previewZoom -= ZOOM_STEP;
+    updateScale();
+  });
+  zoomIn.addEventListener("click", () => {
+    previewZoom += ZOOM_STEP;
+    updateScale();
+  });
+
+  const controls = root.querySelector<HTMLElement>("#studio-controls");
+  let hideScrollbar = 0;
+  let ignoreScroll = false;
+  controls?.addEventListener("scroll", () => {
+    if (ignoreScroll) return;
+    controls.classList.add("is-scrolling");
+    window.clearTimeout(hideScrollbar);
+    hideScrollbar = window.setTimeout(() => {
+      ignoreScroll = true;
+      controls.classList.remove("is-scrolling");
+      window.setTimeout(() => {
+        ignoreScroll = false;
+      }, 80);
+    }, 700);
+  });
 
   let themeImage: HTMLImageElement | null = null;
   let imageAspect = 1;
@@ -909,7 +964,7 @@ export function bindStudio(
 
   const applyControlsWidth = (value: number) => {
     const studioWidth = studio.getBoundingClientRect().width;
-    const room = CONTROLS_MIN + PREVIEW_MIN + 10;
+    const room = CONTROLS_MIN + PREVIEW_MIN + SPLITTER_WIDTH;
     const requested = Number.isFinite(value) ? value : state.controlsWidth;
     state.controlsWidth = studioWidth >= room
       ? clampControlsWidth(requested, studioWidth)
@@ -918,7 +973,7 @@ export function bindStudio(
     splitter.setAttribute("aria-valuenow", String(state.controlsWidth));
     splitter.setAttribute(
       "aria-valuemax",
-      String(studioWidth >= room ? Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - 10) : state.controlsWidth),
+      String(studioWidth >= room ? Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - SPLITTER_WIDTH) : state.controlsWidth),
     );
     updateScale();
   };

@@ -12,6 +12,9 @@ export const IMAGE_MAX = 4000;
 export const CONTROLS_MIN = 240;
 export const CONTROLS_DEFAULT = 360;
 export const PREVIEW_MIN = 280;
+export const SPLITTER_WIDTH = 6;
+export const DEFAULT_TITLE = "빛을 담은 표면";
+export const DEFAULT_BODY = "고요한 원과 따뜻한 색이 만나는 자리. 브랜드의 첫 인상을 한 장으로 전합니다.";
 
 export const BUILTIN_FONTS = [
   { id: "pretendard", label: "Pretendard", stack: '"Pretendard Variable", Pretendard, system-ui, sans-serif' },
@@ -93,7 +96,7 @@ export function clampImageOffset(value: number, card: number, image: number): nu
 }
 
 export function clampControlsWidth(value: number, studioWidth: number): number {
-  const max = Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - 10);
+  const max = Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - SPLITTER_WIDTH);
   if (!Number.isFinite(value)) return CONTROLS_DEFAULT;
   return Math.min(max, Math.max(CONTROLS_MIN, Math.round(value)));
 }
@@ -118,8 +121,8 @@ export function createStudioState(themeSlug: string, color: string): StudioState
     presetId: preset.id,
     cardWidth: preset.width,
     cardHeight: preset.height,
-    title: "",
-    body: "",
+    title: DEFAULT_TITLE,
+    body: DEFAULT_BODY,
     themeSlug,
     color,
     radius: RADIUS_DEFAULT,

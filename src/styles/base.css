@@ -920,7 +920,7 @@ html[data-mode="dark"] .spider-callout {
 
 .studio {
   display: grid;
-  grid-template-columns: var(--studio-controls-width, 360px) 10px minmax(0, 1fr);
+  grid-template-columns: var(--studio-controls-width, 360px) 6px minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   background: var(--bg);
@@ -932,6 +932,31 @@ html[data-mode="dark"] .spider-callout {
   overflow: auto;
   padding: 20px 20px 32px;
   font-size: 14px;
+  scrollbar-width: none;
+}
+
+.studio__controls.is-scrolling {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--fg) 30%, transparent) transparent;
+}
+
+.studio__controls::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.studio__controls.is-scrolling::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.studio__controls::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.studio__controls.is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--fg) 30%, transparent);
 }
 
 .studio__splitter {
@@ -1052,6 +1077,11 @@ html[data-mode="dark"] .spider-callout {
   border-radius: 50%;
 }
 
+.studio__color-picker--text {
+  box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, var(--fg) 30%, transparent);
+}
+
 .studio__radius input[type="range"] {
   flex: 1;
   accent-color: var(--primary);
@@ -1114,17 +1144,27 @@ html[data-mode="dark"] .spider-callout {
 }
 
 .studio__stage {
-  display: grid;
+  display: block;
   flex: 1;
-  place-items: center;
   min-height: 0;
-  padding: 24px;
-  overflow: hidden;
+  overflow: auto;
   background: color-mix(in srgb, var(--tint) 35%, var(--bg));
+}
+
+.studio__stage-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 24px;
 }
 
 .studio__fit {
   position: relative;
+  flex: none;
+  overflow: hidden;
 }
 
 .studio__scaler {
@@ -1172,6 +1212,43 @@ html[data-mode="dark"] .spider-callout {
   gap: 16px;
   padding: 16px 24px;
   border-top: var(--line-width) solid var(--line-color);
+}
+
+.studio__bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.studio__zoom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.studio__zoom-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: var(--line-width) solid var(--line-color);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.studio__zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.studio__zoom-label {
+  min-width: 48px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 .studio__meta {
@@ -1261,6 +1338,12 @@ html[data-mode="dark"] .spider-callout {
   }
 
   .studio__color-picker {
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+  }
+
+  .studio__zoom-btn {
     width: 48px;
     height: 48px;
     min-height: 48px;

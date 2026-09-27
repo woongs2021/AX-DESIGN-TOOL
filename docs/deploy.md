@@ -46,12 +46,12 @@ public URL/소스에서 다음이 0건이어야 한다.
 
 마우스 없이 확인한다.
 
-1. Tab으로 네비(Archive / Online Marketing Studio / History) → 모드 토글 → Archive 검색 → All/Pin 탭 → 카드
+1. Tab으로 네비(Archive / Online Marketing Studio / History) → 모드 토글 → All/Pin 탭 → 카드
 2. Online Marketing Studio에서 카드 크기, 텍스트, 테마 선택, PNG 다운로드에 키보드 포커스가 보이는지 확인
 3. Enter로 Archive 카드 상세 진입
 4. 상세에서 Pin 후 Archive의 Pin 탭에 나타나는지 확인
 5. 각 단계에서 `:focus-visible` 링이 보이는지 확인
-6. Archive 검색에서 Escape로 검색어 초기화
+6. 모드를 한 번 바꾼 뒤 새로고침하면 마지막 선택이 유지되고, 저장값이 없으면 다크 모드로 열린다
 
 ## 측정 수치
 

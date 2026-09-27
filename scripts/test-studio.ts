@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
   clampCardSize,
+  createStudioState,
+  DEFAULT_BODY,
+  DEFAULT_TITLE,
+  resetStudioState,
   clampFontSize,
   clampImageWidth,
   clampRadius,
@@ -43,6 +47,16 @@ assert.equal(clampFontSize(2000, 1080), 1060);
 assert.equal(clampFontSize(40, 100), 40);
 assert.equal(fontLabelFromPath("fonts/Noto_Sans.woff2"), "Noto Sans");
 assert.equal(fontLabelFromPath("fonts/Pretendard.ttf"), "Pretendard");
+
+const draft = createStudioState("capsule-pattern", "#ffffff");
+assert.equal(draft.title, DEFAULT_TITLE);
+assert.equal(draft.body, DEFAULT_BODY);
+draft.title = "바꿈";
+draft.body = "";
+resetStudioState(draft, "#ffffff");
+assert.equal(draft.title, DEFAULT_TITLE);
+assert.equal(draft.body, DEFAULT_BODY);
+assert.equal(draft.themeSlug, "capsule-pattern");
 
 const widthOf = (line: string) => line.length * 10;
 assert.deepEqual(wrapText("hello world", 50, widthOf), ["hello", "world"]);

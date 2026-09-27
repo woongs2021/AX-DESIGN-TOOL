@@ -1,6 +1,5 @@
 import "./shared/tokens.css";
 import "./styles/base.css";
-import type { FilterState } from "./shared/filter.ts";
 import type { SiteIndex } from "./shared/index-types.ts";
 import {
   createStudioState,
@@ -22,7 +21,7 @@ import { renderHistory } from "./views/history.ts";
 import { renderNotFound } from "./views/placeholders.ts";
 import { bindStudio, renderStudio } from "./views/studio.ts";
 
-const MODE_KEY = "design-llm-wiki-mode";
+const MODE_KEY = "ax-design-studio-mode";
 const DATA_URL = "./data/index.json";
 
 type Mode = "light" | "dark";
@@ -32,14 +31,6 @@ type LoadState =
   | { status: "ready"; index: SiteIndex };
 
 let loadState: LoadState = { status: "loading" };
-let filters: FilterState = {
-  query: "",
-  platforms: [],
-  screenTypes: [],
-  uiPatterns: [],
-  tags: [],
-  tones: [],
-};
 let pinnedSlugs = readPins();
 let archiveTab: ArchiveTab = "all";
 let studioState: StudioState | null = null;
@@ -47,7 +38,9 @@ let appliedTheme: string | null = null;
 let route: Route = parseHash();
 
 function readStoredMode(): Mode {
-  return localStorage.getItem(MODE_KEY) === "dark" ? "dark" : "light";
+  const stored = localStorage.getItem(MODE_KEY);
+  if (stored === "light" || stored === "dark") return stored;
+  return "dark";
 }
 
 function applyMode(mode: Mode): void {
@@ -142,7 +135,7 @@ function renderMain(): string {
   const index = loadState.index;
   switch (route.name) {
     case "archive":
-      return renderArchive(index, filters, pinnedSlugs, archiveTab);
+      return renderArchive(index, pinnedSlugs, archiveTab);
     case "capture":
       return renderCaptureDetail(index, route.slug, pinnedSlugs);
     case "studio":
@@ -169,32 +162,7 @@ function render(): void {
   if (loadState.status !== "ready") return;
 
   if (route.name === "archive") {
-    bindArchive(app, filters, {
-      onFilterChange: (next) => {
-        const active = document.activeElement as HTMLElement | null;
-        const restore = active?.id === "archive-search" ? "search" : null;
-        filters = next;
-        render();
-        if (restore === "search") {
-          const search =
-            document.querySelector<HTMLInputElement>("#archive-search");
-          search?.focus();
-          const len = search?.value.length ?? 0;
-          search?.setSelectionRange(len, len);
-        }
-      },
-      onClearFilters: () => {
-        filters = {
-          query: "",
-          platforms: [],
-          screenTypes: [],
-          uiPatterns: [],
-          tags: [],
-          tones: [],
-        };
-        render();
-        document.querySelector<HTMLInputElement>("#archive-search")?.focus();
-      },
+    bindArchive(app, {
       onTabChange: (tab) => {
         archiveTab = tab;
         render();
