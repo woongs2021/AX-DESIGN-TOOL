@@ -114,6 +114,22 @@ export function clampImageOffset(value: number, card: number, image: number): nu
   return Math.min(hi, Math.max(lo, Math.round(value)));
 }
 
+/** Resize the image to nextWidth while the anchor point stays fixed on the card. */
+export function scaleImageAround(
+  image: { x: number; y: number; width: number },
+  nextWidth: number,
+  anchorX: number,
+  anchorY: number,
+): { x: number; y: number; width: number } {
+  const width = clampImageWidth(nextWidth);
+  const factor = width / Math.max(1, image.width);
+  return {
+    x: Math.round(anchorX - (anchorX - image.x) * factor),
+    y: Math.round(anchorY - (anchorY - image.y) * factor),
+    width,
+  };
+}
+
 export function clampControlsWidth(value: number, studioWidth: number): number {
   const max = Math.max(CONTROLS_MIN, Math.round(studioWidth) - PREVIEW_MIN - SPLITTER_WIDTH);
   if (!Number.isFinite(value)) return CONTROLS_DEFAULT;
