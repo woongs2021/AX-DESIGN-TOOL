@@ -100,16 +100,16 @@ Phase 0–2와 5(감사)는 완료이므로 유지보수 대상이다. 아래는
 - 입력은 확정된 `obsidian/design-systems/<name>/design-system.md`와 `tokens.json`이다. → verify: 미확정 디자인 시스템으로는 이미지 생성을 시작하지 않는다.
 - 생성 방식은 아직 구현하지 않는다. 이미지 모델, 저작권·브랜드 정책, 산출물 저장 위치, 사람 승인 기준을 나중에 확정한 뒤 로컬 CLI 방식으로 착수한다. → verify: 현재 코드/라우트/스크립트에는 이미지 생성 기능이 없다.
 
-## 측정된 빌드 수치 (더미 vault)
+## 측정된 빌드 수치
 
-`reports/*-build-report.json`에서 읽은 값이다. 추정으로 적지 않는다. 더미 재생성: `npm run seed:dummy`.
+`reports/*-build-report.json`에서 읽은 값이다. 현재 아카이브는 `image-pick-hermes` 스터디 16건이다. `npm run seed:dummy`는 이 캡처를 더미 데이터로 덮어쓴다.
 
 | 타깃 | captures | asset bytes | Pages remaining / 1GB |
 |---|---|---|---|
-| internal | 16/16 | 87341 | 1073654483 / 1073741824 |
-| public | 6/16 | 26757 | 1073715067 / 1073741824 |
+| internal | 16/16 | 2728980 | 1071012844 / 1073741824 |
+| public | 16/16 | 2728980 | 1071012844 / 1073741824 |
 
-public 제외: captures/collections 13건, wiki 4건. 자산 미복사 10 files / 56908 bytes. `npm run check:public-leak` 통과.
+public 제외: 0건. `npm run check:public-leak` 통과.
 
 ## 주요 명령
 

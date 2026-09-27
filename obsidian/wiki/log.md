@@ -2,14 +2,10 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
-## [2026-08-05] ingest | dummy vault seed
+## [2026-09-27] ingest | hermes visual studies
 
-실제 화면처럼 보이도록 캡처 16건, 컬렉션 4개, wiki 패턴/서비스/비교/질문 페이지를 더미 데이터로 재구성했다. 분석 본문은 전문용어를 제외하고 한글로 작성.
+image-pick-hermes 정지 이미지 16건을 아카이브에 넣고 더미 캡처를 제거했다. 분석은 보이는 색, 형태, 여백, 재질만 적었다.
 
-## [2026-08-05] lint | public capture refs
+## [2026-09-27] lint | dummy capture removal
 
-public wiki 페이지는 public 캡처만 링크하도록 정리했다. 내부 모션·운영 패턴은 internal 페이지로 분리.
-
-## [2026-08-03] query | filter pattern overlap
-
-`naver-shopping-gallery`와 `figma-community-gallery`는 tags/uiPatterns 교집합이 커서 related에 같이 뜬다.
+더미 서비스 캡처와 그 캡처만 가리키던 컬렉션·wiki 페이지를 Hermes 스터디 기준으로 교체했다.

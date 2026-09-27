@@ -14,13 +14,13 @@ export OPENAI_API_KEY=sk-...
 # 선택: export OPENAI_BASE_URL=... / export DESIGN_SYSTEM_MODEL=gpt-4o-mini
 
 # Archive/Design System 탭에서 제안된 slug 목록으로 생성
-npm run design-system -- --name filters --slugs naver-shopping-gallery airbnb-mobile-search
+npm run design-system -- --name hermes-discs --slugs capsule-pattern coral-blue-luminous-ring
 
 # LLM 없이 구조만 검증하는 deterministic draft
-npm run design-system -- --name filters --slugs naver-shopping-gallery airbnb-mobile-search --no-llm
+npm run design-system -- --name hermes-discs --slugs capsule-pattern coral-blue-luminous-ring --no-llm
 
 # 파일을 쓰지 않고 출력만 확인
-npm run design-system -- --name filters --slugs naver-shopping-gallery airbnb-mobile-search --dry-run
+npm run design-system -- --name hermes-discs --slugs capsule-pattern coral-blue-luminous-ring --dry-run
 ```
 
 생성 위치: `obsidian/design-systems/<name>/design-system.md`, `sources.md`, `tokens.json`.

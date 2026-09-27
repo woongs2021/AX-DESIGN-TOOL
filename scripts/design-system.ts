@@ -2,7 +2,7 @@
  * Generate a design-system draft from selected vault captures.
  *
  * Usage:
- *   npm run design-system -- --name filters --slugs naver-shopping-gallery airbnb-mobile-search
+ *   npm run design-system -- --name hermes-discs --slugs capsule-pattern coral-blue-luminous-ring
  *
  * Secrets:
  *   OPENAI_API_KEY          required unless --no-llm

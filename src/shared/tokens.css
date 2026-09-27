@@ -39,6 +39,7 @@ html[data-mode="light"],
   --fg-muted: rgba(1, 1, 2, 0.82);
   --stroke: rgba(1, 1, 2, 0.72);
   --focus-ring: #4065f8;
+  --media-matte: #ffffff;
 }
 
 html[data-mode="dark"] {
@@ -47,4 +48,5 @@ html[data-mode="dark"] {
   --fg-muted: rgba(252, 252, 255, 0.72);
   --stroke: rgba(252, 252, 255, 0.72);
   --focus-ring: #a1d0f6;
+  --media-matte: #000000;
 }

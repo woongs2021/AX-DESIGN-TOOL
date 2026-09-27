@@ -1,0 +1,15 @@
+---
+slug: warm-earth-surfaces
+title: "웜 어스 면"
+description: "베이지, 테라코타, 세이지가 종이 질감으로 겹친 스터디."
+captures:
+  - capsule-pattern
+  - matte-circle-fields
+  - warm-earth-oval
+  - angular-shadow-surface
+  - warm-offwhite-eclipse-disc
+---
+
+# 웜 어스 면
+
+따뜻한 색면과 매트한 가장자리.

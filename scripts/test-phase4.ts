@@ -9,18 +9,18 @@ const index = JSON.parse(
   readFileSync("dist/internal/data/index.json", "utf8"),
 ) as SiteIndex;
 
-const still = index.captures.find((c) => c.slug === "naver-shopping-gallery");
+const still = index.captures.find((c) => c.slug === "capsule-pattern");
 assert.ok(still);
 
 const related = relatedCaptureSlugs(still, index.captures);
-assert.ok(related.includes("figma-community-gallery"));
+assert.ok(related.includes("modular-arch-surface"));
 assert.deepEqual(related, relatedCaptureSlugs(still, index.captures));
 
 const wikiForStill = index.wiki.pages.filter((page) =>
-  page.captureRefs.includes("naver-shopping-gallery"),
+  page.captureRefs.includes("capsule-pattern"),
 );
-assert.ok(wikiForStill.some((page) => page.id === "patterns/filterable-gallery"));
-assert.ok(wikiForStill.some((page) => page.id === "services/naver-shopping"));
+assert.ok(wikiForStill.some((page) => page.id === "patterns/capsule-fields"));
+assert.ok(wikiForStill.some((page) => page.id === "services/hermes-studies"));
 
 const stats = computeCaptureStats(index.captures);
 assert.equal(stats.total, index.captures.length);
@@ -36,10 +36,10 @@ const publicStats = computeCaptureStats(publicIndex.captures);
 assert.ok(publicStats.total >= 1);
 assert.ok(!publicStats.visibility.some((item) => item.key === "internal"));
 
-const collection = index.collections.find((item) => item.slug === "public-gallery");
+const collection = index.collections.find((item) => item.slug === "hermes-gallery");
 assert.ok(collection);
-assert.ok(collection.captures.includes("naver-shopping-gallery"));
-assert.ok(collection.captures.includes("toss-onboarding-welcome"));
+assert.ok(collection.captures.includes("capsule-pattern"));
+assert.ok(collection.captures.includes("modular-arch-surface"));
 
 const exportText = buildPromptExport({
   captures: [still],
@@ -53,7 +53,7 @@ const exportAgain = buildPromptExport({
 });
 assert.equal(exportText, exportAgain);
 assert.ok(exportText.includes(still.title));
-assert.ok(exportText.includes("필터형 갤러리"));
+assert.ok(exportText.includes("캡슐 필드"));
 assert.ok(exportText.includes("### Analysis"));
 
 // Simulate preview DOM textContent parity: escaped HTML round-trips to same text.

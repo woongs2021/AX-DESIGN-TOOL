@@ -1,28 +1,23 @@
 ---
 title: Wiki 인덱스
-summary: LLM이 유지하는 디자인 지식 페이지 목록.
+summary: Hermes 비주얼 스터디에서 누적한 지식 페이지 목록.
 ---
 
 # Wiki 인덱스
 
-ingest / query / lint 할 때마다 갱신하는 콘텐츠 카탈로그.
-
 ## Patterns
 
-- [필터형 갤러리](patterns/filterable-gallery.md) — 칩 필터와 카드 그리드를 함께 쓰는 탐색 패턴.
-- [필터 확정 모션](patterns/internal-filter-motion.md) — 내부 도구에서 필터 반영을 짧게 확인시키는 펄스.
-- [밀도 높은 운영 대시보드](patterns/dense-ops-dashboard.md) — 탭·표·KPI가 겹치는 운영 화면.
+- [캡슐 필드](patterns/capsule-fields.md) — 잘린 캡슐과 모듈 아치가 격자를 프레임으로 쓰는 패턴.
+- [발광 원반](patterns/luminous-discs.md) — 가장자리 빛으로 원반을 세우는 패턴.
 
 ## Services
 
-- [네이버 쇼핑](services/naver-shopping.md) — 공개 캡처가 있는 커머스 탐색 UI.
-- [토스](services/toss.md) — 온보딩·친화적 카피 톤 참고.
-- [Ops Console](services/ops-console.md) — 내부 운영 콘솔(비공개).
+- [Hermes studies](services/hermes-studies.md) — image-pick-hermes 정지 스터디.
 
 ## Comparisons
 
-- [공개 커머스 필터 비교](comparisons/commerce-filters.md) — 네이버 쇼핑과 Airbnb 필터 배치 비교.
+- [웜 면과 발광 링](comparisons/warm-vs-luminous.md) — 종이 질감의 색면과 발광 링의 차이.
 
 ## Questions
 
-- [칩 필터의 기본값](questions/chip-filter-defaults.md) — 첫 진입 시 칩을 전부 꺼둘지, 추천 칩을 켤지.
+- [글자 없는 위계](questions/hierarchy-without-type.md) — 글자가 없을 때 무엇으로 위계를 읽을지.

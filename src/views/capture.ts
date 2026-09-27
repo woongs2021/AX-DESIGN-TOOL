@@ -1,9 +1,7 @@
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
 import { renderMarkdownLite } from "../lib/markdown.ts";
-import { hrefFor } from "../router.ts";
 import { getCaptureScores, totalScore } from "../shared/analysis-scores.ts";
 import type { CaptureRecord, SiteIndex } from "../shared/index-types.ts";
-import { relatedCaptureSlugs } from "../shared/related.ts";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -138,20 +136,18 @@ export function renderCaptureDetail(
       <section class="state-panel state-panel--soft">
         <h1 class="state-panel__title">Capture not found</h1>
         <p class="state-panel__text">${escapeHtml(slug)} is not in this bundle.</p>
-        <p><a class="button button--secondary" href="#/">Back to Archive</a></p>
+        <p><a class="detail__back" href="#/"><span class="detail__back-icon" aria-hidden="true">←</span> Back</a></p>
       </section>
     `;
   }
 
-  const related = relatedCaptureSlugs(capture, index.captures)
-    .map((relatedSlug) => index.captures.find((item) => item.slug === relatedSlug))
-    .filter((item): item is CaptureRecord => Boolean(item));
   const isPinned = pinned.includes(slug);
 
   return `
     <article class="detail">
       <header class="detail__header">
-        <div>
+        <a class="detail__back" href="#/"><span class="detail__back-icon" aria-hidden="true">←</span> Back</a>
+        <div class="detail__heading">
           <p class="detail__eyebrow">${escapeHtml(capture.service)} · ${escapeHtml(capture.platform)}</p>
           <h1 class="detail__title">${escapeHtml(capture.title)}</h1>
           <p class="detail__insight">${escapeHtml(capture.insight)}</p>
@@ -160,7 +156,6 @@ export function renderCaptureDetail(
           <button type="button" class="button button--secondary" data-pin-slug="${escapeHtml(slug)}" aria-pressed="${isPinned ? "true" : "false"}">
             ${isPinned ? "Unpin" : "Pin"}
           </button>
-          <a class="button button--secondary" href="#/">Archive</a>
         </div>
       </header>
 
@@ -195,23 +190,6 @@ export function renderCaptureDetail(
       <section class="detail__section prose">
         <h2>Analysis</h2>
         ${renderMarkdownLite(capture.body)}
-      </section>
-
-      <section class="detail__section">
-        <h2>Related captures</h2>
-        ${
-          related.length === 0
-            ? `<p class="detail__empty">No related captures with shared tags or UI patterns.</p>`
-            : `<div class="link-list">${related
-                .map(
-                  (item) => `
-              <a class="link-card" href="${hrefFor({ name: "capture", slug: item.slug })}">
-                <strong>${escapeHtml(item.title)}</strong>
-                <span>${escapeHtml(item.insight)}</span>
-              </a>`,
-                )
-                .join("")}</div>`
-        }
       </section>
     </article>
   `;

@@ -159,7 +159,11 @@ function renderCard(capture: CaptureRecord, pinned: boolean): string {
       <a class="capture-card__link" href="${hrefFor({ name: "capture", slug: capture.slug })}">
         <div class="capture-card__frame">
           ${cardImage(capture)}
-          <span class="capture-card__kind">${escapeHtml(capture.asset.kind)}</span>
+          ${
+            capture.asset.kind === "still"
+              ? ""
+              : `<span class="capture-card__kind">${escapeHtml(capture.asset.kind)}</span>`
+          }
           ${pinned ? `<span class="capture-card__pin-badge">Pinned</span>` : ""}
         </div>
         <div class="capture-card__body">

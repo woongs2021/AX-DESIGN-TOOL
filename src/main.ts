@@ -76,7 +76,7 @@ function shell(mainHtml: string): string {
   const nextModeLabel = mode === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환";
   return `
     <header class="top-nav">
-      <a class="wordmark" href="#/">Design LLM Wiki</a>
+      <a class="wordmark" href="#/">AX Design Studio</a>
       <nav class="nav-menu" aria-label="Primary">
         ${navLink("Archive", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
         ${navLink("Intake", hrefFor({ name: "intake" }), route.name === "intake")}
