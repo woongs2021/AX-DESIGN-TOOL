@@ -1088,7 +1088,8 @@ html[data-mode="dark"] .spider-callout {
   object-fit: cover;
 }
 
-.studio__copy {
+.studio__copy,
+.studio__reset {
   width: 100%;
   margin-bottom: 12px;
 }

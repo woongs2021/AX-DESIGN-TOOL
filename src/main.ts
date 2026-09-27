@@ -4,6 +4,7 @@ import type { FilterState } from "./shared/filter.ts";
 import type { SiteIndex } from "./shared/index-types.ts";
 import {
   createStudioState,
+  resetStudioState,
   normalizeHex,
   parseRgb,
   rgbToHex,
@@ -212,7 +213,12 @@ function render(): void {
   }
 
   if (route.name === "studio" && loadState.status === "ready" && studioState) {
-    bindStudio(app, studioState, loadState.index.captures);
+    bindStudio(app, studioState, loadState.index.captures, () => {
+      if (!studioState) return;
+      resetStudioState(studioState, defaultStudioColor());
+      render();
+      document.querySelector<HTMLButtonElement>("#studio-reset")?.focus();
+    });
   }
 }
 

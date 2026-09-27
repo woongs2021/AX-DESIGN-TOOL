@@ -37,7 +37,8 @@ export type StudioState = {
   titleY: number;
   bodyX: number;
   bodyY: number;
-  fontId: string;
+  titleFontId: string;
+  bodyFontId: string;
   titleColor: string;
   bodyColor: string;
   imageWidth: number;
@@ -131,13 +132,22 @@ export function createStudioState(themeSlug: string, color: string): StudioState
     titleY: clampTextOffset(titleY, preset.height, titleSize),
     bodyX: clampTextOffset(Math.round(preset.width * 0.06), preset.width, bodySize),
     bodyY: clampTextOffset(titleY + Math.round(titleSize * 1.6), preset.height, bodySize),
-    fontId: "pretendard",
+    titleFontId: "pretendard",
+    bodyFontId: "pretendard",
     titleColor: inkHex(color),
     bodyColor: inkHex(color),
     imageWidth: clampImageWidth(preset.width),
     imageX: 0,
     imageY: 0,
   };
+}
+
+/** Restore the card to its starting values. The chosen theme and panel width stay. */
+export function resetStudioState(state: StudioState, color: string): void {
+  const next = createStudioState(state.themeSlug, color);
+  next.controlsWidth = state.controlsWidth;
+  next.panel = state.panel;
+  Object.assign(state, next);
 }
 
 export function normalizeHex(value: string): string | null {
@@ -318,7 +328,7 @@ export function designToCode(): string {
     overflow: hidden;
     background: var(--studio-color);
     border-radius: var(--studio-radius);
-    font-family: var(--studio-font);
+    font-family: var(--studio-title-font);
     color: var(--studio-ink);
   }
   .studio-card img {
@@ -335,6 +345,7 @@ export function designToCode(): string {
     top: var(--studio-title-y);
     font-size: var(--studio-title-size);
     font-weight: 600;
+    font-family: var(--studio-title-font);
     color: var(--studio-title-color);
   }
   .studio-card p {
@@ -342,6 +353,7 @@ export function designToCode(): string {
     top: var(--studio-body-y);
     font-size: var(--studio-body-size);
     font-weight: 400;
+    font-family: var(--studio-body-font);
     color: var(--studio-body-color);
   }
 </style>`;
@@ -353,7 +365,8 @@ export type StudioDocumentInput = StudioSubstitution & {
   width: number;
   height: number;
   code: string;
-  fontStack: string;
+  titleFontStack: string;
+  bodyFontStack: string;
   titleSize: number;
   bodySize: number;
   titleX: number;
@@ -376,7 +389,8 @@ export function studioFragment(input: StudioDocumentInput): string {
   const preset = presetById("ig-feed-square");
   const width = input.width > 0 ? input.width : preset.width;
   const height = input.height > 0 ? input.height : preset.height;
-  const font = input.fontStack.replaceAll(";", "");
+  const titleFont = input.titleFontStack.replaceAll(";", "");
+  const bodyFont = input.bodyFontStack.replaceAll(";", "");
   const body = substituteStudioCode(input.code.trim() || designToCode(), input);
   const vars = [
     `--studio-color:${color}`,
@@ -384,7 +398,8 @@ export function studioFragment(input: StudioDocumentInput): string {
     `--studio-radius:${radius}px`,
     `--studio-width:${width}px`,
     `--studio-height:${height}px`,
-    `--studio-font:${font}`,
+    `--studio-title-font:${titleFont}`,
+    `--studio-body-font:${bodyFont}`,
     `--studio-title-size:${clampFontSize(input.titleSize, width)}px`,
     `--studio-body-size:${clampFontSize(input.bodySize, width)}px`,
     `--studio-title-x:${Math.round(input.titleX)}px`,

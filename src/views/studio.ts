@@ -136,7 +136,8 @@ function documentInput(state: StudioState, themeImage: string): StudioDocumentIn
     width: state.cardWidth,
     height: state.cardHeight,
     code: state.code,
-    fontStack: fontStack(state.fontId, extraFonts()),
+    titleFontStack: fontStack(state.titleFontId, extraFonts()),
+    bodyFontStack: fontStack(state.bodyFontId, extraFonts()),
     titleSize: state.titleSize,
     bodySize: state.bodySize,
     titleX: state.titleX,
@@ -177,7 +178,6 @@ function drawCard(
     hits.push({ kind: "image", x: state.imageX, y: state.imageY, w: drawWidth, h: drawHeight });
   }
 
-  const stack = fontStack(state.fontId, extraFonts());
   const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
   ctx.textBaseline = "top";
 
@@ -188,6 +188,7 @@ function drawCard(
     y: number,
     size: number,
     weight: number,
+    stack: string,
     color: string,
   ): void => {
     if (!text.trim()) return;
@@ -203,8 +204,9 @@ function drawCard(
     hits.push({ kind, x, y, w: Math.max(widest, size), h: Math.max(lines.length, 1) * lineHeight });
   };
 
-  paintText("body", state.body, state.bodyX, state.bodyY, state.bodySize, 400, state.bodyColor);
-  paintText("title", state.title, state.titleX, state.titleY, state.titleSize, 600, state.titleColor);
+  const extras = extraFonts();
+  paintText("body", state.body, state.bodyX, state.bodyY, state.bodySize, 400, fontStack(state.bodyFontId, extras), state.bodyColor);
+  paintText("title", state.title, state.titleX, state.titleY, state.titleSize, 600, fontStack(state.titleFontId, extras), state.titleColor);
   ctx.restore();
   return hits;
 }
@@ -259,6 +261,9 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
   const ink = inkHex(state.color);
   state.titleColor = normalizeHex(String(state.titleColor ?? "")) ?? ink;
   state.bodyColor = normalizeHex(String(state.bodyColor ?? "")) ?? ink;
+  const legacyFont = (state as StudioState & { fontId?: string }).fontId;
+  if (!state.titleFontId) state.titleFontId = legacyFont || "pretendard";
+  if (!state.bodyFontId) state.bodyFontId = legacyFont || "pretendard";
   const preset = presetById(state.presetId);
   const options = STUDIO_PRESETS.map(
     (item) =>
@@ -284,12 +289,13 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
   const designSelected = state.panel === "design";
   const fonts = fontChoices();
   const fontMax = maxFontSize(state.cardWidth);
-  const fontOptions = fonts
-    .map(
-      (font) =>
-        `<option value="${escapeHtml(font.id)}"${font.id === state.fontId ? " selected" : ""}>${escapeHtml(font.label)}</option>`,
-    )
-    .join("");
+  const fontOptions = (selected: string) =>
+    fonts
+      .map(
+        (font) =>
+          `<option value="${escapeHtml(font.id)}"${font.id === selected ? " selected" : ""}>${escapeHtml(font.label)}</option>`,
+      )
+      .join("");
 
   return `
     <section class="studio" style="--studio-controls-width:${state.controlsWidth}px">
@@ -337,6 +343,10 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             </div>
           </div>
           <div class="studio__field">
+            <label for="studio-title-font">타이틀 폰트</label>
+            <select id="studio-title-font" class="studio__control">${fontOptions(state.titleFontId)}</select>
+          </div>
+          <div class="studio__field">
             <label for="studio-body">본문</label>
             <textarea id="studio-body" class="studio__control studio__control--area" placeholder="본문">${escapeHtml(state.body)}</textarea>
           </div>
@@ -354,11 +364,11 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <input id="studio-body-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${state.bodySize}" aria-label="본문 폰트 크기 수치" />
             </div>
           </div>
-          <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮길 수 있습니다.</p>
           <div class="studio__field">
-            <label for="studio-font">폰트</label>
-            <select id="studio-font" class="studio__control">${fontOptions}</select>
+            <label for="studio-body-font">본문 폰트</label>
+            <select id="studio-body-font" class="studio__control">${fontOptions(state.bodyFontId)}</select>
           </div>
+          <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮길 수 있습니다.</p>
           <div class="studio__field">
             <span id="studio-theme-label">아카이브 테마</span>
             <div class="studio__themes" role="radiogroup" aria-labelledby="studio-theme-label">${themes}</div>
@@ -385,6 +395,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <input id="studio-radius-number" class="studio__control studio__control--number" type="number" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${state.radius}" aria-label="카드 radius 수치" />
             </div>
           </div>
+          <button type="button" class="button button--secondary studio__reset" id="studio-reset">초기화</button>
         </div>
 
         <div id="studio-panel-code" role="tabpanel" aria-labelledby="studio-tab-code"${designSelected ? " hidden" : ""}>
@@ -421,6 +432,7 @@ export function bindStudio(
   root: HTMLElement,
   state: StudioState,
   captures: CaptureRecord[],
+  onReset: () => void,
 ): void {
   if (captures.length === 0) return;
   const presetSelect = root.querySelector<HTMLSelectElement>("#studio-preset");
@@ -438,7 +450,8 @@ export function bindStudio(
   const bodyHexInput = root.querySelector<HTMLInputElement>("#studio-body-hex");
   const bodySizeRange = root.querySelector<HTMLInputElement>("#studio-body-size");
   const bodySizeNumber = root.querySelector<HTMLInputElement>("#studio-body-size-number");
-  const fontSelect = root.querySelector<HTMLSelectElement>("#studio-font");
+  const titleFontSelect = root.querySelector<HTMLSelectElement>("#studio-title-font");
+  const bodyFontSelect = root.querySelector<HTMLSelectElement>("#studio-body-font");
   const imageRange = root.querySelector<HTMLInputElement>("#studio-image-width");
   const imageNumber = root.querySelector<HTMLInputElement>("#studio-image-width-number");
   const colorInput = root.querySelector<HTMLInputElement>("#studio-color");
@@ -472,7 +485,8 @@ export function bindStudio(
     !bodyHexInput ||
     !bodySizeRange ||
     !bodySizeNumber ||
-    !fontSelect ||
+    !titleFontSelect ||
+    !bodyFontSelect ||
     !imageRange ||
     !imageNumber ||
     !colorInput ||
@@ -606,16 +620,18 @@ export function bindStudio(
       safe.hidden = true;
     }
 
-    const family = fontStack(state.fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
-    if (family) {
-      try {
-        await Promise.all([
-          document.fonts.load(`600 ${state.titleSize}px "${family}"`),
-          document.fonts.load(`400 ${state.bodySize}px "${family}"`),
-        ]);
-      } catch {
-        /* the canvas stack falls through to the next family */
-      }
+    const loadFace = (fontId: string, weight: number, size: number) => {
+      const family = fontStack(fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
+      if (!family) return Promise.resolve();
+      return document.fonts.load(`${weight} ${size}px "${family}"`);
+    };
+    try {
+      await Promise.all([
+        loadFace(state.titleFontId, 600, state.titleSize),
+        loadFace(state.bodyFontId, 400, state.bodySize),
+      ]);
+    } catch {
+      /* the canvas stack falls through to the next family */
     }
     if (token !== drawToken) return;
 
@@ -693,9 +709,16 @@ export function bindStudio(
   bindPair(imageRange, imageNumber, (value) => {
     state.imageWidth = value;
   }, () => state.imageWidth);
-  fontSelect.addEventListener("change", () => {
-    state.fontId = fontSelect.value;
+  titleFontSelect.addEventListener("change", () => {
+    state.titleFontId = titleFontSelect.value;
     void redraw();
+  });
+  bodyFontSelect.addEventListener("change", () => {
+    state.bodyFontId = bodyFontSelect.value;
+    void redraw();
+  });
+  root.querySelector("#studio-reset")?.addEventListener("click", () => {
+    onReset();
   });
   titleInput.addEventListener("input", () => {
     state.title = titleInput.value;
