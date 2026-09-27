@@ -1,6 +1,6 @@
 # AX Design Studio
 
-Repo: [https://github.com/woongs2021/AX-DESIGN-TOOL](https://github.com/woongs2021/AX-DESIGN-TOOL)
+Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.io/AX-DESIGN-TOOL/) — GitHub에서 바로 열어볼 수 있는 정적 사이트
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
