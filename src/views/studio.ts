@@ -690,8 +690,10 @@ export function bindStudio(
     range.style.setProperty("--range-fill", `${Math.min(100, Math.max(0, pct))}%`);
   };
   let sizeRatio = state.cardHeight / Math.max(1, state.cardWidth);
+  let sizeBase = { cardWidth: state.cardWidth, imageWidth: state.imageWidth, imageX: state.imageX, imageY: state.imageY };
   const captureSizeRatio = () => {
     sizeRatio = state.cardHeight / Math.max(1, state.cardWidth);
+    sizeBase = { cardWidth: state.cardWidth, imageWidth: state.imageWidth, imageX: state.imageX, imageY: state.imageY };
   };
 
   let themeImage: HTMLImageElement | null = null;
@@ -907,6 +909,11 @@ export function bindStudio(
     );
     state.cardWidth = next.cardWidth;
     state.cardHeight = next.cardHeight;
+    const factor = state.cardWidth / Math.max(1, sizeBase.cardWidth);
+    state.imageWidth = clampImageWidth(sizeBase.imageWidth * factor);
+    const imageFactor = state.imageWidth / Math.max(1, sizeBase.imageWidth);
+    state.imageX = Math.round(sizeBase.imageX * imageFactor);
+    state.imageY = Math.round(sizeBase.imageY * imageFactor);
     const nextFit = fitScaleFor(state.cardWidth, state.cardHeight);
     if (nextFit > 0 && Number.isFinite(screen) && screen > 0) previewZoom = screen / nextFit;
   }, () => state.cardWidth);
