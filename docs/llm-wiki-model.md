@@ -10,7 +10,7 @@
 | Wiki | `obsidian/wiki/`의 패턴, 서비스, 비교, 질문 답변, 종합 페이지 |
 | Schema | `CLAUDE.md`, `CURSOR.md`, `docs/decisions.md`, `docs/authoring-guide.md` |
 | `index.md` | `obsidian/wiki/index.md` — wiki 페이지 카탈로그 |
-| `log.md` | `obsidian/wiki/log.md` — ingest, query, lint 이력 |
+| `log.md` | `obsidian/wiki/log.md` — ingest, query, lint 이력과 사이트 기능 변경(`update`) 이력 |
 
 ## 역할 분담
 

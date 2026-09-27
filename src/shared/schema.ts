@@ -92,7 +92,7 @@ export type CaptureValidation = {
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOG_RE =
-  /^## \[(\d{4}-\d{2}-\d{2})\] (ingest|query|lint) \| (.+)$/;
+  /^## \[(\d{4}-\d{2}-\d{2})\] (ingest|query|lint|update) \| (.+)$/;
 
 const REQUIRED_CAPTURE_FIELDS = [
   "slug",
@@ -480,7 +480,7 @@ export function parseWikiLog(path: string, text: string): {
       issues.push({
         path,
         field: `line ${index + 1}`,
-        message: `Invalid log heading "${line}" — expected "## [YYYY-MM-DD] <ingest|query|lint> | <title>"`,
+        message: `Invalid log heading "${line}" — expected "## [YYYY-MM-DD] <ingest|query|lint|update> | <title>"`,
       });
       return;
     }

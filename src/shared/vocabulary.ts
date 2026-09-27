@@ -106,7 +106,7 @@ export const MOTION_EXTENSIONS = new Set([".gif", ".mp4", ".webm"]);
 export const VISIBILITIES = ["internal", "public"] as const;
 export const DEFAULT_VISIBILITY = "internal" as const;
 
-export const WIKI_OPERATIONS = ["ingest", "query", "lint"] as const;
+export const WIKI_OPERATIONS = ["ingest", "query", "lint", "update"] as const;
 
 export const WIKI_PAGE_DIRS = [
   "patterns",
