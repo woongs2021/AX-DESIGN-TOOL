@@ -467,6 +467,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <button type="button" class="studio__zoom-btn" id="studio-zoom-out" aria-label="축소">−</button>
               <span class="studio__zoom-label" id="studio-zoom-label">100%</span>
               <button type="button" class="studio__zoom-btn" id="studio-zoom-in" aria-label="확대">+</button>
+              <button type="button" class="studio__zoom-btn studio__zoom-btn--text" id="studio-zoom-fit" aria-label="프리뷰에 맞춤">Fit</button>
             </div>
             <button type="button" class="button" id="studio-download">PNG 다운로드</button>
           </div>
@@ -590,7 +591,7 @@ export function bindStudio(
 
   const fitScaleFor = (cardWidth: number, cardHeight: number) => {
     const bounds = stage.getBoundingClientRect();
-    const pad = 48;
+    const pad = 20;
     const fitScale = Math.min(
       Math.max(bounds.width - pad, 1) / cardWidth,
       Math.max(bounds.height - pad, 1) / cardHeight,
@@ -616,6 +617,11 @@ export function bindStudio(
   zoomIn.addEventListener("click", () => {
     previewZoom = Math.min(ZOOM_MAX, previewZoom + ZOOM_STEP);
     updateScale();
+  });
+  root.querySelector("#studio-zoom-fit")?.addEventListener("click", () => {
+    previewZoom = 1;
+    updateScale();
+    stage.scrollTo(0, 0);
   });
 
   const controls = root.querySelector<HTMLElement>("#studio-controls");
