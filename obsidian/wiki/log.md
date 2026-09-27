@@ -2,6 +2,10 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-09-27] update | 태블릿·모바일 레이아웃 최적화와 공개 History 표시
+
+태블릿은 2단 스튜디오를 유지하고, 모바일은 헤더·프리뷰·하단 바를 좁은 폭에 맞췄다. 공개 사이트 History에 update 항목을 보인다.
+
 ## [2026-09-27] update | 너비·높이 함께 조절 시 프레임과 이미지를 같이 키우고 폰트는 유지
 
 카드 비율을 지키며 프레임을 바꾸면 이미지 크기와 위치도 같은 비율로 따라간다. 폰트 크기와 글자 위치는 그대로다.

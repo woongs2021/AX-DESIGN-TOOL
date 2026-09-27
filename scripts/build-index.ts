@@ -285,15 +285,14 @@ const index = {
   collections: builtCollections,
   wiki: {
     indexBody: wikiIndexBody,
-    // Wiki log may name internal captures; keep it out of the public bundle.
-    logEntries:
-      target === "public"
-        ? []
-        : vault.wikiLogEntries.map((e) => ({
-            date: e.date,
-            operation: e.operation,
-            title: e.title,
-          })),
+    // ingest/query/lint entries may name internal captures; public keeps only site updates.
+    logEntries: vault.wikiLogEntries
+      .filter((e) => target !== "public" || e.operation === "update")
+      .map((e) => ({
+        date: e.date,
+        operation: e.operation,
+        title: e.title,
+      })),
     pages: builtWikiPages,
   },
   facets: computeFacetCounts(builtCaptures, EMPTY_FILTER),

@@ -1254,7 +1254,7 @@ export function bindStudio(
   applyControlsWidth(state.controlsWidth);
 
   splitter.addEventListener("pointerdown", (event) => {
-    if (window.matchMedia("(max-width: 1023px)").matches) return;
+    if (window.matchMedia("(max-width: 767px)").matches) return;
     try {
       splitter.setPointerCapture(event.pointerId);
     } catch {
