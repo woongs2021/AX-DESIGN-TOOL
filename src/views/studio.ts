@@ -69,6 +69,7 @@ const TABLET_QUERY = "(min-width: 768px)";
 const DESKTOP_QUERY = "(min-width: 1025px)";
 let studioDevice: Device | null = null;
 let stopDeviceWatch: (() => void) | null = null;
+let stopHistoryShortcut: (() => void) | null = null;
 
 function largestDevice(): Device {
   if (window.matchMedia(DESKTOP_QUERY).matches) return "desktop";
@@ -528,7 +529,9 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
                 <div class="studio__safe" id="studio-safe" hidden></div>
               </div>
               <div class="studio__overlay">
-                <div class="studio__image-frame" id="studio-image-frame" hidden></div>
+                <div class="studio__select-frame" data-frame="image" hidden></div>
+                <div class="studio__select-frame" data-frame="title" hidden></div>
+                <div class="studio__select-frame" data-frame="body" hidden></div>
                 <span class="studio__handle" data-handle="top" hidden></span>
                 <span class="studio__handle" data-handle="right" hidden></span>
                 <span class="studio__handle" data-handle="bottom" hidden></span>
@@ -613,11 +616,10 @@ export function bindStudio(
   const exportCode = root.querySelector<HTMLElement>("#studio-export");
   const splitter = root.querySelector<HTMLElement>("#studio-splitter");
   const studio = root.querySelector<HTMLElement>(".studio");
-  const imageFrame = root.querySelector<HTMLElement>("#studio-image-frame");
+  const frames = [...root.querySelectorAll<HTMLElement>(".studio__select-frame")];
   const editor = root.querySelector<HTMLTextAreaElement>("#studio-editor");
   const handles = [...root.querySelectorAll<HTMLElement>(".studio__handle")];
   if (
-    !imageFrame ||
     !editor ||
     !presetSelect ||
     !sizeRange ||
@@ -673,7 +675,7 @@ export function bindStudio(
 
   let drawToken = 0;
   let viewScale = 1;
-  let imageSelected = false;
+  const selected = new Set<HitBox["kind"]>();
   let editing: { kind: "title" | "body"; original: string } | null = null;
   let paint = () => {};
   let syncOverlay = () => {};
@@ -1264,18 +1266,53 @@ export function bindStudio(
   };
   const paintDragStroke = () => {
     if (!drag) return;
-    const box = hits.find((hit) => hit.kind === drag?.kind);
-    if (box) strokeDragBox(box);
+    for (const box of hits) if (drag.kinds.includes(box.kind)) strokeDragBox(box);
   };
 
   type ImageBox = { x: number; y: number; width: number };
-  let drag: { kind: HitBox["kind"]; dx: number; dy: number; pointerId: number } | null = null;
-  let tapStart: { x: number; y: number; moved: boolean } | null = null;
+  type Point = { x: number; y: number };
+  let drag: {
+    kind: HitBox["kind"];
+    kinds: HitBox["kind"][];
+    origin: Point;
+    start: Map<HitBox["kind"], Point>;
+    pointerId: number;
+  } | null = null;
+  let tapStart: { x: number; y: number; moved: boolean; shift: boolean } | null = null;
   let lastTap: { kind: HitBox["kind"]; time: number; x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
   let pinch: { distance: number; mid: { x: number; y: number }; image: ImageBox } | null = null;
 
   const imageBox = (): ImageBox => ({ x: state.imageX, y: state.imageY, width: state.imageWidth });
+  const positionOf = (kind: HitBox["kind"]): Point =>
+    kind === "title" ? { x: state.titleX, y: state.titleY }
+    : kind === "body" ? { x: state.bodyX, y: state.bodyY }
+    : { x: state.imageX, y: state.imageY };
+  const clampPosition = (kind: HitBox["kind"], x: number, y: number): Point =>
+    kind === "title" ? {
+      x: clampTextOffset(x, state.cardWidth, state.titleSize),
+      y: clampTextOffset(y, state.cardHeight, state.titleSize),
+    }
+    : kind === "body" ? {
+      x: clampTextOffset(x, state.cardWidth, state.bodySize),
+      y: clampTextOffset(y, state.cardHeight, state.bodySize),
+    }
+    : {
+      x: clampImageOffset(x, state.cardWidth, state.imageWidth),
+      y: clampImageOffset(y, state.cardHeight, imageDrawHeight()),
+    };
+  const setPosition = (kind: HitBox["kind"], point: Point) => {
+    if (kind === "title") {
+      state.titleX = point.x;
+      state.titleY = point.y;
+    } else if (kind === "body") {
+      state.bodyX = point.x;
+      state.bodyY = point.y;
+    } else {
+      state.imageX = point.x;
+      state.imageY = point.y;
+    }
+  };
   const applyImage = (next: ImageBox) => {
     state.imageWidth = next.width;
     state.imageX = clampImageOffset(next.x, state.cardWidth, state.imageWidth);
@@ -1309,14 +1346,21 @@ export function bindStudio(
     editor.style.height = `${editor.scrollHeight}px`;
   };
   syncOverlay = () => {
+    const visible = !editing && !state.code.trim();
+    for (const frame of frames) {
+      const box = hits.find((hit) => hit.kind === frame.dataset.frame);
+      const show = visible && Boolean(box) && selected.has(frame.dataset.frame as HitBox["kind"]);
+      frame.hidden = !show;
+      if (show && box) {
+        placeAt(frame, box.x, box.y);
+        frame.style.width = `${box.w * viewScale}px`;
+        frame.style.height = `${box.h * viewScale}px`;
+      }
+    }
     const box = hits.find((hit) => hit.kind === "image");
-    const show = imageSelected && !editing && !state.code.trim() && Boolean(box);
-    imageFrame.hidden = !show;
+    const show = visible && selected.size === 1 && selected.has("image") && Boolean(box);
     for (const handle of handles) handle.hidden = !show;
     if (show && box) {
-      placeAt(imageFrame, box.x, box.y);
-      imageFrame.style.width = `${box.w * viewScale}px`;
-      imageFrame.style.height = `${box.h * viewScale}px`;
       const inset = 12 / Math.max(viewScale, 0.001);
       const clampX = (value: number) => Math.min(state.cardWidth - inset, Math.max(inset, value));
       const clampY = (value: number) => Math.min(state.cardHeight - inset, Math.max(inset, value));
@@ -1382,7 +1426,7 @@ export function bindStudio(
   const openEditor = (kind: "title" | "body") => {
     if (state.code.trim()) return;
     editing = { kind, original: state[kind] };
-    imageSelected = false;
+    selected.clear();
     beginGesture(editor);
     editor.value = state[kind];
     editor.hidden = false;
@@ -1468,19 +1512,38 @@ export function bindStudio(
     }
     const point = cardPoint(event);
     const hit = hitAt(point.x, point.y);
-    imageSelected = event.pointerType === "mouse" && hit?.kind === "image";
-    tapStart = hit ? { x: event.clientX, y: event.clientY, moved: false } : null;
-    syncOverlay();
-    if (!hit) return;
+    const mouse = event.pointerType === "mouse";
+    if (!mouse) selected.clear();
+    else if (event.shiftKey) {
+      if (hit && selected.has(hit.kind)) selected.delete(hit.kind);
+      else if (hit) selected.add(hit.kind);
+    } else if (!hit) selected.clear();
+    else if (!selected.has(hit.kind)) {
+      selected.clear();
+      selected.add(hit.kind);
+    }
+    if (!hit || (mouse && !selected.has(hit.kind))) {
+      tapStart = null;
+      paint();
+      return;
+    }
+    tapStart = { x: event.clientX, y: event.clientY, moved: false, shift: event.shiftKey };
     try {
       canvas.setPointerCapture(event.pointerId);
     } catch {
       /* the pointer can already be inactive */
     }
     beginGesture(canvas);
-    drag = { kind: hit.kind, dx: point.x - hit.x, dy: point.y - hit.y, pointerId: event.pointerId };
+    const kinds = mouse ? [...selected] : [hit.kind];
+    drag = {
+      kind: hit.kind,
+      kinds,
+      origin: point,
+      start: new Map(kinds.map((kind) => [kind, positionOf(kind)])),
+      pointerId: event.pointerId,
+    };
     canvas.dataset.dragging = "true";
-    paintDragStroke();
+    paint();
   });
   canvas.addEventListener("pointermove", (event) => {
     if (touches.has(event.pointerId)) touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1503,18 +1566,16 @@ export function bindStudio(
       canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
       return;
     }
-    const x = point.x - drag.dx;
-    const y = point.y - drag.dy;
-    if (drag.kind === "title") {
-      state.titleX = clampTextOffset(x, state.cardWidth, state.titleSize);
-      state.titleY = clampTextOffset(y, state.cardHeight, state.titleSize);
-    } else if (drag.kind === "body") {
-      state.bodyX = clampTextOffset(x, state.cardWidth, state.bodySize);
-      state.bodyY = clampTextOffset(y, state.cardHeight, state.bodySize);
-    } else {
-      state.imageX = clampImageOffset(x, state.cardWidth, state.imageWidth);
-      state.imageY = clampImageOffset(y, state.cardHeight, imageDrawHeight());
+    // Shrink the shared delta to the most constrained item so the group keeps its spacing at card edges.
+    const nearer = (a: number, b: number) => (Math.abs(b) < Math.abs(a) ? b : a);
+    let dx = point.x - drag.origin.x;
+    let dy = point.y - drag.origin.y;
+    for (const [kind, start] of drag.start) {
+      const clamped = clampPosition(kind, start.x + dx, start.y + dy);
+      dx = nearer(dx, clamped.x - start.x);
+      dy = nearer(dy, clamped.y - start.y);
     }
+    for (const [kind, start] of drag.start) setPosition(kind, clampPosition(kind, start.x + dx, start.y + dy));
     paint();
   });
   const endDrag = (event: PointerEvent) => {
@@ -1532,9 +1593,15 @@ export function bindStudio(
     drag = null;
     delete canvas.dataset.dragging;
     finishGesture(canvas);
-    paint();
-    if (event.type === "pointerup" && tapStart && !tapStart.moved) registerTap(kind, event);
+    if (event.type === "pointerup" && tapStart && !tapStart.moved && !tapStart.shift) {
+      if (selected.size > 1) {
+        selected.clear();
+        selected.add(kind);
+      }
+      registerTap(kind, event);
+    }
     tapStart = null;
+    paint();
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
@@ -1585,9 +1652,9 @@ export function bindStudio(
   });
 
   stage.addEventListener("pointerdown", (event) => {
-    if (event.target === canvas || !imageSelected) return;
+    if (event.target === canvas || selected.size === 0) return;
     if (event.target instanceof Element && event.target.closest(".studio__handle")) return;
-    imageSelected = false;
+    selected.clear();
     syncOverlay();
   });
 
@@ -1638,6 +1705,27 @@ export function bindStudio(
   stopDeviceWatch = () => {
     for (const query of deviceQueries) query.removeEventListener("change", syncDevice);
   };
+
+  stopHistoryShortcut?.();
+  const historyShortcut = (event: KeyboardEvent) => {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    // event.code keeps the shortcut working when a Korean IME turns Z/Y into "ㅋ"/"ㅛ".
+    const redo = (event.code === "KeyZ" && event.shiftKey) || (event.code === "KeyY" && event.ctrlKey && !event.shiftKey);
+    const undo = event.code === "KeyZ" && !event.shiftKey;
+    if (!undo && !redo) return;
+    const button = redo ? redoButton : undoButton;
+    if (!button.isConnected || button.disabled) return;
+    const target = event.target;
+    const typing =
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target.matches("textarea, input:not([type=range], [type=color], [type=radio], [type=checkbox], [type=button])"));
+    if (typing) return;
+    event.preventDefault();
+    button.click();
+  };
+  document.addEventListener("keydown", historyShortcut);
+  stopHistoryShortcut = () => document.removeEventListener("keydown", historyShortcut);
 
   splitter.addEventListener("pointerdown", (event) => {
     if (studio.getBoundingClientRect().width < 768) return;

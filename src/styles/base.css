@@ -1435,7 +1435,7 @@ html[data-mode="light"] .studio__radius input[type="range"] {
   pointer-events: none;
 }
 
-.studio__image-frame {
+.studio__select-frame {
   position: absolute;
   box-sizing: border-box;
   border: 1px solid var(--primary);
@@ -1472,7 +1472,7 @@ html[data-mode="light"] .studio__radius input[type="range"] {
 }
 
 .studio__handle[hidden],
-.studio__image-frame[hidden],
+.studio__select-frame[hidden],
 .studio__editor[hidden] {
   display: none;
 }
