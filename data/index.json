@@ -655,6 +655,31 @@
     "indexBody": "# Wiki index\n\nContent-oriented catalog for the public bundle. Internal-only pages are omitted.\n\n## Patterns\n\n- [캡슐 필드](patterns/capsule-fields.md) — 중심 캡슐과 모듈 아치가 여백과 격자 안에서 프레임으로 읽히는 패턴.\n- [발광 원반](patterns/luminous-discs.md) — 원반의 재질을 면 색이 아니라 가장자리 빛으로 만드는 패턴.\n\n## Services\n\n- [Hermes studies](services/hermes-studies.md) — image-pick-hermes에서 가져온 색면·원반·기하 스터디.\n\n## Comparisons\n\n- [웜 면과 발광 링](comparisons/warm-vs-luminous.md) — 종이 질감의 따뜻한 색면과, 어두운 배경 위 발광 링의 차이.\n\n## Questions\n\n- [글자 없는 위계](questions/hierarchy-without-type.md) — 글자가 없는 스터디에서 위계를 크기, 대비, 가장자리 중 무엇으로 읽을지.\n",
     "logEntries": [
       {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "디바이스 아이콘 테두리와 프레임 좌우 선 제거"
+      },
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "디바이더와 상단 디바이스 바를 같은 색으로"
+      },
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "모바일·타블렛 프레임 스크롤바를 스크롤할 때만 표시"
+      },
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "모바일·타블렛·데스크탑 뷰 전환"
+      },
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "프리뷰에서 이미지 핀치와 텍스트 바로 수정"
+      },
+      {
         "date": "2026-09-27",
         "operation": "update",
         "title": "태블릿·모바일 레이아웃 최적화와 공개 History 표시"
