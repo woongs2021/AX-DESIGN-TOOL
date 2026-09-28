@@ -1,7 +1,7 @@
 ---
 slug: hermes-gallery
 title: "Hermes 비주얼 스터디"
-description: "image-pick-hermes의 정지 스터디 16건."
+description: "image-pick-hermes의 정지 스터디 20건."
 captures:
   - capsule-pattern
   - directional-flow
@@ -19,6 +19,10 @@ captures:
   - coral-blue-luminous-ring
   - cyan-luminous-arc-edge
   - frosted-blue-glass-disc
+  - bitmap-stripe-rhythm
+  - floral-radial-bloom
+  - iridescent-chrome-field
+  - monochrome-architectural-block
 ---
 
 # Hermes 비주얼 스터디

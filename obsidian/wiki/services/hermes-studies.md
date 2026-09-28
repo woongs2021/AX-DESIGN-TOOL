@@ -13,3 +13,7 @@ visibility: public
 - [[capsule-pattern]]
 - [[modular-arch-surface]]
 - [[coral-blue-luminous-ring]]
+- [[bitmap-stripe-rhythm]]
+- [[floral-radial-bloom]]
+- [[iridescent-chrome-field]]
+- [[monochrome-architectural-block]]

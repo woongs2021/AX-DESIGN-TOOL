@@ -2,6 +2,22 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-09-28] update | 이전 동작·원래대로 키보드 단축키
+
+이전 동작은 Cmd+Z(맥)·Ctrl+Z(윈도우), 원래대로는 Cmd+Shift+Z·Ctrl+Y로 누른다. 글자 입력칸 안에서는 입력한 글자만 되돌린다.
+
+## [2026-09-28] update | Shift로 여러 요소 선택하고 함께 옮기기
+
+프리뷰에서 타이틀·본문·이미지를 Shift+클릭하면 여러 개가 선택되고, 다시 Shift+클릭하면 그것만 빠진다. 선택한 요소는 한꺼번에 끌어 옮긴다.
+
+## [2026-09-28] update | Graphic Library와 스튜디오 테마에 그래픽 4점 추가
+
+비트맵 스트라이프, 방사형 꽃잎, 이리데센트 크롬, 모노크롬 건축 블록을 추가해 모두 20점이 되었다. 스튜디오 테마로도 고를 수 있다.
+
+## [2026-09-28] ingest | hermes visual studies 17–20
+
+image-pick-hermes 17–20을 캡처 4건으로 추가했다: bitmap-stripe-rhythm, floral-radial-bloom, iridescent-chrome-field, monochrome-architectural-block. 분석은 보이는 색, 형태, 여백, 재질만 적었다. hermes-gallery(20건), geometric-structures, warm-earth-surfaces 컬렉션과 Hermes studies 페이지에 연결했다.
+
 ## [2026-09-28] update | 디바이스 아이콘 테두리와 프레임 좌우 선 제거
 
 상단 모바일·타블렛·데스크탑 아이콘의 원형 테두리를 없앴다. 모바일·타블렛 뷰 좌우의 선도 지웠다.

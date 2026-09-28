@@ -36,7 +36,7 @@
 - 네비: Graphic Library / Online Marketing Studio / History. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 - Archive: All/Pin 탭 + 1:1 카드 그리드(이미지 cover 채움). 검색창과 필터 패널은 없다. 카드 kind 뱃지는 motion만 표시.
 - 상세 뷰: 왼쪽 Back 버튼, 이미지 contain + 남는 영역 light 흰색 / dark 검정(`--media-matte`), 분석 본문과 `Graphic asset` 설명.
-- 데이터: `image-pick-hermes` 그래픽 에셋 스터디 16건(모두 public). 더미 캡처는 삭제했다.
+- 데이터: `image-pick-hermes` 그래픽 에셋 스터디 20건(모두 public). 더미 캡처는 삭제했다.
 
 ## 명령
 

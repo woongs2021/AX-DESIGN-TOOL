@@ -11,7 +11,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | Phase | 목표 | 상태 | 문서 |
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
-| 1 Online Marketing Studio | 16개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
+| 1 Online Marketing Studio | 20개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
 
 ## Phase 1 — Online Marketing Studio 계획 요약
 
@@ -27,7 +27,8 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 - 좌측은 **컨트롤 패널**, 우측은 **프리뷰**. 768px 이상(태블릿·데스크톱)에서는 가운데 바를 드래그해 두 영역의 너비를 조절한다. 767px 이하 모바일은 프리뷰 위, 컨트롤 아래로 쌓고, 헤더는 로고·모드 버튼 한 줄과 메뉴 한 줄로 줄인다. 헤더 아래에는 모바일·타블렛·데스크탑 뷰 아이콘이 있다. 화면 폭에 따라 하나, 둘, 셋이 보이고, 누르면 컨트롤 패널과 프리뷰가 그 화면으로 함께 바뀐다. 아이콘에는 원형 테두리가 없고, 모바일·타블렛 프레임 좌우에도 선이 없다. 프레임 스크롤바는 스크롤할 때만 콘텐츠 위에 겹친다. 프리뷰 폭이 좁으면 하단 바가 크기 정보, 편집·줌 버튼, 다운로드 버튼 순으로 줄바꿈된다. 프리뷰는 `−` / `+`로 확대·축소하고, `Fit`을 누르면 사방 10px 여백을 두고 100%로 맞춘다. 현재 카드의 실제 픽셀 크기 PNG로 다운로드한다. 첫 방문의 화면 모드는 다크다.
 - 컨트롤 패널은 **디자인 영역**과 **코드 영역** 두 탭으로 나눈다.
 - **Graphic Library**(예전 Archive)는 스튜디오에 쓸 그래픽을 모아 둔 화면이다. 제목 아래 설명 문장과 `Target … · N · N pinned` 줄을 두고, 검색창·필터 없이 All/Pin 탭으로만 나눈다.
-- 프리뷰에는 이전 동작·원래대로 버튼이 있고, 드래그하는 동안만 잡은 요소에 테두리가 보인다. 분할 바는 옅은 색이고, 조절바의 빈 트랙은 라이트·다크 모드 모두에서 보이게 칠한다.
+- 프리뷰에는 이전 동작·원래대로 버튼이 있고, 드래그하는 동안만 잡은 요소에 테두리가 보인다. 단축키는 이전 동작 Cmd/Ctrl+Z, 원래대로 Cmd+Shift+Z · Ctrl+Y다(글자 입력칸 안에서는 브라우저 기본 동작).
+- 프리뷰에서 타이틀·본문·이미지를 클릭하면 선택되고, Shift+클릭으로 여러 개를 선택하거나 하나만 뺀다. 선택된 객체를 끌면 함께 움직인다. 분할 바는 옅은 색이고, 조절바의 빈 트랙은 라이트·다크 모드 모두에서 보이게 칠한다.
 
 **디자인 영역 컨트롤**
 
@@ -38,7 +39,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | 폰트 크기 | 타이틀·본문 각각 range 바 + 수치. 최소 5px, 최대는 카드 너비 − 20px |
 | 폰트 | 타이틀·본문 각각 선택. Roboto, Pretendard, Montserrat. `fonts/`에 폰트 파일을 넣고 다시 빌드하면 목록에 추가 |
 | 초기화 | 카드 설정을 처음 값으로 되돌린다. 타이틀·본문 초안도 복원. 선택한 테마와 패널 너비는 유지 |
-| 아카이브 테마 | 16개 아카이브 작업물 썸네일 중 하나 선택 |
+| 아카이브 테마 | 20개 아카이브 작업물 썸네일 중 하나 선택 |
 | 카드 이미지 | 너비 바 + 수치(100~4000px, 높이는 원본 비율). 프리뷰에서 드래그해 위치 이동. 핀치하거나 클릭 후 상하좌우 핸들로 크기 조절 |
 | 카드 컬러 | 원형 컬러 피커 + hex 입력. 타이틀·본문 시작색은 대비에 맞춘 흑 또는 백 |
 | 카드 radius | range 바 + 수치 입력 동기화(0~120px, 기본 28px), CSS 변수로 적용 |
@@ -55,7 +56,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-09-28 | 프리뷰에서 이미지 핀치·크기 핸들과 텍스트 바로 수정. 모바일·타블렛·데스크탑 뷰 전환, 스크롤할 때만 보이는 프레임 스크롤바. 디바이더와 디바이스 바를 같은 색으로 맞추고 아이콘 테두리·프레임 좌우 선을 없앴다. History 본문 글자 크기를 날짜와 같게 14px로 맞췄다. |
+| 2026-09-28 | 프리뷰에서 이미지 핀치·크기 핸들과 텍스트 바로 수정. 모바일·타블렛·데스크탑 뷰 전환, 스크롤할 때만 보이는 프레임 스크롤바. 디바이더와 디바이스 바를 같은 색으로 맞추고 아이콘 테두리·프레임 좌우 선을 없앴다. History 본문 글자 크기를 날짜와 같게 14px로 맞췄다. 그래픽 4점을 추가해 테마 20개. Shift 다중 선택·함께 드래그, 이전 동작·원래대로 키보드 단축키. |
 | 2026-09-27 | Online Marketing Studio 공개. 레이아웃·폰트·이미지 수동 조절, 타이틀·본문 폰트 분리, 초기화. Archive를 Graphic Library로 바꾸고 검색·필터 제거. 다크 모드 기본값, 기본 문구 `시즌`, 글자색 피커 테두리. 프리뷰 줌·Fit·이전 동작/원래대로·드래그 영역 표시. 너비·높이 함께 조절은 프레임과 이미지를 같이 바꾸고 폰트는 유지. 스크롤바·분할 바·조절바 시인성 정돈. 상세는 [Phase 1 문서의 업데이트 기록](docs/phase-1-online-marketing-studio.md#업데이트-기록). |
 
 History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 보여 준다. public 번들(GitHub Pages)에는 `update` 항목만 들어가고, 캡처 이름이 나올 수 있는 `ingest`·`query`·`lint` 항목은 internal에만 둔다. 같은 날 태블릿·모바일 레이아웃도 정리했다.
@@ -81,7 +82,7 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 
 ## 현재 아카이브
 
-`image-pick-hermes` 그래픽 에셋 스터디 16건이다. 모두 `visibility: public`이며 Phase 1 스튜디오의 테마 후보가 된다. `npm run seed:dummy`는 이 아카이브를 더미 데이터로 덮어쓰므로 실행하지 않는다.
+`image-pick-hermes` 그래픽 에셋 스터디 20건이다. 모두 `visibility: public`이며 Phase 1 스튜디오의 테마 후보가 된다. `npm run seed:dummy`는 이 아카이브를 더미 데이터로 덮어쓰므로 실행하지 않는다.
 
 | 타깃 | captures | asset bytes | Pages remaining / 1GB |
 |---|---|---|---|
