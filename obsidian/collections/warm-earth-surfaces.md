@@ -8,6 +8,7 @@ captures:
   - warm-earth-oval
   - angular-shadow-surface
   - warm-offwhite-eclipse-disc
+  - floral-radial-bloom
 ---
 
 # 웜 어스 면

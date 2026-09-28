@@ -7,6 +7,8 @@ captures:
   - geometric-arch-grid
   - modular-arch-surface
   - orbit-circle-signal
+  - bitmap-stripe-rhythm
+  - monochrome-architectural-block
 ---
 
 # 기하 구조
