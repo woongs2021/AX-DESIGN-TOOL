@@ -3,6 +3,144 @@
     {
       "appVersion": null,
       "asset": {
+        "bytes": 246347,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "cf307d590e1f262325c542f0006404b0808f22bb5eb2d388b6e8e7461d8d8e30",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/bitmap-stripe-rhythm/capture.jpg",
+        "posterPath": null,
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n아이보리 면이 네 개의 세로 열로 나뉘고, 각 열에 굵기가 다른 가로 막대가 쌓인다. 열 사이 막대의 높이가 맞지 않아 경계에서 엇갈린다. 왼쪽과 오른쪽 끝 열은 화면 밖으로 잘린다.\n\n## Color\n\n블랙에 가까운 네이비가 가장 많고, 더스티 블루, 머스터드 옐로, 레드가 사이에 끼어든다. 막대 가장자리는 스크린 인쇄처럼 거칠게 번지고 종이 결이 비친다.\n\n## Graphic asset\n\n그래픽 에셋이다. 반복 단위가 가로 막대라 좌우로 잘라도 패턴이 유지되어, 띠 배너나 섹션 배경으로 크롭하기 쉽다.\n\n## Typography\n\n글자가 없다. 위계는 막대 굵기와 네이비 비중으로만 생긴다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-09-28",
+      "copyTone": "restrained",
+      "insight": "열마다 막대의 높이 기준선을 어긋나게 두면, 같은 가로 막대 반복도 표가 아니라 리듬으로 읽힌다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "bitmap-stripe-rhythm",
+      "sourceUrl": null,
+      "tags": [
+        "color",
+        "density"
+      ],
+      "title": "비트맵 스트라이프 리듬 — 네 열 가로 막대",
+      "tone": "playful",
+      "uiPatterns": [
+        "data-table"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 184663,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "eb06b3c9dab00c313fcdeb43b81b55b9d65d0d5542b35c326d33e8e30a4a27ce",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/floral-radial-bloom/capture.jpg",
+        "posterPath": null,
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n화면 중앙보다 약간 위의 한 점에서 물방울 모양 꽃잎 열한 장이 사방으로 퍼진다. 아래쪽의 가는 블루 줄기만 화면 밖으로 빠져나간다. 오른쪽 위와 왼쪽 아래 꽃잎은 가장자리에 닿을 듯 크다.\n\n## Color\n\n크림 종이 위에 크림슨, 버건디, 블랙, 코랄, 피치, 오커, 토프, 더스티 블루. 붓 자국과 종이 결이 색면 안에 남아 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 중심점이 명확한 단일 오브제라, 히어로 한가운데 심벌이나 캠페인 키 비주얼로 쓸 수 있다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-09-28",
+      "copyTone": "restrained",
+      "insight": "모든 꽃잎이 화면 중앙 한 점에 모이면, 색이 열 가지여도 시선은 그 점 하나로 정리된다.",
+      "platform": "web",
+      "screenType": "marketing",
+      "service": "Hermes studies",
+      "slug": "floral-radial-bloom",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "방사형 꽃잎 — 한 점에서 퍼지는 색면",
+      "tone": "editorial",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 265270,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "ebdbc5630c0ffd67298c94c8fbe9a253770058fe2347446e2655a7c820cfe780",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/iridescent-chrome-field/capture.jpg",
+        "posterPath": null,
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n녹은 금속이 세로로 흘러내린 듯한 굴곡면이 화면을 채운다. 왼쪽과 가운데는 부푼 둥근 띠, 오른쪽 아래는 검은 입자가 흩뿌려진 거친 면이다. 닫힌 도형이나 수평선은 없다.\n\n## Color\n\n실버 크롬 위에 아쿠아, 오렌지, 라벤더 무지갯빛 반사가 번진다. 입자 부분은 차콜 점과 연한 민트.\n\n## Graphic asset\n\n그래픽 에셋이다. 풀블리드 재질 텍스처라 배경이나 제품 소재 무드로 쓴다. 반사가 강해 위에 올리는 글자는 대비 확인이 필요하다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-09-28",
+      "copyTone": "restrained",
+      "insight": "매끈한 반사면 옆에 입자가 흩뿌려진 면을 붙이면, 같은 금속이 녹은 부분과 굳은 부분으로 나뉘어 보인다.",
+      "platform": "web",
+      "screenType": "detail",
+      "service": "Hermes studies",
+      "slug": "iridescent-chrome-field",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "이리데센트 크롬 — 녹아 흐르는 금속면",
+      "tone": "playful",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 187332,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "617f4d0b58180e7fc19a818dcae639d4693bbd710ff81a108f063d6fd87b6234",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/monochrome-architectural-block/capture.jpg",
+        "posterPath": null,
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n블랙 배경을 흰 수직 기둥이 가운데에서 관통한다. 왼쪽 아래는 낮은 흰 블록, 오른쪽 아래는 그레이 사선 면이 대각으로 올라온다. 기둥 아래쪽 블랙이 흰 면으로 번지며 그림자처럼 보인다.\n\n## Color\n\n블랙, 오프화이트, 미드 그레이. 모든 면에 콘크리트 같은 미세 입자가 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 수직 기둥과 사선이 면을 나누므로, 섹션을 나누는 배경 플레이트나 흑백 캠페인 배경으로 쓴다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-09-28",
+      "copyTone": "restrained",
+      "insight": "색이 흑백뿐이어도 흰 기둥 하나와 사선 한 줄이 있으면 면이 공간처럼 깊이를 가진다.",
+      "platform": "web",
+      "screenType": "detail",
+      "service": "Hermes studies",
+      "slug": "monochrome-architectural-block",
+      "sourceUrl": null,
+      "tags": [
+        "color",
+        "navigation"
+      ],
+      "title": "모노크롬 건축 블록 — 수직 기둥과 사선 면",
+      "tone": "calm",
+      "uiPatterns": [
+        "split-view"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
         "bytes": 476354,
         "durationSec": null,
         "format": "jpeg",
@@ -563,7 +701,9 @@
         "directional-flow",
         "geometric-arch-grid",
         "modular-arch-surface",
-        "orbit-circle-signal"
+        "orbit-circle-signal",
+        "bitmap-stripe-rhythm",
+        "monochrome-architectural-block"
       ],
       "description": "격자, 대각, 궤도 선으로 방향을 만드는 스터디.",
       "slug": "geometric-structures",
@@ -587,9 +727,13 @@
         "warm-offwhite-eclipse-disc",
         "coral-blue-luminous-ring",
         "cyan-luminous-arc-edge",
-        "frosted-blue-glass-disc"
+        "frosted-blue-glass-disc",
+        "bitmap-stripe-rhythm",
+        "floral-radial-bloom",
+        "iridescent-chrome-field",
+        "monochrome-architectural-block"
       ],
-      "description": "image-pick-hermes의 정지 스터디 16건.",
+      "description": "image-pick-hermes의 정지 스터디 20건.",
       "slug": "hermes-gallery",
       "title": "Hermes 비주얼 스터디"
     },
@@ -614,7 +758,8 @@
         "matte-circle-fields",
         "warm-earth-oval",
         "angular-shadow-surface",
-        "warm-offwhite-eclipse-disc"
+        "warm-offwhite-eclipse-disc",
+        "floral-radial-bloom"
       ],
       "description": "베이지, 테라코타, 세이지가 종이 질감으로 겹친 스터디.",
       "slug": "warm-earth-surfaces",
@@ -623,30 +768,33 @@
   ],
   "facets": {
     "platform": {
-      "web": 16
+      "web": 20
     },
     "screenType": {
-      "detail": 6,
-      "gallery": 3,
-      "marketing": 7
+      "detail": 8,
+      "gallery": 4,
+      "marketing": 8
     },
     "tag": {
       "cards": 3,
-      "color": 16,
+      "color": 20,
+      "density": 1,
       "empty-state": 1,
       "gallery": 2,
       "motion": 3,
-      "navigation": 2
+      "navigation": 3
     },
     "tone": {
-      "calm": 7,
-      "editorial": 8,
-      "informational": 1
+      "calm": 8,
+      "editorial": 9,
+      "informational": 1,
+      "playful": 2
     },
     "uiPattern": {
       "card-grid": 2,
-      "hero-band": 12,
-      "split-view": 2
+      "data-table": 1,
+      "hero-band": 14,
+      "split-view": 3
     }
   },
   "target": "public",
@@ -654,6 +802,21 @@
   "wiki": {
     "indexBody": "# Wiki index\n\nContent-oriented catalog for the public bundle. Internal-only pages are omitted.\n\n## Patterns\n\n- [캡슐 필드](patterns/capsule-fields.md) — 중심 캡슐과 모듈 아치가 여백과 격자 안에서 프레임으로 읽히는 패턴.\n- [발광 원반](patterns/luminous-discs.md) — 원반의 재질을 면 색이 아니라 가장자리 빛으로 만드는 패턴.\n\n## Services\n\n- [Hermes studies](services/hermes-studies.md) — image-pick-hermes에서 가져온 색면·원반·기하 스터디.\n\n## Comparisons\n\n- [웜 면과 발광 링](comparisons/warm-vs-luminous.md) — 종이 질감의 따뜻한 색면과, 어두운 배경 위 발광 링의 차이.\n\n## Questions\n\n- [글자 없는 위계](questions/hierarchy-without-type.md) — 글자가 없는 스터디에서 위계를 크기, 대비, 가장자리 중 무엇으로 읽을지.\n",
     "logEntries": [
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "이전 동작·원래대로 키보드 단축키"
+      },
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "Shift로 여러 요소 선택하고 함께 옮기기"
+      },
+      {
+        "date": "2026-09-28",
+        "operation": "update",
+        "title": "Graphic Library와 스튜디오 테마에 그래픽 4점 추가"
+      },
       {
         "date": "2026-09-28",
         "operation": "update",
@@ -783,11 +946,15 @@
         "visibility": "public"
       },
       {
-        "body": "\n# Hermes studies\n\n제품 UI가 아니라 비주얼 스터디다. 색, 가장자리, 여백, 재질만 기록한다.\n\n## 관련 캡처\n\n- [[capsule-pattern]]\n- [[modular-arch-surface]]\n- [[coral-blue-luminous-ring]]\n",
+        "body": "\n# Hermes studies\n\n제품 UI가 아니라 비주얼 스터디다. 색, 가장자리, 여백, 재질만 기록한다.\n\n## 관련 캡처\n\n- [[capsule-pattern]]\n- [[modular-arch-surface]]\n- [[coral-blue-luminous-ring]]\n- [[bitmap-stripe-rhythm]]\n- [[floral-radial-bloom]]\n- [[iridescent-chrome-field]]\n- [[monochrome-architectural-block]]\n",
         "captureRefs": [
+          "bitmap-stripe-rhythm",
           "capsule-pattern",
           "coral-blue-luminous-ring",
-          "modular-arch-surface"
+          "floral-radial-bloom",
+          "iridescent-chrome-field",
+          "modular-arch-surface",
+          "monochrome-architectural-block"
         ],
         "id": "services/hermes-studies",
         "summary": "image-pick-hermes에서 가져온 색면·원반·기하 스터디.",
