@@ -11,7 +11,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | Phase | 목표 | 상태 | 문서 |
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
-| 1 Online Marketing Studio | 20개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
+| 1 Online Marketing Studio | 30개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
 
 ## Phase 1 — Online Marketing Studio 계획 요약
 
@@ -35,11 +35,11 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | 컨트롤 | 형태 |
 |---|---|
 | 카드 크기 | SNS 기본 규격 프리셋. 진입 시 Instagram Feed 1080 × 1080 자동 선택. 너비·높이는 바 + 수치로 100~4000px 직접 조절. 둘을 한 번에 조절하는 바는 비율을 유지한 채 프레임과 이미지를 함께 키우거나 줄이고, 폰트는 그대로 둔다 |
-| 카드 타이틀 / 본문 | 텍스트 input / textarea. 시작값은 `시즌`과 짧은 본문 초안. 입력 즉시 프리뷰 반영. 프리뷰에서 드래그해 위치 이동하고, 더블 클릭하면 그 자리에서 수정. 글자색은 각각 원형 컬러 피커(모드에 맞는 30% 테두리) |
+| 카드 타이틀 / 본문 | 텍스트 input / textarea. 시작값은 `Hello`와 헤르메스 본문 초안. 타이틀은 Montserrat 100px, 본문은 Pretendard 32px. 입력 즉시 프리뷰 반영. 프리뷰에서 드래그해 위치 이동하고, 더블 클릭하면 그 자리에서 수정. 글자색은 각각 원형 컬러 피커(모드에 맞는 30% 테두리) |
 | 폰트 크기 | 타이틀·본문 각각 range 바 + 수치. 최소 5px, 최대는 카드 너비 − 20px |
 | 폰트 | 타이틀·본문 각각 선택. Roboto, Pretendard, Montserrat. `fonts/`에 폰트 파일을 넣고 다시 빌드하면 목록에 추가 |
 | 초기화 | 카드 설정을 처음 값으로 되돌린다. 타이틀·본문 초안도 복원. 선택한 테마와 패널 너비는 유지 |
-| 아카이브 테마 | 20개 아카이브 작업물 썸네일 중 하나 선택 |
+| 아카이브 테마 | 30개 아카이브 작업물 썸네일 중 하나 선택 |
 | 카드 이미지 | 너비 바 + 수치(100~4000px, 높이는 원본 비율). 프리뷰에서 드래그해 위치 이동. 핀치하거나 클릭 후 상하좌우 핸들로 크기 조절 |
 | 카드 컬러 | 원형 컬러 피커 + hex 입력. 타이틀·본문 시작색은 대비에 맞춘 흑 또는 백 |
 | 카드 radius | range 바 + 수치 입력 동기화(0~120px, 기본 28px), CSS 변수로 적용 |
@@ -56,6 +56,8 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-10-05 | Graphic Library와 스튜디오 테마 이미지를 4096 정사각 PNG로 교체하고, 새 그래픽 10점을 더해 30개가 되었다. 스튜디오에 초기화로 세팅·설정 메뉴의 리셋·그래픽 라이브러리 저장(Saved 탭)을 넣었다. |
+
 | 2026-09-28 | 프리뷰에서 이미지 핀치·크기 핸들과 텍스트 바로 수정. 모바일·타블렛·데스크탑 뷰 전환, 스크롤할 때만 보이는 프레임 스크롤바. 디바이더와 디바이스 바를 같은 색으로 맞추고 아이콘 테두리·프레임 좌우 선을 없앴다. History 본문 글자 크기를 날짜와 같게 14px로 맞췄다. 그래픽 4점을 추가해 테마 20개. Shift 다중 선택·함께 드래그, 이전 동작·원래대로 키보드 단축키. |
 | 2026-09-27 | Online Marketing Studio 공개. 레이아웃·폰트·이미지 수동 조절, 타이틀·본문 폰트 분리, 초기화. Archive를 Graphic Library로 바꾸고 검색·필터 제거. 다크 모드 기본값, 기본 문구 `시즌`, 글자색 피커 테두리. 프리뷰 줌·Fit·이전 동작/원래대로·드래그 영역 표시. 너비·높이 함께 조절은 프레임과 이미지를 같이 바꾸고 폰트는 유지. 스크롤바·분할 바·조절바 시인성 정돈. 상세는 [Phase 1 문서의 업데이트 기록](docs/phase-1-online-marketing-studio.md#업데이트-기록). |
 
@@ -82,7 +84,7 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 
 ## 현재 아카이브
 
-`image-pick-hermes` 그래픽 에셋 스터디 20건이다. 모두 `visibility: public`이며 Phase 1 스튜디오의 테마 후보가 된다. `npm run seed:dummy`는 이 아카이브를 더미 데이터로 덮어쓰므로 실행하지 않는다.
+`image-pick-hermes` 그래픽 에셋 스터디 30건이다. 에셋은 4096 정사각 PNG다. 모두 `visibility: public`이며 Phase 1 스튜디오의 테마 후보가 된다. `npm run seed:dummy`는 이 아카이브를 더미 데이터로 덮어쓰므로 실행하지 않는다.
 
 | 타깃 | captures | asset bytes | Pages remaining / 1GB |
 |---|---|---|---|

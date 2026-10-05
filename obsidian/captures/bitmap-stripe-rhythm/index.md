@@ -1,7 +1,7 @@
 ---
 slug: bitmap-stripe-rhythm
 title: "비트맵 스트라이프 리듬 — 네 열 가로 막대"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
 service: "Hermes studies"

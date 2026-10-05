@@ -1,7 +1,7 @@
 ---
 slug: directional-flow
 title: "방향성 면 분할 — 대각과 수직 밴드"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

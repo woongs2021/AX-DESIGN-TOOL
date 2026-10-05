@@ -2,8 +2,9 @@ import { sortCaptures } from "../shared/filter.ts";
 import type { CaptureRecord, SiteIndex } from "../shared/index-types.ts";
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
 import { hrefFor } from "../router.ts";
+import type { SavedCard } from "../saved-cards.ts";
 
-export type ArchiveTab = "all" | "pin";
+export type ArchiveTab = "all" | "pin" | "saved";
 
 export type ArchiveCallbacks = {
   onTabChange: (tab: ArchiveTab) => void;
@@ -64,6 +65,23 @@ function cardImage(capture: CaptureRecord): string {
   return `<img class="capture-card__media" src="${escapeHtml(assetUrl(src))}" alt="" loading="lazy" width="${capture.asset.width}" height="${capture.asset.height}" />`;
 }
 
+function renderSavedCard(card: SavedCard): string {
+  const size = `${card.state.cardWidth} × ${card.state.cardHeight}`;
+  return `
+    <article class="capture-card">
+      <a class="capture-card__link" href="${hrefFor({ name: "studio", theme: null, card: card.id })}">
+        <div class="capture-card__frame">
+          <img class="capture-card__media" src="${escapeHtml(card.thumbnail)}" alt="" width="${card.state.cardWidth}" height="${card.state.cardHeight}" />
+        </div>
+        <div class="capture-card__body">
+          <h2 class="capture-card__title">${escapeHtml(card.title)}</h2>
+          <p class="capture-card__insight">${escapeHtml(size)}</p>
+        </div>
+      </a>
+    </article>
+  `;
+}
+
 function renderCard(capture: CaptureRecord, pinned: boolean): string {
   return `
     <article class="capture-card${pinned ? " capture-card--pinned" : ""}">
@@ -106,6 +124,7 @@ export function renderArchive(
   index: SiteIndex,
   pinnedSlugs: string[],
   tab: ArchiveTab,
+  savedCards: SavedCard[],
 ): string {
   const pinSet = new Set(pinnedSlugs);
   const scoped =
@@ -129,7 +148,11 @@ export function renderArchive(
         <div>
           <h1 class="gallery__title">Graphic Library</h1>
           <p class="gallery__lede">모든 마케팅 비주얼의 출발점이 되는 그래픽 라이브러리입니다. 브랜드 톤에 맞춰 선별한 에셋을 <span class="gallery__nowrap">형태·색·질감</span> 기준으로 탐색하고, Online Marketing Studio에서 채널별 규격에 맞는 카드로 바로 완성할 수 있습니다.</p>
-          <p class="gallery__meta">Target ${escapeHtml(index.target)} · ${filtered.length} · ${pinnedSlugs.length} pinned</p>
+          <p class="gallery__meta">${
+            tab === "saved"
+              ? `Saved ${savedCards.length}`
+              : `Target ${escapeHtml(index.target)} · ${filtered.length} · ${pinnedSlugs.length} pinned`
+          }</p>
         </div>
       </header>
 
@@ -141,11 +164,21 @@ export function renderArchive(
         <button type="button" class="archive-tab" role="tab" id="archive-tab-pin" data-archive-tab="pin" aria-selected="${tab === "pin" ? "true" : "false"}">
           Pin <span class="archive-tab__count">${pinnedSlugs.length}</span>
         </button>
+        <button type="button" class="archive-tab" role="tab" id="archive-tab-saved" data-archive-tab="saved" aria-selected="${tab === "saved" ? "true" : "false"}">
+          Saved <span class="archive-tab__count">${savedCards.length}</span>
+        </button>
       </div>
 
       <div class="gallery__results archive__results" aria-live="polite">
         ${
-          filtered.length === 0
+          tab === "saved"
+            ? savedCards.length === 0
+              ? `<section class="state-panel state-panel--tint">
+                  <h2 class="state-panel__title">저장된 카드가 없습니다</h2>
+                  <p class="state-panel__text">스튜디오에서 그래픽 라이브러리에 추가를 누르면 이 탭에 모입니다.</p>
+                </section>`
+              : `<div class="capture-grid">${savedCards.map((card) => renderSavedCard(card)).join("")}</div>`
+            : filtered.length === 0
             ? `<section class="state-panel state-panel--tint">
                 <h2 class="state-panel__title">${tab === "pin" ? "No pinned captures" : "No captures"}</h2>
                 <p class="state-panel__text">${
@@ -172,7 +205,7 @@ export function bindArchive(
   root.querySelectorAll<HTMLButtonElement>("[data-archive-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       const next = button.dataset.archiveTab;
-      if (next === "all" || next === "pin") callbacks.onTabChange(next);
+      if (next === "all" || next === "pin" || next === "saved") callbacks.onTabChange(next);
     });
   });
 

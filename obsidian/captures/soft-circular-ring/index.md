@@ -1,7 +1,7 @@
 ---
 slug: soft-circular-ring
 title: "소프트 링 — 코랄에서 블루로 번지는 고리"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

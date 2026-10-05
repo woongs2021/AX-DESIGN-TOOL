@@ -1,7 +1,7 @@
 ---
 slug: cyan-luminous-arc-edge
 title: "시안 발광 아크 가장자리"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

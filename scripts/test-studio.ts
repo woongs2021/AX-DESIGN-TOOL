@@ -6,6 +6,7 @@ import {
   createStudioState,
   DEFAULT_BODY,
   DEFAULT_TITLE,
+  applyStudioBaseline,
   resetStudioState,
   clampFontSize,
   clampImageWidth,
@@ -57,6 +58,23 @@ assert.equal(clampFontSize(40, 100), 40);
 assert.equal(fontLabelFromPath("fonts/Noto_Sans.woff2"), "Noto Sans");
 assert.equal(fontLabelFromPath("fonts/Pretendard.ttf"), "Pretendard");
 
+const home = createStudioState("black-mountain-red-horizon", "#d8f1ff");
+assert.equal(home.title, "Hello");
+assert.equal(home.body, "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.");
+assert.equal(home.titleFontId, "montserrat");
+assert.equal(home.bodyFontId, "pretendard");
+assert.equal(home.titleSize, 100);
+assert.equal(home.bodySize, 32);
+assert.equal(home.titleX, 71);
+assert.equal(home.titleY, 99);
+assert.equal(home.bodyX, 77);
+assert.equal(home.bodyY, 209);
+assert.equal(home.titleColor, "#000000");
+assert.equal(home.bodyColor, "#000000");
+assert.equal(home.imageWidth, 1080);
+assert.equal(home.imageX, 0);
+assert.equal(home.imageY, 0);
+
 const draft = createStudioState("capsule-pattern", "#ffffff");
 assert.equal(draft.title, DEFAULT_TITLE);
 assert.equal(draft.body, DEFAULT_BODY);
@@ -65,6 +83,18 @@ draft.body = "";
 resetStudioState(draft, "#ffffff");
 assert.equal(draft.title, DEFAULT_TITLE);
 assert.equal(draft.body, DEFAULT_BODY);
+assert.equal(draft.themeSlug, "capsule-pattern");
+
+const baseline = createStudioState("capsule-pattern", "#ffffff");
+baseline.title = "세팅";
+baseline.titleX = 120;
+draft.title = "다른 값";
+applyStudioBaseline(draft, baseline, "#ffffff");
+assert.equal(draft.title, "세팅");
+assert.equal(draft.titleX, 120);
+draft.title = "다시";
+applyStudioBaseline(draft, null, "#ffffff");
+assert.equal(draft.title, DEFAULT_TITLE);
 assert.equal(draft.themeSlug, "capsule-pattern");
 
 const widthOf = (line: string) => line.length * 10;
@@ -96,16 +126,23 @@ assert.match(rendered, /A&lt;B/);
 assert.match(rendered, /본문/);
 assert.equal(sanitizeStudioCode(`<div onclick="alert(1)"><script>alert(1)</script>ok</div>`), "<div>ok</div>");
 
-assert.deepEqual(parseHash("#/studio"), { name: "studio", theme: null });
+assert.deepEqual(parseHash("#/studio"), { name: "studio", theme: null, card: null });
 assert.deepEqual(parseHash("#/studio?theme=capsule-pattern"), {
   name: "studio",
   theme: "capsule-pattern",
+  card: null,
 });
-assert.deepEqual(parseHash("#/intake"), { name: "studio", theme: null });
-assert.deepEqual(parseHash("#/design-system"), { name: "studio", theme: null });
-assert.deepEqual(parseHash("#/stats"), { name: "studio", theme: null });
+assert.deepEqual(parseHash("#/studio?card=saved-abc"), {
+  name: "studio",
+  theme: null,
+  card: "saved-abc",
+});
+assert.deepEqual(parseHash("#/intake"), { name: "studio", theme: null, card: null });
+assert.deepEqual(parseHash("#/design-system"), { name: "studio", theme: null, card: null });
+assert.deepEqual(parseHash("#/stats"), { name: "studio", theme: null, card: null });
 assert.equal(isLegacyStudioHash("#/intake"), true);
 assert.equal(isLegacyStudioHash("#/studio"), false);
-assert.equal(hrefFor({ name: "studio", theme: "warm-earth-oval" }), "#/studio?theme=warm-earth-oval");
+assert.equal(hrefFor({ name: "studio", theme: "warm-earth-oval", card: null }), "#/studio?theme=warm-earth-oval");
+assert.equal(hrefFor({ name: "studio", theme: "warm-earth-oval", card: "saved-abc" }), "#/studio?card=saved-abc");
 
 console.log("OK: studio preset, size, font, radius, wrap, ink, code, and route checks");

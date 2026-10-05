@@ -1,7 +1,7 @@
 ---
 slug: floral-radial-bloom
 title: "방사형 꽃잎 — 한 점에서 퍼지는 색면"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
 service: "Hermes studies"

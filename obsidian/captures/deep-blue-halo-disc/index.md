@@ -1,7 +1,7 @@
 ---
 slug: deep-blue-halo-disc
 title: "딥 블루 헤일로 원반"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

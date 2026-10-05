@@ -1,7 +1,7 @@
 ---
 slug: orbit-circle-signal
 title: "궤도 원 — 틸 원반과 잘린 코랄 원"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

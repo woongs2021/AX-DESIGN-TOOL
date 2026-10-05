@@ -1,7 +1,7 @@
 ---
 slug: ambient-blue-peach-gradient
 title: "앰비언트 그라데이션 — 틸과 피치"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

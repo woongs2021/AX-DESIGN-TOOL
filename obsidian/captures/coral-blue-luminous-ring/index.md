@@ -1,7 +1,7 @@
 ---
 slug: coral-blue-luminous-ring
 title: "코랄-블루 발광 링"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

@@ -1,7 +1,7 @@
 ---
 slug: iridescent-chrome-field
 title: "이리데센트 크롬 — 녹아 흐르는 금속면"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
 service: "Hermes studies"

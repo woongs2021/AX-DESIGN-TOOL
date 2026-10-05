@@ -1,7 +1,7 @@
 ---
 slug: modular-arch-surface
 title: "모듈 아치 그리드 — 머스타드 세로선"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

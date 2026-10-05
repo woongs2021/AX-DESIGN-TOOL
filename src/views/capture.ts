@@ -154,7 +154,7 @@ export function renderCaptureDetail(
           <p class="detail__insight">${escapeHtml(capture.insight)}</p>
         </div>
         <div class="detail__actions">
-          <a class="button button--secondary" href="${escapeHtml(hrefFor({ name: "studio", theme: slug }))}">이 테마로 만들기</a>
+          <a class="button button--secondary" href="${escapeHtml(hrefFor({ name: "studio", theme: slug, card: null }))}">이 테마로 만들기</a>
           <button type="button" class="button button--secondary" data-pin-slug="${escapeHtml(slug)}" aria-pressed="${isPinned ? "true" : "false"}">
             ${isPinned ? "Unpin" : "Pin"}
           </button>
