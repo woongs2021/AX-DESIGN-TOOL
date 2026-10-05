@@ -3,17 +3,361 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 246347,
+        "bytes": 30991480,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "cf307d590e1f262325c542f0006404b0808f22bb5eb2d388b6e8e7461d8d8e30",
-        "height": 1024,
+        "hash": "9ebc76cebc174654a8b50273ca1dc2a0a06a4f8c4eb14fa01a6282ccd4a61a50",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/bitmap-stripe-rhythm/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/black-mountain-red-horizon/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n위는 넓은 아이보리 여백, 오른쪽에서 왼쪽으로 낮아지는 검은 산 실루엣, 그 아래는 거친 먹 자국이다. 실루엣 하단을 얇은 빨간 수평선이 관통한다.\n\n## Color\n\n웜 아이보리, 블랙, 가는 레드 선. 종이 결과 잉크 입자가 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 위쪽 여백이 넓어 타입을 올리고, 실루엣은 하단 배경으로 남긴다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "면의 대부분이 비어 있어도, 검은 실루엣을 가로지르는 빨간 선 하나가 수평을 고정한다.",
+      "platform": "web",
+      "screenType": "detail",
+      "service": "Hermes studies",
+      "slug": "black-mountain-red-horizon",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "블랙 마운틴 — 빨간 수평선",
+      "tone": "editorial",
+      "uiPatterns": [
+        "split-view"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 32135878,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "059741bd55d93d08e6fe3490c9f8c45fb8b1afd3930609a409ed5072ecaeeba2",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/coral-black-stripe-block/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n가운데에 블랙과 아이보리가 번갈아 선 세로 줄무늬 기둥이 있다. 왼쪽과 오른쪽은 코랄 직사각형과 굵은 블랙 막대, 오른쪽 위에는 그레이 입자가 흩뿌려진 면이 잘려 들어온다.\n\n## Color\n\n아이보리, 코랄, 블랙, 입자 있는 그레이. 인쇄 그레인이 면 전체에 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 중앙 줄무늬를 남기고 가장자리 블록은 프레임으로 크롭하는 패턴 원판에 가깝다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "가운데의 촘촘한 세로 줄이 기준이 되면, 주변의 굵은 코랄 블록은 프레임처럼 읽힌다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "coral-black-stripe-block",
+      "sourceUrl": null,
+      "tags": [
+        "color",
+        "density"
+      ],
+      "title": "코랄 블랙 스트라이프 블록",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 35392874,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "f2c132d7ef464e8e519aa610020247a911c28d224f3c9f240fd3fbdffc978938",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/cropped-circular-segments/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n큰 원이 왼쪽과 아래로 잘려 오른쪽 호만 보인다. 왼쪽은 검은 원반과 작은 구멍, 오른쪽 호는 세이지, 코랄, 라일락 그레이 띠로 나뉜다. 호 바깥으로 오렌지 빛이 번진다.\n\n## Color\n\n아이보리, 블랙, 세이지, 코랄, 라일락 그레이, 번지는 오렌지. 붓 결이 색띠 안에 남아 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 잘린 원반이라 카드 한쪽에 두고 반대편 여백에 타입을 올린다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "원이 화면 밖으로 잘려도, 중심의 검은 구멍과 호를 나눈 색띠가 원의 나머지를 암시한다.",
+      "platform": "web",
+      "screenType": "detail",
+      "service": "Hermes studies",
+      "slug": "cropped-circular-segments",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "잘린 원형 색 분할",
+      "tone": "editorial",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 30722992,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "b66797dcb6890598b399445ee46aa5c67f110835867a91bdceac92667a1f0965",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/deep-teal-pinch-light/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n면이 왼쪽 아래의 한 점으로 접혀 들어간다. 오른쪽 위는 거의 검은 틸의 평평한 면, 왼쪽과 아래는 빛 받는 곡면이다. 접힌 점에 작은 노란 하이라이트가 있다.\n\n## Color\n\n딥 틸, 미드 틸, 하이라이트의 옅은 노랑. 미세한 입자가 금속 면처럼 보인다.\n\n## Graphic asset\n\n그래픽 에셋이다. 닫힌 도형 없는 재질 면이라 풀블리드 배경으로 쓴다. 어두운 오른쪽 위에 밝은 글자를 올리기 쉽다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "같은 틸 면이라도 한 점으로 접히면, 그 점의 하이라이트만으로 깊이가 생긴다.",
+      "platform": "web",
+      "screenType": "detail",
+      "service": "Hermes studies",
+      "slug": "deep-teal-pinch-light",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "딥 틸 핀치 라이트",
+      "tone": "calm",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 31106643,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "5433b15df6b6fa31d6a12c47c05e52e9618edf10c496289dabc8b40e29d2a034",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/electric-blue-pinch-fold/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n면이 화면 중심보다 약간 왼쪽의 좁은 목으로 접힌다. 오른쪽 위는 어두운 평평한 면, 아래와 왼쪽은 빛을 받는 곡면이다. 닫힌 도형은 없다.\n\n## Color\n\n일렉트릭 블루, 딥 네이비, 접힌 목의 밝은 시안. 고운 입자가 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 풀블리드 재질 배경이다. 어두운 모서리와 밝은 곡면의 대비로 글자 위치를 고른다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "네 면이 중심의 좁은 목으로 모이면, 색이 블루 하나여도 접힌 방향이 위계가 된다.",
+      "platform": "web",
+      "screenType": "detail",
+      "service": "Hermes studies",
+      "slug": "electric-blue-pinch-fold",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "일렉트릭 블루 핀치 폴드",
+      "tone": "calm",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 29359084,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "7d0845ba288bf5c80ba87e8b436eb984b5c2febdab39ba1fc9c79c09c24e139d",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/textile-horizontal-bands/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n화면을 가로지르는 수평 밴드가 위아래로 쌓인다. 위는 블랙, 머스터드, 네이비, 가운데는 넓은 아이보리, 아래는 머스터드와 블랙·네이비가 다시 나온다. 좌우는 잘리지 않고 밴드가 끝까지 이어진다.\n\n## Color\n\n아이보리 바탕, 머스터드, 딥 네이비, 블랙. 면에 직물 결이 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 수평 반복이라 위아래를 잘라 띠 배너나 섹션 구분으로 쓴다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "같은 두께의 가로 밴드라도 아이보리 여백이 사이에 있으면 줄무늬가 아니라 천의 위아래로 읽힌다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "textile-horizontal-bands",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "직물 가로 밴드 — 머스터드와 네이비",
+      "tone": "calm",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 31085165,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "3d399809c320958e2d024882d0cd2d12721c8eaceb653b1998a38dd4338ee9a9",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/textile-vertical-bar-grid/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n블랙 바탕 위에 짧은 세로 막대가 여러 행으로 선다. 행마다 막대의 시작 높이가 어긋나고, 좌우 끝 막대는 화면 밖으로 잘린다.\n\n## Color\n\n블랙 바탕, 아이보리, 코랄, 포레스트 그린, 머스터드. 막대 가장자리는 직물처럼 거칠다.\n\n## Graphic asset\n\n그래픽 에셋이다. 반복 단위가 세로 막대라 위아래로 잘라도 패턴이 유지된다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "세로 막대가 행마다 시작 높이를 바꾸면, 같은 반복도 표가 아니라 엇갈린 리듬으로 읽힌다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "textile-vertical-bar-grid",
+      "sourceUrl": null,
+      "tags": [
+        "color",
+        "density"
+      ],
+      "title": "직물 세로 막대 그리드",
+      "tone": "playful",
+      "uiPatterns": [
+        "data-table"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 26834902,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "3637894e5bed27b3ff04413bbb4a968052029b4ce512373467ade80719135d9c",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/warm-amber-folded-surface/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n베이지 배경 한가운데, 위쪽 둥근 면과 아래쪽 둥근 면이 S자로 꼬여 만난다. 만나는 지점은 가늘고, 위는 화면 밖으로, 아래는 오른쪽 아래로 불룩하다.\n\n## Color\n\n웜 베이지 배경, 앰버, 번트 오렌지, 아래 덩어리의 화이트 하이라이트. 표면에 고운 입자가 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 중심이 분명한 단일 오브제라 히어로 한가운데 둔다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "위아래 둥근 덩어리가 한 점에서 꼬이면, 색이 앰버에서 화이트로 바뀌어도 하나의 형태로 읽힌다.",
+      "platform": "web",
+      "screenType": "marketing",
+      "service": "Hermes studies",
+      "slug": "warm-amber-folded-surface",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "웜 앰버 접힘 면",
+      "tone": "editorial",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 29421250,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "cdffbed6f0f5faee425fd16e1b5415129534cec9919601d5763c2d97bf53181b",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/warm-horizon-brush-field/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n위는 넓은 그레이 블루 하늘, 가운데는 코랄에서 아이보리로 올라가는 능선, 그 아래는 네이비와 화이트가 섞인 어두운 붓질, 하단은 코랄 면이다. 모든 경계가 수평 붓 자국이다.\n\n## Color\n\n그레이 블루, 코랄, 아이보리, 네이비, 하단의 레드 코랄. 붓 결이 방향을 만든다.\n\n## Graphic asset\n\n그래픽 에셋이다. 위쪽 여백이 비어 있어 히어로 배경으로 쓰고, 글자는 하늘 면에 둔다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "수평 붓질이 여러 색이어도, 가운데의 흰 능선 하나가 지평선처럼 면을 위아래로 가른다.",
+      "platform": "web",
+      "screenType": "marketing",
+      "service": "Hermes studies",
+      "slug": "warm-horizon-brush-field",
+      "sourceUrl": null,
+      "tags": [
+        "color"
+      ],
+      "title": "웜 호라이즌 붓질 면",
+      "tone": "calm",
+      "uiPatterns": [
+        "hero-band"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 29208726,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "2c57c92725c813d7a1e3a7c4cb7dde5864942fa5eeac372d9f7c906fd56167e2",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/woven-modular-block-grid/capture.png",
+        "posterPath": null,
+        "width": 4096
+      },
+      "body": "\n## Layout\n\n세로로 긴 아이보리·베이지 기둥이 화면을 나누고, 기둥 사이에 블랙·세이지·토프·플럼 블록이 높이를 달리하며 끼어 있다. 가장자리 기둥은 화면 밖으로 잘린다.\n\n## Color\n\n아이보리, 베이지, 블랙, 세이지, 토프, 플럼. 천 결이 모든 면에 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 모듈 블록 반복이라 좌우로 잘라 패턴 배경으로 쓴다.\n\n## Typography\n\n글자가 없다. 위계는 세로 기둥의 폭으로만 생긴다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
+      "capturedAt": "2026-10-05",
+      "copyTone": "restrained",
+      "insight": "세로 기둥이 먼저 서 있으면, 그 안의 블록 높이가 들쭉날쭉해도 격자가 무너져 보이지 않는다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "woven-modular-block-grid",
+      "sourceUrl": null,
+      "tags": [
+        "color",
+        "cards",
+        "density"
+      ],
+      "title": "직조 모듈 그리드 — 세로 기둥과 블록",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 27780231,
+        "durationSec": null,
+        "format": "png",
+        "frameCount": null,
+        "hash": "328d952af5f01693cfad7b76fd83c682fd5e5047d8c065f724df2c32085e1dae",
+        "height": 4096,
+        "kind": "still",
+        "originalName": "capture.png",
+        "path": "assets/captures/bitmap-stripe-rhythm/capture.png",
+        "posterPath": null,
+        "width": 4096
       },
       "body": "\n## Layout\n\n아이보리 면이 네 개의 세로 열로 나뉘고, 각 열에 굵기가 다른 가로 막대가 쌓인다. 열 사이 막대의 높이가 맞지 않아 경계에서 엇갈린다. 왼쪽과 오른쪽 끝 열은 화면 밖으로 잘린다.\n\n## Color\n\n블랙에 가까운 네이비가 가장 많고, 더스티 블루, 머스터드 옐로, 레드가 사이에 끼어든다. 막대 가장자리는 스크린 인쇄처럼 거칠게 번지고 종이 결이 비친다.\n\n## Graphic asset\n\n그래픽 에셋이다. 반복 단위가 가로 막대라 좌우로 잘라도 패턴이 유지되어, 띠 배너나 섹션 배경으로 크롭하기 쉽다.\n\n## Typography\n\n글자가 없다. 위계는 막대 굵기와 네이비 비중으로만 생긴다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-28",
@@ -38,17 +382,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 184663,
+        "bytes": 30993856,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "eb06b3c9dab00c313fcdeb43b81b55b9d65d0d5542b35c326d33e8e30a4a27ce",
-        "height": 1024,
+        "hash": "02134ad093370d8abace3c037580b5942233210c968ea3e478d7744d59ac37b2",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/floral-radial-bloom/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/floral-radial-bloom/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n화면 중앙보다 약간 위의 한 점에서 물방울 모양 꽃잎 열한 장이 사방으로 퍼진다. 아래쪽의 가는 블루 줄기만 화면 밖으로 빠져나간다. 오른쪽 위와 왼쪽 아래 꽃잎은 가장자리에 닿을 듯 크다.\n\n## Color\n\n크림 종이 위에 크림슨, 버건디, 블랙, 코랄, 피치, 오커, 토프, 더스티 블루. 붓 자국과 종이 결이 색면 안에 남아 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 중심점이 명확한 단일 오브제라, 히어로 한가운데 심벌이나 캠페인 키 비주얼로 쓸 수 있다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-28",
@@ -72,17 +416,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 265270,
+        "bytes": 3474073,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "ebdbc5630c0ffd67298c94c8fbe9a253770058fe2347446e2655a7c820cfe780",
-        "height": 1024,
+        "hash": "dc82815c7a5823280c20d2cf09373e054cb58b9ddccfa240af68038a8c008cda",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/iridescent-chrome-field/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/iridescent-chrome-field/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n녹은 금속이 세로로 흘러내린 듯한 굴곡면이 화면을 채운다. 왼쪽과 가운데는 부푼 둥근 띠, 오른쪽 아래는 검은 입자가 흩뿌려진 거친 면이다. 닫힌 도형이나 수평선은 없다.\n\n## Color\n\n실버 크롬 위에 아쿠아, 오렌지, 라벤더 무지갯빛 반사가 번진다. 입자 부분은 차콜 점과 연한 민트.\n\n## Graphic asset\n\n그래픽 에셋이다. 풀블리드 재질 텍스처라 배경이나 제품 소재 무드로 쓴다. 반사가 강해 위에 올리는 글자는 대비 확인이 필요하다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-28",
@@ -106,17 +450,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 187332,
+        "bytes": 20379284,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "617f4d0b58180e7fc19a818dcae639d4693bbd710ff81a108f063d6fd87b6234",
-        "height": 1024,
+        "hash": "7f7eb2f7418f265016f276e4381be530e46f6e5348e01c63651455ff461eb4a5",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/monochrome-architectural-block/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/monochrome-architectural-block/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n블랙 배경을 흰 수직 기둥이 가운데에서 관통한다. 왼쪽 아래는 낮은 흰 블록, 오른쪽 아래는 그레이 사선 면이 대각으로 올라온다. 기둥 아래쪽 블랙이 흰 면으로 번지며 그림자처럼 보인다.\n\n## Color\n\n블랙, 오프화이트, 미드 그레이. 모든 면에 콘크리트 같은 미세 입자가 있다.\n\n## Graphic asset\n\n그래픽 에셋이다. 수직 기둥과 사선이 면을 나누므로, 섹션을 나누는 배경 플레이트나 흑백 캠페인 배경으로 쓴다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-28",
@@ -141,17 +485,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 476354,
+        "bytes": 30272539,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "574f688c54f248fb1cf070f748f2cf79dbee5ebc74b0d808eb5a1d4c93e71898",
-        "height": 984,
+        "hash": "8de38d177dffe4d07c1ea0a84633d5cdbc5da9c7a57505b962f0e76fa449807b",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/ambient-blue-peach-gradient/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/ambient-blue-peach-gradient/capture.png",
         "posterPath": null,
-        "width": 984
+        "width": 4096
       },
       "body": "\n## Layout\n\n면 전체가 그라데이션이다. 좌상단은 딥 틸, 우상단은 피치, 하단은 블루 밴드. 닫힌 도형은 없다.\n\n## Color\n\n딥 틸, 피치, 미드 블루. 필름 그레인이 경계 없는 면을 입자로 붙잡는다.\n\n## Graphic asset\n\n그래픽 에셋이다. 닫힌 형태가 없는 풀블리드 배경이라, 위쪽 피치와 아래쪽 블루 사이에 타입이나 제품을 올린다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -175,17 +519,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 357459,
+        "bytes": 31522050,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "32bfe1e70098f1ff2c165d2e07894898931d614d52dcffa88c18ce8e62d4577a",
-        "height": 960,
+        "hash": "92fa84727792f0db953205b8efb094f63da0874828aae981d60ac45a2f41af6f",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/angular-shadow-surface/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/angular-shadow-surface/capture.png",
         "posterPath": null,
-        "width": 960
+        "width": 4096
       },
       "body": "\n## Layout\n\n왼쪽 위는 밝은 석고면, 오른쪽 위는 피치 빛이 닿은 면, 아래는 네이비 덩어리다. 경계는 부드러운 블루 그림자.\n\n## Color\n\n오프화이트, 피치, 더스티 블루, 딥 네이비. 필름 그레인.\n\n## Graphic asset\n\n그래픽 에셋이다. 면 분할과 번진 그림자가 한 장의 배경 플레이트이고, 가장자리를 더 잘라도 면의 방향은 유지된다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -209,17 +553,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 225847,
+        "bytes": 27603755,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "06a29c5d3ff3e509c3207445138980d7127d8c2ece25fc61f345e8c514c68a10",
-        "height": 1024,
+        "hash": "d8903ae8c7bb2d3cded0c15b9d59bdc0a3ee6faa03d7542700f469c233568476",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/capsule-pattern/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/capsule-pattern/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n중앙의 세로 네이비 캡슐이 화면을 관통하고, 가장자리는 코랄·피치·베이지의 둥근 직사각형이 잘려 들어온다. 흰 여백이 형태 사이를 분리한다.\n\n## Color\n\n딥 네이비 중심, 코랄과 번트 오렌지, 웜 베이지. 종이 질감이 면 전체를 덮는다. 관측 색 후보: 네이비, 코랄, 아이보리(데이터, 사이트 토큰 아님).\n\n## Graphic asset\n\n그래픽 에셋이다. 반복 타일보다, 중앙 캡슐을 남기고 가장자리 형태는 프레임으로 크롭하는 패턴 원판에 가깝다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -245,17 +589,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 207177,
+        "bytes": 24740596,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "007defb3771cc20891ac9a4d808d4411eccb6eef4ea29101c1075f097ba8a75b",
-        "height": 1024,
+        "hash": "f00a817c0f2c8440cc1c3bf8e365d0206bd042e3161c13f2a59f8896f7c2518b",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/complete-circle-disc/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/complete-circle-disc/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n정중앙의 아이보리 원. 가장자리에만 옅은 블루 그림자가 원을 배경에서 분리한다.\n\n## Color\n\n거의 단색 아이보리. 가장자리만 쿨 블루.\n\n## Graphic asset\n\n그래픽 에셋이다. 배경과 거의 같은 원반은 엠블럼이나 빈 스테이지이고, 형태는 가장자리 헤일로만 남긴다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -280,17 +624,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 73573,
+        "bytes": 14470701,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "20dc1e479788dcc9bb8ff28b1187688963c4aab7ac58341f2a13e072293be327",
-        "height": 1024,
+        "hash": "f478fa78a43dbbe52a61f09e611d57b32fe267807ecbf98cb021c33148136c9b",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/coral-blue-luminous-ring/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/coral-blue-luminous-ring/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n다크 틸 배경의 정중앙 링. 내부는 어두운 코어이고, 링은 왼쪽 코랄에서 오른쪽 시안으로 돈다.\n\n## Color\n\n다크 틸, 코랄, 웜 화이트, 시안. 가장자리가 배경으로 번진다.\n\n## Graphic asset\n\n그래픽 에셋이다. 발광 링은 선이 아니라 빛 번짐이 형태라, 어두운 배경 위의 포컬 마크에 맞다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -315,17 +659,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 73062,
+        "bytes": 14336919,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "a103f7844ab42819451ab6debe33a8b30a9de1fb13eaacdcf5ec6fc2e893edf1",
-        "height": 1024,
+        "hash": "8e699270288e4d4b224634eb60a9552a4e87be6cba35aa433c0a2e4a7d763174",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/cyan-luminous-arc-edge/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/cyan-luminous-arc-edge/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n프레임을 벗어난 거대한 원호. 왼쪽은 시안 빛, 오른쪽 아래는 거의 블랙인 코어. 얇은 림이 여러 겹이다.\n\n## Color\n\n시안, 틸, 블랙. 빛은 왼쪽 가장자리에서만 강하고 안쪽은 빠르게 어두워진다.\n\n## Graphic asset\n\n그래픽 에셋이다. 원호만 프레임에 걸려 있어, 가장자리 장식이나 섹션의 라이트 엣지로 자른다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -350,17 +694,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 66040,
+        "bytes": 20372245,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "a87609e36375a05470e2933b9e379339b7e04d35f5cb6bd4ee40384c39bd54ac",
-        "height": 1024,
+        "hash": "3c0965d03f44d7c23ca4b9ba1d519ac5f1885b85246945570d3f2d8e9d5f7f54",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/deep-blue-halo-disc/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/deep-blue-halo-disc/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n네이비 배경의 정중앙에 큰 원. 내부는 옅은 블루그레이이고, 테두리는 상단 블루 글로우와 하단 코랄 글로우로 나뉜다.\n\n## Color\n\n네이비 필드, 파우더 블루 원, 코랄과 시안 림라이트.\n\n## Graphic asset\n\n그래픽 에셋이다. 중앙 원반은 엠블럼 자리고, 림의 코랄·시안 빛이 재질을 대신한다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -384,17 +728,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 168720,
+        "bytes": 32359892,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "e0312f4dc17b190be0c89aaea0821bc8f94038e7f248f598470c094d3bcf9c13",
-        "height": 1024,
+        "hash": "91a430381d4f1c2f996188fa8af0bcbf43bf159a974f304fa852135983e5bec7",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/directional-flow/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/directional-flow/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n왼쪽은 넓은 그레이 수직면, 중앙은 크림색 대각 쐐기, 오른쪽은 네이비 수직 밴드와 블랙 삼각형, 하단은 코랄 경사면이다.\n\n## Color\n\n쿨 그레이, 크림, 네이비, 블랙, 코랄. 인쇄 그레인이 면을 종이에 가깝게 만든다.\n\n## Graphic asset\n\n그래픽 에셋이다. 면이 방향을 가지고 이어지므로, 히어로 배경이나 섹션을 나누는 플레이트로 자를 수 있다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -419,17 +763,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 247206,
+        "bytes": 27090659,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "acbabc8044c693ffbc0cb71e34f576c12760f613a8e15e75cfe4bf146c0bc643",
-        "height": 1024,
+        "hash": "8397e3526258505146cb775c170689632d79120aa22828dade0e9b0cf46c9e89",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/frosted-blue-glass-disc/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/frosted-blue-glass-disc/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n연한 벽 위의 동심 유리 접시. 가장자리는 얇은 금속 림, 중심은 오목한 틸 우물. 오른쪽 위에 하이라이트가 있다.\n\n## Color\n\n블러시 월, 아쿠아와 틸 글라스, 실버 림. 표면은 성긴 입자.\n\n## Graphic asset\n\n그래픽 에셋이다. 유리 접시는 중심 우물과 금속 림이 있는 오브제라, 아이콘이나 제품 받침으로 읽힌다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -453,17 +797,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 260246,
+        "bytes": 30004637,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "915fc59c2aeabda1294767319604b24e3241774647e234f842412499be9e0dd6",
-        "height": 1024,
+        "hash": "f135a81ab804e7ab3db81e084c6896f2656c35dcc0b7c778d0697590e01b1c9a",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/geometric-arch-grid/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/geometric-arch-grid/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n짙은 아치가 위쪽 크림 면과 아래쪽 블루그레이 면을 가른다. 왼쪽은 더 차가운 그레이 그라데이션이다.\n\n## Color\n\n차콜 아치, 웜 오프화이트, 블루그레이. 필름 그레인이 경계의 그라데이션을 부드럽게 한다.\n\n## Graphic asset\n\n그래픽 에셋이다. 아치가 프레임 밖으로 나가 있어, 위를 더 자르면 배너, 전체를 두면 포스터 플레이트로 쓴다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -487,17 +831,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 259631,
+        "bytes": 28050226,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "3d2634a5526103916dbb0feaf6999f96d14c7fc2e6bae01c01c851e76ec6618c",
-        "height": 1024,
+        "hash": "b28b95c424374d8cfdc1458dd795349b9fdea03dea8bad8d92aba1a34122cd6f",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/matte-circle-fields/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/matte-circle-fields/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n큰 원호 세 겹이 왼쪽에서 겹치고, 오른쪽은 거친 오프화이트 여백으로 남는다.\n\n## Color\n\n테라코타, 세이지, 브라운, 석고 화이트. 매트하고 마른 표면.\n\n## Graphic asset\n\n그래픽 에셋이다. 겹친 원호는 단독 모티프이고, 오른쪽 여백은 카피나 로고를 올릴 자리로 남아 있다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -521,17 +865,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 200706,
+        "bytes": 36048730,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "445adb8c6aa7594ade475433fac925942faab69a74eb67256cd8e8bf59ae17cc",
-        "height": 1024,
+        "hash": "aa69038a96ab877380b3c8746761ad870ab0f26d8d5b6e1cebf80bb40c0cc1a9",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/modular-arch-surface/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/modular-arch-surface/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n반복 격자 위에 반원·원·직사각형이 걸린다. 머스타드 세로 띠가 리듬을 고정하고, 블랙 반원은 격자 선을 넘어간다.\n\n## Color\n\n아이보리, 웜 그레이, 차콜, 머스타드. 캔버스 텍스처가 면을 균일하게 덮는다.\n\n## Graphic asset\n\n그래픽 에셋이다. 격자와 아치가 모듈로 반복되므로 패턴 필이나 커버 텍스처로 확장할 수 있다.\n\n## Typography\n\n글자가 없다. 격자 자체가 타이포그래피의 베이스라인처럼 읽힌다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -557,17 +901,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 143701,
+        "bytes": 25890157,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "a999be453b245c61a5a4d0a0e4541ee96ab2db8093f197b8e0785ad6e26a786f",
-        "height": 1024,
+        "hash": "ce582c104eab9a4e05d2b974560b7f0ce433f8f511bf15a2e3166ec2787cba30",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/orbit-circle-signal/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/orbit-circle-signal/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n왼쪽 위 큰 틸 원, 그 아래 코랄과 그레이로 잘린 작은 원. 얇은 골드·테라코타 궤도가 오른쪽 여백을 감싼다.\n\n## Color\n\n크림 배경, 딥 틸, 코랄, 웜 그레이, 골드 라인.\n\n## Graphic asset\n\n그래픽 에셋이다. 원 두 개와 얇은 궤도 선이 한 세트라, 아이콘 크기로 줄여도 실루엣이 남는다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -592,17 +936,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 44022,
+        "bytes": 19378669,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "855b0498051b25416d8d3b91ebeb66a213c185b3ef1967525e74a38ea5ff6740",
-        "height": 1024,
+        "hash": "c99856e8e51fcf139cd06ed178c001637b5545224e1be71902dd78c888c52834",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/soft-circular-ring/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/soft-circular-ring/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n중앙이 빈 원. 고리는 좌하단 코랄에서 우측 블루·차콜로 돈다. 배경은 따뜻한 오프화이트.\n\n## Color\n\n아이보리 배경, 코랄, 슬레이트 블루, 차콜. 파스텔 에어브러시.\n\n## Graphic asset\n\n그래픽 에셋이다. 속이 빈 링은 로고나 버튼 뒤 장식으로 두고, 색이 도는 고리만 방향을 만든다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -627,17 +971,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 233273,
+        "bytes": 25940803,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "d571a44093944c1486ec6e8800aa5b16f5cced2a55e681f2dee31de544b3cb55",
-        "height": 1024,
+        "hash": "c9b11cd8f5a73e906509f745f06b8edf48af191cd5dc8f844015d861a6289888",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/warm-earth-oval/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/warm-earth-oval/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n중앙의 세이지 타원, 왼쪽의 탄 수직 기둥, 오른쪽 테라코타, 하단의 브라운과 크림 호.\n\n## Color\n\n오크, 세이지, 테라코타, 브라운, 크림. 수채 브러시 결이 보인다.\n\n## Graphic asset\n\n그래픽 에셋이다. 세로 타원이 중심 모티프이고, 주변 호는 배경으로 깔리는 유기적 패턴이다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -662,17 +1006,17 @@
     {
       "appVersion": null,
       "asset": {
-        "bytes": 32651,
+        "bytes": 20121574,
         "durationSec": null,
-        "format": "jpeg",
+        "format": "png",
         "frameCount": null,
-        "hash": "89c2dbbed25511b1865a716c1e5a8e0e000313766ef471091a76b7e29e51f32a",
-        "height": 1024,
+        "hash": "29f2aae39e703172a001a9f7af290f5602dfc1214fd18f85e4e93caeb42526f7",
+        "height": 4096,
         "kind": "still",
-        "originalName": "capture.jpg",
-        "path": "assets/captures/warm-offwhite-eclipse-disc/capture.jpg",
+        "originalName": "capture.png",
+        "path": "assets/captures/warm-offwhite-eclipse-disc/capture.png",
         "posterPath": null,
-        "width": 1024
+        "width": 4096
       },
       "body": "\n## Layout\n\n베이지 배경 위, 거의 같은 색의 원. 왼쪽 아래는 블루 섀도, 오른쪽 위는 코랄 헤일로.\n\n## Color\n\n웜 베이지, 코랄 림, 슬레이트 섀도.\n\n## Graphic asset\n\n그래픽 에셋이다. 배경과 동색인 원반은 단독 오브제이고, 그림자와 헤일로만 입체를 만든다.\n\n## Typography\n\n글자가 없다. Typeface: 미확정.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다. 사용자 확인 필요 — 모션이 있다면 별도 캡처로 확인해야 한다.\n",
       "capturedAt": "2026-09-27",
@@ -703,7 +1047,11 @@
         "modular-arch-surface",
         "orbit-circle-signal",
         "bitmap-stripe-rhythm",
-        "monochrome-architectural-block"
+        "monochrome-architectural-block",
+        "textile-horizontal-bands",
+        "woven-modular-block-grid",
+        "coral-black-stripe-block",
+        "textile-vertical-bar-grid"
       ],
       "description": "격자, 대각, 궤도 선으로 방향을 만드는 스터디.",
       "slug": "geometric-structures",
@@ -731,9 +1079,19 @@
         "bitmap-stripe-rhythm",
         "floral-radial-bloom",
         "iridescent-chrome-field",
-        "monochrome-architectural-block"
+        "monochrome-architectural-block",
+        "textile-horizontal-bands",
+        "woven-modular-block-grid",
+        "coral-black-stripe-block",
+        "black-mountain-red-horizon",
+        "deep-teal-pinch-light",
+        "warm-amber-folded-surface",
+        "cropped-circular-segments",
+        "electric-blue-pinch-fold",
+        "textile-vertical-bar-grid",
+        "warm-horizon-brush-field"
       ],
-      "description": "image-pick-hermes의 정지 스터디 20건.",
+      "description": "image-pick-hermes의 정지 스터디 30건.",
       "slug": "hermes-gallery",
       "title": "Hermes 비주얼 스터디"
     },
@@ -759,7 +1117,11 @@
         "warm-earth-oval",
         "angular-shadow-surface",
         "warm-offwhite-eclipse-disc",
-        "floral-radial-bloom"
+        "floral-radial-bloom",
+        "black-mountain-red-horizon",
+        "warm-amber-folded-surface",
+        "cropped-circular-segments",
+        "warm-horizon-brush-field"
       ],
       "description": "베이지, 테라코타, 세이지가 종이 질감으로 겹친 스터디.",
       "slug": "warm-earth-surfaces",
@@ -768,33 +1130,33 @@
   ],
   "facets": {
     "platform": {
-      "web": 20
+      "web": 30
     },
     "screenType": {
-      "detail": 8,
-      "gallery": 4,
-      "marketing": 8
+      "detail": 12,
+      "gallery": 8,
+      "marketing": 10
     },
     "tag": {
-      "cards": 3,
-      "color": 20,
-      "density": 1,
+      "cards": 4,
+      "color": 30,
+      "density": 4,
       "empty-state": 1,
       "gallery": 2,
       "motion": 3,
       "navigation": 3
     },
     "tone": {
-      "calm": 8,
-      "editorial": 9,
+      "calm": 13,
+      "editorial": 13,
       "informational": 1,
-      "playful": 2
+      "playful": 3
     },
     "uiPattern": {
-      "card-grid": 2,
-      "data-table": 1,
-      "hero-band": 14,
-      "split-view": 3
+      "card-grid": 4,
+      "data-table": 2,
+      "hero-band": 20,
+      "split-view": 4
     }
   },
   "target": "public",
@@ -802,6 +1164,16 @@
   "wiki": {
     "indexBody": "# Wiki index\n\nContent-oriented catalog for the public bundle. Internal-only pages are omitted.\n\n## Patterns\n\n- [캡슐 필드](patterns/capsule-fields.md) — 중심 캡슐과 모듈 아치가 여백과 격자 안에서 프레임으로 읽히는 패턴.\n- [발광 원반](patterns/luminous-discs.md) — 원반의 재질을 면 색이 아니라 가장자리 빛으로 만드는 패턴.\n\n## Services\n\n- [Hermes studies](services/hermes-studies.md) — image-pick-hermes에서 가져온 색면·원반·기하 스터디.\n\n## Comparisons\n\n- [웜 면과 발광 링](comparisons/warm-vs-luminous.md) — 종이 질감의 따뜻한 색면과, 어두운 배경 위 발광 링의 차이.\n\n## Questions\n\n- [글자 없는 위계](questions/hierarchy-without-type.md) — 글자가 없는 스터디에서 위계를 크기, 대비, 가장자리 중 무엇으로 읽을지.\n",
     "logEntries": [
+      {
+        "date": "2026-10-05",
+        "operation": "update",
+        "title": "초기화 기준 세팅, 리셋, 라이브러리 저장"
+      },
+      {
+        "date": "2026-10-05",
+        "operation": "update",
+        "title": "Graphic Library와 스튜디오 테마를 4K로 교체"
+      },
       {
         "date": "2026-09-28",
         "operation": "update",
@@ -946,15 +1318,25 @@
         "visibility": "public"
       },
       {
-        "body": "\n# Hermes studies\n\n제품 UI가 아니라 비주얼 스터디다. 색, 가장자리, 여백, 재질만 기록한다.\n\n## 관련 캡처\n\n- [[capsule-pattern]]\n- [[modular-arch-surface]]\n- [[coral-blue-luminous-ring]]\n- [[bitmap-stripe-rhythm]]\n- [[floral-radial-bloom]]\n- [[iridescent-chrome-field]]\n- [[monochrome-architectural-block]]\n",
+        "body": "\n# Hermes studies\n\n제품 UI가 아니라 비주얼 스터디다. 색, 가장자리, 여백, 재질만 기록한다.\n\n## 관련 캡처\n\n- [[capsule-pattern]]\n- [[modular-arch-surface]]\n- [[coral-blue-luminous-ring]]\n- [[bitmap-stripe-rhythm]]\n- [[floral-radial-bloom]]\n- [[iridescent-chrome-field]]\n- [[monochrome-architectural-block]]\n- [[textile-horizontal-bands]]\n- [[woven-modular-block-grid]]\n- [[coral-black-stripe-block]]\n- [[black-mountain-red-horizon]]\n- [[deep-teal-pinch-light]]\n- [[warm-amber-folded-surface]]\n- [[cropped-circular-segments]]\n- [[electric-blue-pinch-fold]]\n- [[textile-vertical-bar-grid]]\n- [[warm-horizon-brush-field]]\n",
         "captureRefs": [
           "bitmap-stripe-rhythm",
+          "black-mountain-red-horizon",
           "capsule-pattern",
+          "coral-black-stripe-block",
           "coral-blue-luminous-ring",
+          "cropped-circular-segments",
+          "deep-teal-pinch-light",
+          "electric-blue-pinch-fold",
           "floral-radial-bloom",
           "iridescent-chrome-field",
           "modular-arch-surface",
-          "monochrome-architectural-block"
+          "monochrome-architectural-block",
+          "textile-horizontal-bands",
+          "textile-vertical-bar-grid",
+          "warm-amber-folded-surface",
+          "warm-horizon-brush-field",
+          "woven-modular-block-grid"
         ],
         "id": "services/hermes-studies",
         "summary": "image-pick-hermes에서 가져온 색면·원반·기하 스터디.",
