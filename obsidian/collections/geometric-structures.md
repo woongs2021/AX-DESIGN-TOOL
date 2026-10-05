@@ -9,6 +9,10 @@ captures:
   - orbit-circle-signal
   - bitmap-stripe-rhythm
   - monochrome-architectural-block
+  - textile-horizontal-bands
+  - woven-modular-block-grid
+  - coral-black-stripe-block
+  - textile-vertical-bar-grid
 ---
 
 # 기하 구조

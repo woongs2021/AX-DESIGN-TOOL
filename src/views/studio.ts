@@ -34,6 +34,7 @@ import {
   type StudioState,
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
+import { confirmProceed, showToast } from "../feedback.ts";
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
@@ -405,7 +406,8 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <button type="button" class="studio__tab" role="tab" id="studio-tab-design" aria-controls="studio-panel-design" aria-selected="${designSelected ? "true" : "false"}" tabindex="${designSelected ? "0" : "-1"}">Design</button>
           <button type="button" class="studio__tab" role="tab" id="studio-tab-code" aria-controls="studio-panel-code" aria-selected="${designSelected ? "false" : "true"}" tabindex="${designSelected ? "-1" : "0"}">Code</button>
         </div>
-
+        <div class="studio__panel-host">
+        <div class="studio__panel-scroll" id="studio-panel-scroll">
         <div id="studio-panel-design" role="tabpanel" aria-labelledby="studio-tab-design"${designSelected ? "" : " hidden"}>
           <div class="studio__field">
             <label for="studio-preset">카드 크기 프리셋</label>
@@ -504,6 +506,8 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             </div>
           </div>
           <button type="button" class="button button--secondary studio__reset" id="studio-reset">초기화</button>
+          <button type="button" class="button button--secondary studio__reset" id="studio-set-baseline">초기화로 세팅</button>
+          <button type="button" class="button button--secondary studio__reset" id="studio-save-library">그래픽 라이브러리에 추가</button>
         </div>
 
         <div id="studio-panel-code" role="tabpanel" aria-labelledby="studio-tab-code"${designSelected ? " hidden" : ""}>
@@ -514,8 +518,10 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <button type="button" class="button button--secondary studio__copy" id="studio-copy">현재 디자인을 코드로 복사</button>
           <pre class="studio__export" id="studio-export"></pre>
         </div>
+        </div>
+        <div class="studio__scroll-thumb" id="studio-scroll-thumb" hidden></div>
+        </div>
       </form>
-      <div class="studio__scroll-thumb" id="studio-scroll-thumb" hidden></div>
       </div>
       <div class="studio__splitter" id="studio-splitter" role="separator" aria-orientation="vertical" aria-label="컨트롤 패널과 프리뷰 너비" aria-valuemin="${CONTROLS_MIN}" aria-valuenow="${state.controlsWidth}" tabindex="0"></div>
 
@@ -570,7 +576,11 @@ export function bindStudio(
   root: HTMLElement,
   state: StudioState,
   captures: CaptureRecord[],
-  onReset: () => void,
+  actions: {
+    onReset: () => void;
+    onSetBaseline: () => void;
+    onAddToLibrary: (thumbnail: string) => Promise<boolean>;
+  },
 ): void {
   if (captures.length === 0) return;
   const presetSelect = root.querySelector<HTMLSelectElement>("#studio-preset");
@@ -663,7 +673,9 @@ export function bindStudio(
     !controlsWrap ||
     !exportCode ||
     !splitter ||
-    !studio
+    !studio ||
+    !root.querySelector("#studio-set-baseline") ||
+    !root.querySelector("#studio-save-library")
   ) {
     return;
   }
@@ -724,8 +736,15 @@ export function bindStudio(
     stage.scrollTo(0, 0);
   });
 
-  const controls = root.querySelector<HTMLElement>("#studio-controls");
-  if (controls) overlayScrollbar(controls, scrollThumb, controlsWrap);
+  const panelScroll = root.querySelector<HTMLElement>("#studio-panel-scroll");
+  const placeScroll = panelScroll && scrollThumb && controlsWrap
+    ? overlayScrollbar(panelScroll, scrollThumb, controlsWrap)
+    : () => {};
+  const fitCodeInput = () => {
+    codeInput.style.height = "auto";
+    codeInput.style.height = `${Math.max(180, codeInput.scrollHeight)}px`;
+    placeScroll();
+  };
 
   const syncHistoryButtons = () => {
     const undo = document.querySelector<HTMLButtonElement>("#studio-undo");
@@ -882,6 +901,7 @@ export function bindStudio(
     const safeNote = matchesPreset && preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
     meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}${safeNote}`;
     exportCode.textContent = designToCode();
+    fitCodeInput();
     syncRadiusControls();
     updateScale();
 
@@ -1030,11 +1050,52 @@ export function bindStudio(
   bindSelect(bodyFontSelect, () => {
     state.bodyFontId = bodyFontSelect.value;
   });
+  const snapshotCard = async (): Promise<string> => {
+    const offscreen = document.createElement("canvas");
+    if (state.code.trim()) {
+      const url = themeUrl();
+      const themeData = url ? await themeDataUrl(url) : "";
+      await paintForeignObject(
+        offscreen,
+        studioFragment(documentInput(state, themeData)),
+        state.cardWidth,
+        state.cardHeight,
+      );
+    } else {
+      drawCard(offscreen, state, themeImage);
+    }
+    const maxEdge = 1080;
+    const edge = Math.max(state.cardWidth, state.cardHeight);
+    if (edge <= maxEdge) return offscreen.toDataURL("image/png");
+    const scale = maxEdge / edge;
+    const thumb = document.createElement("canvas");
+    thumb.width = Math.max(1, Math.round(state.cardWidth * scale));
+    thumb.height = Math.max(1, Math.round(state.cardHeight * scale));
+    thumb.getContext("2d")?.drawImage(offscreen, 0, 0, thumb.width, thumb.height);
+    return thumb.toDataURL("image/png");
+  };
+
+  root.querySelector("#studio-set-baseline")?.addEventListener("click", () => {
+    void (async () => {
+      const ok = await confirmProceed("현재 레이아웃을 초기화 기준으로 세팅하고 진행하시겠습니까?");
+      if (!ok) return;
+      actions.onSetBaseline();
+      showToast("초기화로 세팅하였습니다.");
+    })();
+  });
+  root.querySelector("#studio-save-library")?.addEventListener("click", () => {
+    void (async () => {
+      const ok = await confirmProceed("현재 카드를 그래픽 라이브러리에 추가하고 진행하시겠습니까?");
+      if (!ok) return;
+      const saved = await actions.onAddToLibrary(await snapshotCard());
+      showToast(saved ? "그래픽 라이브러리에 추가하였습니다." : "그래픽 라이브러리에 추가하지 못했습니다.");
+    })();
+  });
   root.querySelector("#studio-reset")?.addEventListener("click", () => {
     finishGesture();
     const before = cloneStudio(state);
     const beforeZoom = previewZoom;
-    onReset();
+    actions.onReset();
     if (!sameStudio(before, state) || beforeZoom !== previewZoom) {
       undoStack.push(before);
       undoZoom.push(beforeZoom);

@@ -1,7 +1,7 @@
 ---
 slug: geometric-arch-grid
 title: "아치 크롭 — 어두운 곡선과 블루그레이 기단"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

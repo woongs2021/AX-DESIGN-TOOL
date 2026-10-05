@@ -1,7 +1,7 @@
 ---
 slug: angular-shadow-surface
 title: "각진 그림자 면 — 네이비 언덕과 피치 빛"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

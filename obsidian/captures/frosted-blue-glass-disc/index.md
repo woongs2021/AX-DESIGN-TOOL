@@ -1,7 +1,7 @@
 ---
 slug: frosted-blue-glass-disc
 title: "프로스티드 블루 글라스 디스크"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

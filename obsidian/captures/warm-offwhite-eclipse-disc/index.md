@@ -1,7 +1,7 @@
 ---
 slug: warm-offwhite-eclipse-disc
 title: "웜 오프화이트 이클립스"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

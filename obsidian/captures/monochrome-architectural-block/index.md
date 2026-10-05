@@ -1,7 +1,7 @@
 ---
 slug: monochrome-architectural-block
 title: "모노크롬 건축 블록 — 수직 기둥과 사선 면"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
 service: "Hermes studies"

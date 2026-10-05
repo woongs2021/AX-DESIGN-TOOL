@@ -1,7 +1,7 @@
 ---
 slug: capsule-pattern
 title: "캡슐 패턴 — 네이비 세로 캡슐"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

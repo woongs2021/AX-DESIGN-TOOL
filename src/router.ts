@@ -1,7 +1,7 @@
 export type Route =
   | { name: "archive" }
   | { name: "capture"; slug: string }
-  | { name: "studio"; theme: string | null }
+  | { name: "studio"; theme: string | null; card: string | null }
   | { name: "history" }
   | { name: "notfound"; path: string };
 
@@ -17,10 +17,10 @@ function splitHash(hash: string): { path: string; query: string } {
   return { path: cleaned, query };
 }
 
-function readTheme(query: string): string | null {
-  const theme = new URLSearchParams(query).get("theme");
-  if (!theme || !new RegExp(`^${SLUG}$`).test(theme)) return null;
-  return theme;
+function readSlugParam(query: string, key: string): string | null {
+  const value = new URLSearchParams(query).get(key);
+  if (!value || !new RegExp(`^${SLUG}$`).test(value)) return null;
+  return value;
 }
 
 export function isLegacyStudioHash(hash: string): boolean {
@@ -34,7 +34,11 @@ export function parseHash(hash = window.location.hash): Route {
   if (path === "/" || path === "/gallery") return { name: "archive" };
   if (path === "/history") return { name: "history" };
   if (path === "/studio" || isLegacyStudioHash(hash)) {
-    return { name: "studio", theme: path === "/studio" ? readTheme(query) : null };
+    return {
+      name: "studio",
+      theme: path === "/studio" ? readSlugParam(query, "theme") : null,
+      card: path === "/studio" ? readSlugParam(query, "card") : null,
+    };
   }
 
   const capture = path.match(new RegExp(`^/capture/(${SLUG})$`));
@@ -49,8 +53,13 @@ export function hrefFor(route: Route): string {
       return "#/";
     case "capture":
       return `#/capture/${route.slug}`;
-    case "studio":
-      return route.theme ? `#/studio?theme=${route.theme}` : "#/studio";
+    case "studio": {
+      const params = new URLSearchParams();
+      if (route.card) params.set("card", route.card);
+      else if (route.theme) params.set("theme", route.theme);
+      const query = params.toString();
+      return query ? `#/studio?${query}` : "#/studio";
+    }
     case "history":
       return "#/history";
     case "notfound":

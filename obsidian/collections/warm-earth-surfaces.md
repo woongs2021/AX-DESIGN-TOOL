@@ -9,6 +9,10 @@ captures:
   - angular-shadow-surface
   - warm-offwhite-eclipse-disc
   - floral-radial-bloom
+  - black-mountain-red-horizon
+  - warm-amber-folded-surface
+  - cropped-circular-segments
+  - warm-horizon-brush-field
 ---
 
 # 웜 어스 면

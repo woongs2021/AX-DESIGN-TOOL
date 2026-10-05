@@ -1,7 +1,7 @@
 ---
 slug: warm-earth-oval
 title: "웜 어스 오벌 — 세이지 세로 알"
-asset: capture.jpg
+asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
 service: "Hermes studies"

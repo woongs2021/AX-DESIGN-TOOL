@@ -13,8 +13,15 @@ export const CONTROLS_MIN = 240;
 export const CONTROLS_DEFAULT = 360;
 export const PREVIEW_MIN = 280;
 export const SPLITTER_WIDTH = 6;
-export const DEFAULT_TITLE = "시즌";
-export const DEFAULT_BODY = "새로운 컬렉션\n브랜드의 첫 인상을 한 장으로 전합니다.";
+export const DEFAULT_TITLE = "Hello";
+export const DEFAULT_BODY = "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.";
+export const DEFAULT_THEME_SLUG = "black-mountain-red-horizon";
+const DEFAULT_TITLE_SIZE = 100;
+const DEFAULT_BODY_SIZE = 32;
+const DEFAULT_TITLE_X = 71;
+const DEFAULT_TITLE_Y = 99;
+const DEFAULT_BODY_X = 77;
+const DEFAULT_BODY_Y = 209;
 
 export const BUILTIN_FONTS = [
   { id: "pretendard", label: "Pretendard", stack: '"Pretendard Variable", Pretendard, system-ui, sans-serif' },
@@ -149,9 +156,9 @@ export function fontStack(fontId: string, extras: { id: string; stack: string }[
 
 export function createStudioState(themeSlug: string, color: string): StudioState {
   const preset = presetById(DEFAULT_PRESET_ID);
-  const titleSize = clampFontSize(Math.round(preset.width * 0.046), preset.width);
-  const bodySize = clampFontSize(Math.round(preset.width * 0.026), preset.width);
-  const titleY = Math.round(preset.height * 0.7);
+  const titleSize = clampFontSize(DEFAULT_TITLE_SIZE, preset.width);
+  const bodySize = clampFontSize(DEFAULT_BODY_SIZE, preset.width);
+  const ink = rgbToHex(0, 0, 0);
   return {
     presetId: preset.id,
     cardWidth: preset.width,
@@ -166,14 +173,14 @@ export function createStudioState(themeSlug: string, color: string): StudioState
     controlsWidth: CONTROLS_DEFAULT,
     titleSize,
     bodySize,
-    titleX: clampTextOffset(Math.round(preset.width * 0.06), preset.width, titleSize),
-    titleY: clampTextOffset(titleY, preset.height, titleSize),
-    bodyX: clampTextOffset(Math.round(preset.width * 0.06), preset.width, bodySize),
-    bodyY: clampTextOffset(titleY + Math.round(titleSize * 1.6), preset.height, bodySize),
-    titleFontId: "pretendard",
+    titleX: clampTextOffset(DEFAULT_TITLE_X, preset.width, titleSize),
+    titleY: clampTextOffset(DEFAULT_TITLE_Y, preset.height, titleSize),
+    bodyX: clampTextOffset(DEFAULT_BODY_X, preset.width, bodySize),
+    bodyY: clampTextOffset(DEFAULT_BODY_Y, preset.height, bodySize),
+    titleFontId: "montserrat",
     bodyFontId: "pretendard",
-    titleColor: inkHex(color),
-    bodyColor: inkHex(color),
+    titleColor: ink,
+    bodyColor: ink,
     imageWidth: clampImageWidth(preset.width),
     imageX: 0,
     imageY: 0,
@@ -186,6 +193,15 @@ export function resetStudioState(state: StudioState, color: string): void {
   next.controlsWidth = state.controlsWidth;
   next.panel = state.panel;
   Object.assign(state, next);
+}
+
+/** 초기화: a saved baseline replaces the factory start. A missing baseline uses resetStudioState. */
+export function applyStudioBaseline(state: StudioState, baseline: StudioState | null, color: string): void {
+  if (!baseline) {
+    resetStudioState(state, color);
+    return;
+  }
+  Object.assign(state, structuredClone(baseline));
 }
 
 export function normalizeHex(value: string): string | null {

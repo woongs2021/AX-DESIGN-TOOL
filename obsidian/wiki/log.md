@@ -2,6 +2,18 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-10-05] update | 초기화 기준 세팅, 리셋, 라이브러리 저장
+
+스튜디오에서 초기화로 세팅을 누르면 그 레이아웃이 다음 방문의 시작값이자 초기화 지점이 된다. 상단 설정에서 리셋하면 그 기준이 지워진다. 그래픽 라이브러리에 추가하면 Pin 옆 Saved 탭에 PNG 썸네일로 쌓이고, 누르면 그 상태로 다시 고칠 수 있다. 세 동작 모두 진행 확인 뒤에 실행된다.
+
+## [2026-10-05] update | Graphic Library와 스튜디오 테마를 4K로 교체
+
+기존 20점의 이미지를 4096 정사각 PNG로 바꿨다. 직물 밴드, 직조 그리드, 코랄 스트라이프, 산 실루엣, 핀치 라이트 두 점, 앰버 접힘, 잘린 원 분할, 세로 막대, 수평 붓질을 더해 모두 30점이 되었다. 스튜디오 테마도 같은 이미지를 쓴다.
+
+## [2026-10-05] ingest | hermes visual studies 21–30
+
+image-pic-high-resolution 21–30을 캡처 10건으로 추가했다: textile-horizontal-bands, woven-modular-block-grid, coral-black-stripe-block, black-mountain-red-horizon, deep-teal-pinch-light, warm-amber-folded-surface, cropped-circular-segments, electric-blue-pinch-fold, textile-vertical-bar-grid, warm-horizon-brush-field. 01–20은 같은 폴더의 4K PNG로 에셋을 교체했다. 분석은 보이는 색, 형태, 여백, 재질만 적었다. hermes-gallery(30건), geometric-structures, warm-earth-surfaces 컬렉션과 Hermes studies 페이지에 연결했다.
+
 ## [2026-09-28] update | 이전 동작·원래대로 키보드 단축키
 
 이전 동작은 Cmd+Z(맥)·Ctrl+Z(윈도우), 원래대로는 Cmd+Shift+Z·Ctrl+Y로 누른다. 글자 입력칸 안에서는 입력한 글자만 되돌린다.
