@@ -155,6 +155,7 @@ export function renderCaptureDetail(
         </div>
         <div class="detail__actions">
           <a class="button button--secondary" href="${escapeHtml(hrefFor({ name: "studio", theme: slug, card: null }))}">이 테마로 만들기</a>
+          <a class="button button--secondary" href="${escapeHtml(assetUrl(capture.asset.path))}" download="${escapeHtml(`${slug}.${capture.asset.originalName.split(".").pop()}`)}">원본 다운로드</a>
           <button type="button" class="button button--secondary" data-pin-slug="${escapeHtml(slug)}" aria-pressed="${isPinned ? "true" : "false"}">
             ${isPinned ? "Unpin" : "Pin"}
           </button>

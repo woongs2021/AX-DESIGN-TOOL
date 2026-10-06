@@ -219,6 +219,35 @@ html[data-mode="dark"] .nav-popover {
   color: var(--fg);
 }
 
+.nav-popover__item:disabled {
+  color: color-mix(in srgb, var(--fg) 38%, transparent);
+  background: transparent;
+  cursor: default;
+}
+
+.studio-menu {
+  position: fixed;
+  top: auto;
+  right: auto;
+  z-index: 30;
+}
+
+.studio-menu .nav-popover__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.studio-menu .nav-popover__item[hidden] {
+  display: none;
+}
+
+.studio-menu__hint {
+  color: color-mix(in srgb, var(--fg) 50%, transparent);
+  font-size: 12px;
+}
+
 .confirm-backdrop {
   position: fixed;
   inset: 0;
@@ -1544,6 +1573,9 @@ html[data-mode="dark"] .studio__export {
 
 .studio__scaler canvas {
   touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .studio__scaler canvas[data-hover="true"] {
@@ -1594,6 +1626,34 @@ html[data-mode="dark"] .studio__export {
 .studio__handle[data-handle="left"],
 .studio__handle[data-handle="right"] {
   cursor: ew-resize;
+}
+
+.studio__crop-frame {
+  border-style: dashed;
+}
+
+.studio__handle--crop {
+  border-radius: 2px;
+}
+
+.studio__handle[data-crop="n"],
+.studio__handle[data-crop="s"] {
+  cursor: ns-resize;
+}
+
+.studio__handle[data-crop="e"],
+.studio__handle[data-crop="w"] {
+  cursor: ew-resize;
+}
+
+.studio__handle[data-crop="nw"],
+.studio__handle[data-crop="se"] {
+  cursor: nwse-resize;
+}
+
+.studio__handle[data-crop="ne"],
+.studio__handle[data-crop="sw"] {
+  cursor: nesw-resize;
 }
 
 .studio__handle[hidden],

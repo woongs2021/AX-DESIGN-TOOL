@@ -1,5 +1,6 @@
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
+import sharp from "sharp";
 import {
   computeFacetCounts,
   EMPTY_FILTER,
@@ -15,6 +16,9 @@ import { extractPoster, probeAssetFile } from "./lib/probe-asset.ts";
 import { loadVault } from "./lib/vault.ts";
 
 type Target = "internal" | "public";
+
+const THUMB_WIDTH = 1200;
+const THUMB_QUALITY = 82;
 
 type Exclusion = { path: string; reason: string };
 type Failure = { path: string; reason: string };
@@ -154,6 +158,19 @@ for (const item of vault.captures) {
     }
   }
 
+  let thumbPath: string | null = null;
+  if (probed.kind === "still") {
+    const thumbName = `${basename(originalName, extname(originalName))}.thumb.webp`;
+    // iridescent-chrome-field ships without its final CRC/IEND; pixel data is complete.
+    const thumb = await sharp(assetAbs, { failOn: "none" })
+      .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
+      .webp({ quality: THUMB_QUALITY })
+      .toFile(join(assetOutDir, thumbName));
+    thumbPath = `assets/captures/${capture.slug}/${thumbName}`;
+    copiedAssetCount += 1;
+    copiedAssetBytes += thumb.size;
+  }
+
   builtCaptures.push({
     slug: capture.slug,
     title: capture.title,
@@ -182,6 +199,7 @@ for (const item of vault.captures) {
       frameCount: probed.frameCount,
       durationSec: probed.durationSec,
       posterPath,
+      thumbPath,
     },
   });
 }

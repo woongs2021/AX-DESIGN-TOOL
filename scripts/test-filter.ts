@@ -35,6 +35,7 @@ function sample(partial: Partial<CaptureRecord> & Pick<CaptureRecord, "slug" | "
       frameCount: null,
       durationSec: null,
       posterPath: null,
+      thumbPath: null,
     },
     ...partial,
   };
