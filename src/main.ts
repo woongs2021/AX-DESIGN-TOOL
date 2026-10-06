@@ -6,6 +6,7 @@ import {
   createStudioState,
   DEFAULT_THEME_SLUG,
   normalizeHex,
+  normalizeStudioState,
   parseRgb,
   rgbToHex,
   type StudioState,
@@ -103,8 +104,9 @@ function ensureStudio(
   const valid = theme ? knownTheme(theme, captures) : null;
   if (cardId && cardId !== appliedCard) {
     const saved = getSavedCards().find((card) => card.id === cardId);
-    if (saved) {
-      studioState = structuredClone(saved.state);
+    const savedState = saved ? normalizeStudioState(structuredClone(saved.state)) : null;
+    if (savedState) {
+      studioState = savedState;
       if (!knownTheme(studioState.themeSlug, captures)) {
         studioState.themeSlug = captures[0]?.slug ?? "";
       }

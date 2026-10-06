@@ -61,7 +61,7 @@ function cardImage(capture: CaptureRecord): string {
   const src =
     capture.asset.kind === "motion" && capture.asset.posterPath
       ? capture.asset.posterPath
-      : capture.asset.path;
+      : (capture.asset.thumbPath ?? capture.asset.path);
   return `<img class="capture-card__media" src="${escapeHtml(assetUrl(src))}" alt="" loading="lazy" width="${capture.asset.width}" height="${capture.asset.height}" />`;
 }
 

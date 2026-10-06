@@ -12,6 +12,7 @@ export type CaptureAsset = {
   frameCount: number | null;
   durationSec: number | null;
   posterPath: string | null;
+  thumbPath: string | null;
 };
 
 export type CaptureScore = {

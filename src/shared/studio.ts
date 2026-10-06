@@ -29,31 +29,45 @@ export const BUILTIN_FONTS = [
   { id: "montserrat", label: "Montserrat", stack: "Montserrat, system-ui, sans-serif" },
 ] as const;
 
+/** The visible part of the source image, as fractions of its width and height. */
+export type StudioCrop = { x: number; y: number; w: number; h: number };
+export type StudioRect = { x: number; y: number; w: number; h: number };
+
+export type TextKind = "title" | "body";
+export type TextLayer = {
+  id: string;
+  kind: TextKind;
+  text: string;
+  x: number;
+  y: number;
+  size: number;
+  fontId: string;
+  color: string;
+};
+/** Every image layer shows the theme image. x/y/width describe the cropped part on the card. */
+export type ImageLayer = {
+  id: string;
+  kind: "image";
+  x: number;
+  y: number;
+  width: number;
+  crop: StudioCrop | null;
+};
+export type StudioLayer = TextLayer | ImageLayer;
+export type LayerKind = StudioLayer["kind"];
+
 export type StudioState = {
   presetId: string;
   cardWidth: number;
   cardHeight: number;
-  title: string;
-  body: string;
   themeSlug: string;
   color: string;
   radius: number;
   code: string;
   panel: "design" | "code";
   controlsWidth: number;
-  titleSize: number;
-  bodySize: number;
-  titleX: number;
-  titleY: number;
-  bodyX: number;
-  bodyY: number;
-  titleFontId: string;
-  bodyFontId: string;
-  titleColor: string;
-  bodyColor: string;
-  imageWidth: number;
-  imageX: number;
-  imageY: number;
+  /** Bottom to top. */
+  layers: StudioLayer[];
 };
 
 export type Rgb = { r: number; g: number; b: number };
@@ -106,10 +120,15 @@ export function clampImageWidth(value: number): number {
   return Math.min(IMAGE_MAX, Math.max(IMAGE_MIN, Math.round(value)));
 }
 
+/** Element positions snap to 0.5px so arrow-key nudges can move half a pixel. */
+export function roundOffset(value: number): number {
+  return Math.round(value * 2) / 2;
+}
+
 export function clampTextOffset(value: number, limit: number, size: number): number {
   const max = Math.max(0, Math.round(limit) - Math.min(Math.max(size, 0), Math.round(limit)));
   if (!Number.isFinite(value)) return 0;
-  return Math.min(max, Math.max(0, Math.round(value)));
+  return Math.min(max, Math.max(0, roundOffset(value)));
 }
 
 /** Keep at least 40px of the image on the card so it can slide past the edges. */
@@ -118,7 +137,7 @@ export function clampImageOffset(value: number, card: number, image: number): nu
   const hi = Math.round(card - 40);
   if (!Number.isFinite(value)) return 0;
   if (lo > hi) return Math.round((card - image) / 2);
-  return Math.min(hi, Math.max(lo, Math.round(value)));
+  return Math.min(hi, Math.max(lo, roundOffset(value)));
 }
 
 /** Resize the image to nextWidth while the anchor point stays fixed on the card. */
@@ -154,37 +173,217 @@ export function fontStack(fontId: string, extras: { id: string; stack: string }[
   return extras.find((font) => font.id === fontId)?.stack ?? BUILTIN_FONTS[0].stack;
 }
 
+function defaultLayer(kind: "image", cardWidth?: number, cardHeight?: number): ImageLayer;
+function defaultLayer(kind: TextKind, cardWidth?: number, cardHeight?: number): TextLayer;
+function defaultLayer(kind: LayerKind, cardWidth?: number, cardHeight?: number): StudioLayer;
+function defaultLayer(kind: LayerKind, cardWidth = presetById(DEFAULT_PRESET_ID).width, cardHeight = presetById(DEFAULT_PRESET_ID).height): StudioLayer {
+  if (kind === "image") {
+    return { id: "image", kind, x: 0, y: 0, width: clampImageWidth(cardWidth), crop: null };
+  }
+  const title = kind === "title";
+  const size = clampFontSize(title ? DEFAULT_TITLE_SIZE : DEFAULT_BODY_SIZE, cardWidth);
+  return {
+    id: kind,
+    kind,
+    text: title ? DEFAULT_TITLE : DEFAULT_BODY,
+    x: clampTextOffset(title ? DEFAULT_TITLE_X : DEFAULT_BODY_X, cardWidth, size),
+    y: clampTextOffset(title ? DEFAULT_TITLE_Y : DEFAULT_BODY_Y, cardHeight, size),
+    size,
+    fontId: title ? "montserrat" : "pretendard",
+    color: rgbToHex(0, 0, 0),
+  };
+}
+
 export function createStudioState(themeSlug: string, color: string): StudioState {
   const preset = presetById(DEFAULT_PRESET_ID);
-  const titleSize = clampFontSize(DEFAULT_TITLE_SIZE, preset.width);
-  const bodySize = clampFontSize(DEFAULT_BODY_SIZE, preset.width);
-  const ink = rgbToHex(0, 0, 0);
   return {
     presetId: preset.id,
     cardWidth: preset.width,
     cardHeight: preset.height,
-    title: DEFAULT_TITLE,
-    body: DEFAULT_BODY,
     themeSlug,
     color,
     radius: RADIUS_DEFAULT,
     code: "",
     panel: "design",
     controlsWidth: CONTROLS_DEFAULT,
-    titleSize,
-    bodySize,
-    titleX: clampTextOffset(DEFAULT_TITLE_X, preset.width, titleSize),
-    titleY: clampTextOffset(DEFAULT_TITLE_Y, preset.height, titleSize),
-    bodyX: clampTextOffset(DEFAULT_BODY_X, preset.width, bodySize),
-    bodyY: clampTextOffset(DEFAULT_BODY_Y, preset.height, bodySize),
-    titleFontId: "montserrat",
-    bodyFontId: "pretendard",
-    titleColor: ink,
-    bodyColor: ink,
-    imageWidth: clampImageWidth(preset.width),
-    imageX: 0,
-    imageY: 0,
+    layers: [defaultLayer("image"), defaultLayer("body"), defaultLayer("title")],
   };
+}
+
+export function newLayerId(): string {
+  return `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function isTextLayer(layer: StudioLayer): layer is TextLayer {
+  return layer.kind !== "image";
+}
+
+export function firstLayer(state: StudioState, kind: "image"): ImageLayer | undefined;
+export function firstLayer(state: StudioState, kind: TextKind): TextLayer | undefined;
+export function firstLayer(state: StudioState, kind: LayerKind): StudioLayer | undefined {
+  return state.layers.find((layer) => layer.kind === kind);
+}
+
+/** The first layer of a kind, added back with starting values if the state has none. */
+export function ensureLayer(state: StudioState, kind: "image"): ImageLayer;
+export function ensureLayer(state: StudioState, kind: TextKind): TextLayer;
+export function ensureLayer(state: StudioState, kind: LayerKind): StudioLayer {
+  const found = state.layers.find((layer) => layer.kind === kind);
+  if (found) return found;
+  const layer = defaultLayer(kind, state.cardWidth, state.cardHeight);
+  layer.id = newLayerId();
+  if (kind === "image") state.layers.unshift(layer);
+  else state.layers.push(layer);
+  return layer;
+}
+
+/** Height of an image layer on the card. aspect is the source height / width. */
+export function imageLayerHeight(layer: ImageLayer, aspect: number): number {
+  const crop = layer.crop;
+  return crop ? (layer.width * aspect * crop.h) / crop.w : layer.width * aspect;
+}
+
+/** Where the whole source image sits on the card, so a crop can grow back out. */
+export function uncroppedRect(layer: ImageLayer, aspect: number): StudioRect {
+  const crop = layer.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+  const w = layer.width / crop.w;
+  const h = w * aspect;
+  return { x: layer.x - crop.x * w, y: layer.y - crop.y * h, w, h };
+}
+
+/** The crop that shows box out of the full image rect. Null when nothing is cut away. */
+export function cropFromBox(full: StudioRect, box: StudioRect): StudioCrop | null {
+  const crop = {
+    x: (box.x - full.x) / full.w,
+    y: (box.y - full.y) / full.h,
+    w: box.w / full.w,
+    h: box.h / full.h,
+  };
+  const near = (a: number, b: number) => Math.abs(a - b) < 0.001;
+  if (near(crop.x, 0) && near(crop.y, 0) && near(crop.w, 1) && near(crop.h, 1)) return null;
+  return crop;
+}
+
+const CROP_MIN_HEIGHT = 20;
+
+function clampBetween(value: number, lo: number, hi: number): number {
+  return Math.min(Math.max(value, lo), Math.max(lo, hi));
+}
+
+/** Drag one crop handle (n, ne, e, se, s, sw, w, nw). The box stays inside the full image. */
+export function resizeCropBox(full: StudioRect, box: StudioRect, edge: string, dx: number, dy: number): StudioRect {
+  const minW = Math.min(IMAGE_MIN, full.w);
+  const minH = Math.min(CROP_MIN_HEIGHT, full.h);
+  let left = box.x;
+  let top = box.y;
+  let right = box.x + box.w;
+  let bottom = box.y + box.h;
+  if (edge.includes("w")) left = clampBetween(left + dx, full.x, right - minW);
+  if (edge.includes("e")) right = clampBetween(right + dx, left + minW, full.x + full.w);
+  if (edge.includes("n")) top = clampBetween(top + dy, full.y, bottom - minH);
+  if (edge.includes("s")) bottom = clampBetween(bottom + dy, top + minH, full.y + full.h);
+  return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+/** Slide the crop window over the image without changing its size. */
+export function moveCropBox(full: StudioRect, box: StudioRect, dx: number, dy: number): StudioRect {
+  return {
+    ...box,
+    x: clampBetween(box.x + dx, full.x, full.x + full.w - box.w),
+    y: clampBetween(box.y + dy, full.y, full.y + full.h - box.h),
+  };
+}
+
+function parseLayer(raw: unknown, ink: string): StudioLayer | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const num = (field: unknown) => (typeof field === "number" && Number.isFinite(field) ? field : null);
+  const id = typeof value.id === "string" && value.id ? value.id : newLayerId();
+  const x = num(value.x) ?? 0;
+  const y = num(value.y) ?? 0;
+  if (value.kind === "image") {
+    const crop = value.crop as Record<string, unknown> | null | undefined;
+    const cx = num(crop?.x);
+    const cy = num(crop?.y);
+    const cw = num(crop?.w);
+    const ch = num(crop?.h);
+    return {
+      id,
+      kind: "image",
+      x,
+      y,
+      width: clampImageWidth(num(value.width) ?? IMAGE_MIN),
+      crop: cx !== null && cy !== null && cw && ch ? { x: cx, y: cy, w: cw, h: ch } : null,
+    };
+  }
+  if (value.kind !== "title" && value.kind !== "body") return null;
+  return {
+    id,
+    kind: value.kind,
+    text: typeof value.text === "string" ? value.text : "",
+    x,
+    y,
+    size: num(value.size) ?? (value.kind === "title" ? DEFAULT_TITLE_SIZE : DEFAULT_BODY_SIZE),
+    fontId: typeof value.fontId === "string" && value.fontId ? value.fontId : "pretendard",
+    color: normalizeHex(String(value.color ?? "")) ?? ink,
+  };
+}
+
+/** Before layers, the card kept one title, one body, and one image as flat fields. */
+function legacyLayers(value: Record<string, unknown>, ink: string): StudioLayer[] {
+  const num = (field: unknown, fallback: number) => (typeof field === "number" && Number.isFinite(field) ? field : fallback);
+  const text = (field: unknown, fallback: string) => (typeof field === "string" ? field : fallback);
+  const font = text(value.fontId, "pretendard");
+  return [
+    { id: "image", kind: "image", x: num(value.imageX, 0), y: num(value.imageY, 0), width: clampImageWidth(num(value.imageWidth, IMAGE_MIN)), crop: null },
+    {
+      id: "body",
+      kind: "body",
+      text: text(value.body, DEFAULT_BODY),
+      x: num(value.bodyX, DEFAULT_BODY_X),
+      y: num(value.bodyY, DEFAULT_BODY_Y),
+      size: num(value.bodySize, DEFAULT_BODY_SIZE),
+      fontId: text(value.bodyFontId, font) || font,
+      color: normalizeHex(text(value.bodyColor, "")) ?? ink,
+    },
+    {
+      id: "title",
+      kind: "title",
+      text: text(value.title, DEFAULT_TITLE),
+      x: num(value.titleX, DEFAULT_TITLE_X),
+      y: num(value.titleY, DEFAULT_TITLE_Y),
+      size: num(value.titleSize, DEFAULT_TITLE_SIZE),
+      fontId: text(value.titleFontId, font) || font,
+      color: normalizeHex(text(value.titleColor, "")) ?? ink,
+    },
+  ];
+}
+
+/** A stored studio state (baseline or saved card), upgraded to layers. Null when it is not a studio state. */
+export function normalizeStudioState(raw: unknown): StudioState | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  if (typeof value.themeSlug !== "string" || typeof value.color !== "string") return null;
+  const num = (field: unknown, fallback: number) => (typeof field === "number" && Number.isFinite(field) ? field : fallback);
+  const base = createStudioState(value.themeSlug, value.color);
+  const ink = inkHex(value.color);
+  const state: StudioState = {
+    ...base,
+    presetId: typeof value.presetId === "string" ? value.presetId : base.presetId,
+    cardWidth: clampCardSize(num(value.cardWidth, base.cardWidth)),
+    cardHeight: clampCardSize(num(value.cardHeight, base.cardHeight)),
+    radius: clampRadius(num(value.radius, base.radius)),
+    code: typeof value.code === "string" ? value.code : "",
+    panel: value.panel === "code" ? "code" : "design",
+    controlsWidth: num(value.controlsWidth, base.controlsWidth),
+    layers: Array.isArray(value.layers)
+      ? value.layers.map((layer) => parseLayer(layer, ink)).filter((layer): layer is StudioLayer => layer !== null)
+      : legacyLayers(value, ink),
+  };
+  ensureLayer(state, "image");
+  ensureLayer(state, "body");
+  ensureLayer(state, "title");
+  return state;
 }
 
 /** Restore the card to its starting values. The chosen theme and panel width stay. */
@@ -365,12 +564,44 @@ export function substituteStudioCode(code: string, values: StudioSubstitution): 
     .replaceAll("{{themeImage}}", escapeHtml(values.themeImage));
 }
 
-/** Design-panel state as an HTML+CSS fragment. Placeholders stay live. */
-export function designToCode(): string {
+/**
+ * Design-panel state as an HTML+CSS fragment, layers in stacking order.
+ * The first title and body stay live as {{title}} / {{body}}; copies carry their own text.
+ */
+export function designToCode(
+  state: StudioState,
+  aspect = 1,
+  extras: { id: string; stack: string }[] = [],
+): string {
+  const px = (value: number) => `${Math.round(value * 100) / 100}px`;
+  const title = firstLayer(state, "title");
+  const body = firstLayer(state, "body");
+  const items: string[] = [];
+  const rules: string[] = [];
+  state.layers.forEach((layer, index) => {
+    const name = `layer-${index + 1}`;
+    const place = `left: ${px(layer.x)}; top: ${px(layer.y)};`;
+    if (layer.kind === "image") {
+      if (layer.crop) {
+        const full = uncroppedRect(layer, aspect);
+        items.push(`  <div class="studio-crop ${name}"><img src="{{themeImage}}" alt="" /></div>`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, aspect))}; }`);
+        rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
+      } else {
+        items.push(`  <img class="${name}" src="{{themeImage}}" alt="" />`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; }`);
+      }
+      return;
+    }
+    const tag = layer.kind === "title" ? "h1" : "p";
+    const text = layer === title ? "{{title}}" : layer === body ? "{{body}}" : escapeHtml(layer.text);
+    items.push(`  <${tag} class="${name}">${text}</${tag}>`);
+    rules.push(
+      `  .studio-card .${name} { ${place} font-size: ${px(layer.size)}; font-family: ${fontStack(layer.fontId, extras)}; color: ${layer.color}; }`,
+    );
+  });
   return `<article class="studio-card">
-  <img src="{{themeImage}}" alt="" />
-  <h1>{{title}}</h1>
-  <p>{{body}}</p>
+${items.join("\n")}
 </article>
 <style>
   .studio-card {
@@ -385,35 +616,23 @@ export function designToCode(): string {
     font-family: var(--studio-title-font);
     color: var(--studio-ink);
   }
-  .studio-card img {
-    position: absolute;
-    left: var(--studio-image-x);
-    top: var(--studio-image-y);
-    width: var(--studio-image-width);
-    height: auto;
-  }
+  .studio-card img, .studio-card .studio-crop { position: absolute; }
+  .studio-card img { height: auto; }
+  .studio-card .studio-crop { overflow: hidden; }
   .studio-card h1:empty, .studio-card p:empty { display: none; }
   .studio-card h1, .studio-card p { position: absolute; margin: 0; line-height: 1.25; }
-  .studio-card h1 {
-    left: var(--studio-title-x);
-    top: var(--studio-title-y);
-    font-size: var(--studio-title-size);
-    font-weight: 600;
-    font-family: var(--studio-title-font);
-    color: var(--studio-title-color);
-  }
-  .studio-card p {
-    left: var(--studio-body-x);
-    top: var(--studio-body-y);
-    font-size: var(--studio-body-size);
-    font-weight: 400;
-    font-family: var(--studio-body-font);
-    color: var(--studio-body-color);
-  }
+  .studio-card h1 { font-weight: 600; }
+  .studio-card p { font-weight: 400; }
+${rules.join("\n")}
 </style>`;
 }
 
+/**
+ * Card values for the code preview. The title/body/image fields come from the first layer of each
+ * kind and stay exposed as --studio-* variables so code written against them keeps working.
+ */
 export type StudioDocumentInput = StudioSubstitution & {
+  design: string;
   color: string;
   radius: number;
   width: number;
@@ -445,7 +664,7 @@ export function studioFragment(input: StudioDocumentInput): string {
   const height = input.height > 0 ? input.height : preset.height;
   const titleFont = input.titleFontStack.replaceAll(";", "");
   const bodyFont = input.bodyFontStack.replaceAll(";", "");
-  const body = substituteStudioCode(input.code.trim() || designToCode(), input);
+  const body = substituteStudioCode(input.code.trim() || input.design, input);
   const vars = [
     `--studio-color:${color}`,
     `--studio-ink:${ink}`,
@@ -456,13 +675,13 @@ export function studioFragment(input: StudioDocumentInput): string {
     `--studio-body-font:${bodyFont}`,
     `--studio-title-size:${clampFontSize(input.titleSize, width)}px`,
     `--studio-body-size:${clampFontSize(input.bodySize, width)}px`,
-    `--studio-title-x:${Math.round(input.titleX)}px`,
-    `--studio-title-y:${Math.round(input.titleY)}px`,
-    `--studio-body-x:${Math.round(input.bodyX)}px`,
-    `--studio-body-y:${Math.round(input.bodyY)}px`,
+    `--studio-title-x:${roundOffset(input.titleX)}px`,
+    `--studio-title-y:${roundOffset(input.titleY)}px`,
+    `--studio-body-x:${roundOffset(input.bodyX)}px`,
+    `--studio-body-y:${roundOffset(input.bodyY)}px`,
     `--studio-image-width:${clampImageWidth(input.imageWidth)}px`,
-    `--studio-image-x:${Math.round(input.imageX)}px`,
-    `--studio-image-y:${Math.round(input.imageY)}px`,
+    `--studio-image-x:${roundOffset(input.imageX)}px`,
+    `--studio-image-y:${roundOffset(input.imageY)}px`,
     `--studio-title-color:${titleColor}`,
     `--studio-body-color:${bodyColor}`,
   ].join(";");

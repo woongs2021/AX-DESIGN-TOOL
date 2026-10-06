@@ -12,26 +12,39 @@ import {
   clampRadius,
   clampTextOffset,
   CONTROLS_MIN,
+  cropFromBox,
   designToCode,
+  ensureLayer,
   fontLabelFromPath,
   fontStack,
   FONT_SIDE_MARGIN,
   IMAGE_MAX,
-  inkHex,
+  imageLayerHeight,
   IMAGE_MIN,
+  isTextLayer,
   maxFontSize,
+  moveCropBox,
+  newLayerId,
   normalizeHex,
   PREVIEW_MIN,
   SPLITTER_WIDTH,
   RADIUS_MAX,
   RADIUS_MIN,
+  resizeCropBox,
   scaleCardSize,
   scaleImageAround,
   studioFragment,
   studioSrcdoc,
+  uncroppedRect,
   wrapText,
+  type ImageLayer,
+  type LayerKind,
   type StudioDocumentInput,
+  type StudioLayer,
+  type StudioRect,
   type StudioState,
+  type TextKind,
+  type TextLayer,
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
 import { confirmProceed, showToast } from "../feedback.ts";
@@ -39,6 +52,9 @@ import { confirmProceed, showToast } from "../feedback.ts";
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.25;
+const NUDGE_STEP = 0.5;
+const NUDGE_SHIFT_STEP = 10;
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
 const HISTORY_LIMIT = 40;
 let previewZoom = 1;
 let undoStack: StudioState[] = [];
@@ -71,6 +87,11 @@ const DESKTOP_QUERY = "(min-width: 1025px)";
 let studioDevice: Device | null = null;
 let stopDeviceWatch: (() => void) | null = null;
 let stopHistoryShortcut: (() => void) | null = null;
+let stopStudioKeys: (() => void) | null = null;
+let layerClipboard: StudioLayer[] = [];
+let layerMenu: HTMLElement | null = null;
+const LONG_PRESS_MS = 500;
+const PASTE_OFFSET = 20;
 
 function largestDevice(): Device {
   if (window.matchMedia(DESKTOP_QUERY).matches) return "desktop";
@@ -87,7 +108,7 @@ function activeDevice(): Device {
 }
 
 function cloneStudio(state: StudioState): StudioState {
-  return { ...state };
+  return structuredClone(state);
 }
 
 function sameStudio(a: StudioState, b: StudioState): boolean {
@@ -139,7 +160,7 @@ const localFontUrls = import.meta.glob("../../fonts/*.{woff2,woff,ttf,otf}", {
 }) as Record<string, string>;
 
 type FontChoice = { id: string; label: string; stack: string };
-type HitBox = { kind: "title" | "body" | "image"; x: number; y: number; w: number; h: number };
+type HitBox = { id: string; kind: LayerKind; x: number; y: number; w: number; h: number };
 
 const installedFonts = new Set<string>();
 
@@ -188,29 +209,34 @@ function roundedPath(
   ctx.roundRect(0, 0, width, height, r);
 }
 
-function documentInput(state: StudioState, themeImage: string): StudioDocumentInput {
+function documentInput(state: StudioState, themeImage: string, aspect: number): StudioDocumentInput {
+  const title = ensureLayer(state, "title");
+  const body = ensureLayer(state, "body");
+  const image = ensureLayer(state, "image");
+  const extras = extraFonts();
   return {
-    title: state.title,
-    body: state.body,
+    title: title.text,
+    body: body.text,
     themeImage,
+    design: designToCode(state, aspect, extras),
     color: state.color,
     radius: state.radius,
     width: state.cardWidth,
     height: state.cardHeight,
     code: state.code,
-    titleFontStack: fontStack(state.titleFontId, extraFonts()),
-    bodyFontStack: fontStack(state.bodyFontId, extraFonts()),
-    titleSize: state.titleSize,
-    bodySize: state.bodySize,
-    titleX: state.titleX,
-    titleY: state.titleY,
-    bodyX: state.bodyX,
-    bodyY: state.bodyY,
-    imageWidth: state.imageWidth,
-    imageX: state.imageX,
-    imageY: state.imageY,
-    titleColor: state.titleColor,
-    bodyColor: state.bodyColor,
+    titleFontStack: fontStack(title.fontId, extras),
+    bodyFontStack: fontStack(body.fontId, extras),
+    titleSize: title.size,
+    bodySize: body.size,
+    titleX: title.x,
+    titleY: title.y,
+    bodyX: body.x,
+    bodyY: body.y,
+    imageWidth: image.width,
+    imageX: image.x,
+    imageY: image.y,
+    titleColor: title.color,
+    bodyColor: body.color,
   };
 }
 
@@ -218,7 +244,7 @@ function drawCard(
   canvas: HTMLCanvasElement,
   state: StudioState,
   image: HTMLImageElement | null,
-  hidden?: HitBox["kind"],
+  hiddenId?: string,
 ): HitBox[] {
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
@@ -234,42 +260,53 @@ function drawCard(
   ctx.fillRect(0, 0, width, height);
 
   const hits: HitBox[] = [];
-  if (image && image.naturalWidth > 0) {
-    const drawWidth = state.imageWidth;
-    const drawHeight = drawWidth * (image.naturalHeight / image.naturalWidth);
-    ctx.drawImage(image, state.imageX, state.imageY, drawWidth, drawHeight);
-    hits.push({ kind: "image", x: state.imageX, y: state.imageY, w: drawWidth, h: drawHeight });
-  }
-
   const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
   ctx.textBaseline = "top";
+  const extras = extraFonts();
+  const source = image && image.naturalWidth > 0 ? image : null;
+  const aspect = source ? source.naturalHeight / source.naturalWidth : 1;
 
-  const paintText = (
-    kind: "title" | "body",
-    text: string,
-    x: number,
-    y: number,
-    size: number,
-    weight: number,
-    stack: string,
-    color: string,
-  ): void => {
-    if (!text.trim()) return;
-    ctx.fillStyle = color;
-    ctx.font = `${weight} ${size}px ${stack}`;
-    const lines = wrapText(text.trim(), maxText, (value) => ctx.measureText(value).width);
-    const lineHeight = Math.round(size * 1.25);
-    let widest = 0;
-    lines.forEach((line, index) => {
-      if (kind !== hidden) ctx.fillText(line, x, y + index * lineHeight);
-      widest = Math.max(widest, ctx.measureText(line).width);
-    });
-    hits.push({ kind, x, y, w: Math.max(widest, size), h: Math.max(lines.length, 1) * lineHeight });
+  const paintImage = (layer: ImageLayer): void => {
+    if (!source) return;
+    const height = imageLayerHeight(layer, aspect);
+    if (layer.id !== hiddenId) {
+      const crop = layer.crop;
+      if (crop) {
+        const sw = source.naturalWidth;
+        const sh = source.naturalHeight;
+        ctx.drawImage(source, crop.x * sw, crop.y * sh, crop.w * sw, crop.h * sh, layer.x, layer.y, layer.width, height);
+      } else {
+        ctx.drawImage(source, layer.x, layer.y, layer.width, height);
+      }
+    }
+    hits.push({ id: layer.id, kind: "image", x: layer.x, y: layer.y, w: layer.width, h: height });
   };
 
-  const extras = extraFonts();
-  paintText("body", state.body, state.bodyX, state.bodyY, state.bodySize, 400, fontStack(state.bodyFontId, extras), state.bodyColor);
-  paintText("title", state.title, state.titleX, state.titleY, state.titleSize, 600, fontStack(state.titleFontId, extras), state.titleColor);
+  const paintText = (layer: TextLayer): void => {
+    if (!layer.text.trim()) return;
+    ctx.fillStyle = layer.color;
+    ctx.font = `${layer.kind === "title" ? 600 : 400} ${layer.size}px ${fontStack(layer.fontId, extras)}`;
+    const lines = wrapText(layer.text.trim(), maxText, (value) => ctx.measureText(value).width);
+    const lineHeight = Math.round(layer.size * 1.25);
+    let widest = 0;
+    lines.forEach((line, index) => {
+      if (layer.id !== hiddenId) ctx.fillText(line, layer.x, layer.y + index * lineHeight);
+      widest = Math.max(widest, ctx.measureText(line).width);
+    });
+    hits.push({
+      id: layer.id,
+      kind: layer.kind,
+      x: layer.x,
+      y: layer.y,
+      w: Math.max(widest, layer.size),
+      h: Math.max(lines.length, 1) * lineHeight,
+    });
+  };
+
+  for (const layer of state.layers) {
+    if (layer.kind === "image") paintImage(layer);
+    else paintText(layer);
+  }
   ctx.restore();
   return hits;
 }
@@ -346,12 +383,9 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
     `;
   }
 
-  const ink = inkHex(state.color);
-  state.titleColor = normalizeHex(String(state.titleColor ?? "")) ?? ink;
-  state.bodyColor = normalizeHex(String(state.bodyColor ?? "")) ?? ink;
-  const legacyFont = (state as StudioState & { fontId?: string }).fontId;
-  if (!state.titleFontId) state.titleFontId = legacyFont || "pretendard";
-  if (!state.bodyFontId) state.bodyFontId = legacyFont || "pretendard";
+  const title = ensureLayer(state, "title");
+  const body = ensureLayer(state, "body");
+  const image = ensureLayer(state, "image");
   const preset = presetById(state.presetId);
   const options = STUDIO_PRESETS.map(
     (item) =>
@@ -369,7 +403,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           aria-checked="${selected ? "true" : "false"}"
           tabindex="${selected ? "0" : "-1"}"
         >
-          <img src="${escapeHtml(assetUrl(capture.asset.path))}" alt="${escapeHtml(capture.title)}" />
+          <img src="${escapeHtml(assetUrl(capture.asset.thumbPath ?? capture.asset.path))}" alt="${escapeHtml(capture.title)}" />
         </button>
       `;
     })
@@ -436,47 +470,47 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           </div>
           <div class="studio__field">
             <label for="studio-title">카드 타이틀</label>
-            <input id="studio-title" class="studio__control" type="text" value="${escapeHtml(state.title)}" placeholder="타이틀" />
+            <input id="studio-title" class="studio__control" type="text" value="${escapeHtml(title.text)}" placeholder="타이틀" />
           </div>
           <div class="studio__field">
             <label for="studio-title-color">타이틀 컬러</label>
             <div class="studio__color">
-              <input id="studio-title-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(state.titleColor)}" aria-label="타이틀 컬러 피커" />
-              <input id="studio-title-hex" class="studio__control" type="text" value="${escapeHtml(state.titleColor)}" spellcheck="false" aria-label="타이틀 컬러 hex" />
+              <input id="studio-title-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(title.color)}" aria-label="타이틀 컬러 피커" />
+              <input id="studio-title-hex" class="studio__control" type="text" value="${escapeHtml(title.color)}" spellcheck="false" aria-label="타이틀 컬러 hex" />
             </div>
           </div>
           <div class="studio__field">
             <label for="studio-title-size">타이틀 폰트 크기</label>
             <div class="studio__radius">
-              <input id="studio-title-size" type="range" min="5" max="${fontMax}" step="1" value="${state.titleSize}" />
-              <input id="studio-title-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${state.titleSize}" aria-label="타이틀 폰트 크기 수치" />
+              <input id="studio-title-size" type="range" min="5" max="${fontMax}" step="1" value="${title.size}" />
+              <input id="studio-title-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${title.size}" aria-label="타이틀 폰트 크기 수치" />
             </div>
           </div>
           <div class="studio__field">
             <label for="studio-title-font">타이틀 폰트</label>
-            <select id="studio-title-font" class="studio__control">${fontOptions(state.titleFontId)}</select>
+            <select id="studio-title-font" class="studio__control">${fontOptions(title.fontId)}</select>
           </div>
           <div class="studio__field">
             <label for="studio-body">본문</label>
-            <textarea id="studio-body" class="studio__control studio__control--area" placeholder="본문">${escapeHtml(state.body)}</textarea>
+            <textarea id="studio-body" class="studio__control studio__control--area" placeholder="본문">${escapeHtml(body.text)}</textarea>
           </div>
           <div class="studio__field">
             <label for="studio-body-color">본문 컬러</label>
             <div class="studio__color">
-              <input id="studio-body-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(state.bodyColor)}" aria-label="본문 컬러 피커" />
-              <input id="studio-body-hex" class="studio__control" type="text" value="${escapeHtml(state.bodyColor)}" spellcheck="false" aria-label="본문 컬러 hex" />
+              <input id="studio-body-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(body.color)}" aria-label="본문 컬러 피커" />
+              <input id="studio-body-hex" class="studio__control" type="text" value="${escapeHtml(body.color)}" spellcheck="false" aria-label="본문 컬러 hex" />
             </div>
           </div>
           <div class="studio__field">
             <label for="studio-body-size">본문 폰트 크기</label>
             <div class="studio__radius">
-              <input id="studio-body-size" type="range" min="5" max="${fontMax}" step="1" value="${state.bodySize}" />
-              <input id="studio-body-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${state.bodySize}" aria-label="본문 폰트 크기 수치" />
+              <input id="studio-body-size" type="range" min="5" max="${fontMax}" step="1" value="${body.size}" />
+              <input id="studio-body-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${body.size}" aria-label="본문 폰트 크기 수치" />
             </div>
           </div>
           <div class="studio__field">
             <label for="studio-body-font">본문 폰트</label>
-            <select id="studio-body-font" class="studio__control">${fontOptions(state.bodyFontId)}</select>
+            <select id="studio-body-font" class="studio__control">${fontOptions(body.fontId)}</select>
           </div>
           <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮기고, 더블 클릭(탭)해 바로 수정할 수 있습니다.</p>
           <div class="studio__field">
@@ -486,8 +520,8 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <div class="studio__field">
             <label for="studio-image-width">카드 이미지 크기</label>
             <div class="studio__radius">
-              <input id="studio-image-width" type="range" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${state.imageWidth}" />
-              <input id="studio-image-width-number" class="studio__control studio__control--number" type="number" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${state.imageWidth}" aria-label="카드 이미지 크기 수치" />
+              <input id="studio-image-width" type="range" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${image.width}" />
+              <input id="studio-image-width-number" class="studio__control studio__control--number" type="number" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${image.width}" aria-label="카드 이미지 크기 수치" />
             </div>
           </div>
           <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮기고, 핀치하거나 클릭 후 가장자리 핸들을 끌어 크기를 조절할 수 있습니다.</p>
@@ -534,14 +568,13 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
                 <iframe id="studio-iframe" title="카드 코드 프리뷰" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
                 <div class="studio__safe" id="studio-safe" hidden></div>
               </div>
-              <div class="studio__overlay">
-                <div class="studio__select-frame" data-frame="image" hidden></div>
-                <div class="studio__select-frame" data-frame="title" hidden></div>
-                <div class="studio__select-frame" data-frame="body" hidden></div>
+              <div class="studio__overlay" id="studio-overlay">
                 <span class="studio__handle" data-handle="top" hidden></span>
                 <span class="studio__handle" data-handle="right" hidden></span>
                 <span class="studio__handle" data-handle="bottom" hidden></span>
                 <span class="studio__handle" data-handle="left" hidden></span>
+                <div class="studio__select-frame studio__crop-frame" id="studio-crop-frame" hidden></div>
+                ${["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((edge) => `<span class="studio__handle studio__handle--crop" data-crop="${edge}" hidden></span>`).join("")}
                 <textarea class="studio__editor" id="studio-editor" rows="1" spellcheck="false" aria-label="텍스트 편집" hidden></textarea>
               </div>
             </div>
@@ -626,10 +659,14 @@ export function bindStudio(
   const exportCode = root.querySelector<HTMLElement>("#studio-export");
   const splitter = root.querySelector<HTMLElement>("#studio-splitter");
   const studio = root.querySelector<HTMLElement>(".studio");
-  const frames = [...root.querySelectorAll<HTMLElement>(".studio__select-frame")];
+  const overlay = root.querySelector<HTMLElement>("#studio-overlay");
+  const cropFrame = root.querySelector<HTMLElement>("#studio-crop-frame");
   const editor = root.querySelector<HTMLTextAreaElement>("#studio-editor");
-  const handles = [...root.querySelectorAll<HTMLElement>(".studio__handle")];
+  const handles = [...root.querySelectorAll<HTMLElement>(".studio__handle[data-handle]")];
+  const cropHandles = [...root.querySelectorAll<HTMLElement>(".studio__handle[data-crop]")];
   if (
+    !overlay ||
+    !cropFrame ||
     !editor ||
     !presetSelect ||
     !sizeRange ||
@@ -687,10 +724,30 @@ export function bindStudio(
 
   let drawToken = 0;
   let viewScale = 1;
-  const selected = new Set<HitBox["kind"]>();
-  let editing: { kind: "title" | "body"; original: string } | null = null;
+  const selected = new Set<string>();
+  let editing: { id: string; original: string } | null = null;
+  let cropping: { id: string; full: StudioRect; box: StudioRect } | null = null;
   let paint = () => {};
   let syncOverlay = () => {};
+
+  const layerById = (id: string) => state.layers.find((layer) => layer.id === id);
+  const selectedLayers = () => state.layers.filter((layer) => selected.has(layer.id));
+  /** The panel edits the topmost selected layer of a kind, or the first layer of that kind. */
+  const panelText = (kind: TextKind): TextLayer => {
+    for (let index = state.layers.length - 1; index >= 0; index -= 1) {
+      const layer = state.layers[index];
+      if (layer && layer.kind === kind && selected.has(layer.id)) return layer;
+    }
+    return ensureLayer(state, kind);
+  };
+  const panelImage = (): ImageLayer => {
+    for (let index = state.layers.length - 1; index >= 0; index -= 1) {
+      const layer = state.layers[index];
+      if (layer && layer.kind === "image" && selected.has(layer.id)) return layer;
+    }
+    return ensureLayer(state, "image");
+  };
+  const imageLayers = () => state.layers.filter((layer): layer is ImageLayer => layer.kind === "image");
 
   const syncZoom = () => {
     if (!Number.isFinite(previewZoom) || previewZoom <= 0) previewZoom = 1;
@@ -789,22 +846,23 @@ export function bindStudio(
     range.style.setProperty("--range-fill", `${Math.min(100, Math.max(0, pct))}%`);
   };
   let sizeRatio = state.cardHeight / Math.max(1, state.cardWidth);
-  let sizeBase = { cardWidth: state.cardWidth, imageWidth: state.imageWidth, imageX: state.imageX, imageY: state.imageY };
+  const imageSnapshot = () => new Map(imageLayers().map((layer) => [layer.id, { width: layer.width, x: layer.x, y: layer.y }]));
+  let sizeBase = { cardWidth: state.cardWidth, images: imageSnapshot() };
   const captureSizeRatio = () => {
     sizeRatio = state.cardHeight / Math.max(1, state.cardWidth);
-    sizeBase = { cardWidth: state.cardWidth, imageWidth: state.imageWidth, imageX: state.imageX, imageY: state.imageY };
+    sizeBase = { cardWidth: state.cardWidth, images: imageSnapshot() };
   };
 
   let themeImage: HTMLImageElement | null = null;
   let imageAspect = 1;
   let hits: HitBox[] = [];
 
-  const imageDrawHeight = () => state.imageWidth * imageAspect;
+  const layerHeight = (layer: ImageLayer) => imageLayerHeight(layer, imageAspect);
 
   const clampLayout = () => {
     state.cardWidth = clampCardSize(state.cardWidth);
     state.cardHeight = clampCardSize(state.cardHeight);
-    state.imageWidth = clampImageWidth(state.imageWidth);
+    for (const layer of imageLayers()) layer.width = clampImageWidth(layer.width);
   };
 
   const writeControl = (range: HTMLInputElement, number: HTMLInputElement, value: number) => {
@@ -813,9 +871,11 @@ export function bindStudio(
   };
 
   const syncSizeControls = () => {
+    const title = panelText("title");
+    const body = panelText("body");
     const fontCap = maxFontSize(state.cardWidth);
-    const titleMax = String(Math.max(fontCap, state.titleSize));
-    const bodyMax = String(Math.max(fontCap, state.bodySize));
+    const titleMax = String(Math.max(fontCap, title.size));
+    const bodyMax = String(Math.max(fontCap, body.size));
     for (const input of [titleSizeRange, titleSizeNumber]) {
       input.min = "5";
       input.max = titleMax;
@@ -827,9 +887,9 @@ export function bindStudio(
     writeControl(sizeRange, sizeNumber, state.cardWidth);
     writeControl(widthRange, widthNumber, state.cardWidth);
     writeControl(heightRange, heightNumber, state.cardHeight);
-    writeControl(titleSizeRange, titleSizeNumber, state.titleSize);
-    writeControl(bodySizeRange, bodySizeNumber, state.bodySize);
-    writeControl(imageRange, imageNumber, state.imageWidth);
+    writeControl(titleSizeRange, titleSizeNumber, title.size);
+    writeControl(bodySizeRange, bodySizeNumber, body.size);
+    writeControl(imageRange, imageNumber, panelImage().width);
   };
 
   const syncRadiusControls = () => {
@@ -865,23 +925,25 @@ export function bindStudio(
   };
 
   const syncForm = () => {
+    const title = panelText("title");
+    const body = panelText("body");
     presetSelect.value = state.presetId;
-    if (document.activeElement !== titleInput) titleInput.value = state.title;
-    if (document.activeElement !== bodyInput) bodyInput.value = state.body;
+    if (document.activeElement !== titleInput) titleInput.value = title.text;
+    if (document.activeElement !== bodyInput) bodyInput.value = body.text;
     if (document.activeElement !== titleHexInput) {
-      titleColorInput.value = state.titleColor;
-      titleHexInput.value = state.titleColor;
+      titleColorInput.value = title.color;
+      titleHexInput.value = title.color;
     }
     if (document.activeElement !== bodyHexInput) {
-      bodyColorInput.value = state.bodyColor;
-      bodyHexInput.value = state.bodyColor;
+      bodyColorInput.value = body.color;
+      bodyHexInput.value = body.color;
     }
     if (document.activeElement !== hexInput) {
       colorInput.value = state.color;
       hexInput.value = state.color;
     }
-    titleFontSelect.value = state.titleFontId;
-    bodyFontSelect.value = state.bodyFontId;
+    titleFontSelect.value = title.fontId;
+    bodyFontSelect.value = body.fontId;
     if (document.activeElement !== codeInput) codeInput.value = state.code;
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")) {
       const selected = button.dataset.themeSlug === state.themeSlug;
@@ -900,7 +962,7 @@ export function bindStudio(
     const matchesPreset = state.cardWidth === preset.width && state.cardHeight === preset.height;
     const safeNote = matchesPreset && preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
     meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}${safeNote}`;
-    exportCode.textContent = designToCode();
+    exportCode.textContent = designToCode(state, imageAspect, extraFonts());
     fitCodeInput();
     syncRadiusControls();
     updateScale();
@@ -919,10 +981,9 @@ export function bindStudio(
       return document.fonts.load(`${weight} ${size}px "${family}"`);
     };
     try {
-      await Promise.all([
-        loadFace(state.titleFontId, 600, state.titleSize),
-        loadFace(state.bodyFontId, 400, state.bodySize),
-      ]);
+      await Promise.all(
+        state.layers.filter(isTextLayer).map((layer) => loadFace(layer.fontId, layer.kind === "title" ? 600 : 400, layer.size)),
+      );
     } catch {
       /* the canvas stack falls through to the next family */
     }
@@ -934,7 +995,7 @@ export function bindStudio(
       iframe.hidden = false;
       const themeData = url ? await themeDataUrl(url) : "";
       if (token !== drawToken) return;
-      iframe.srcdoc = studioSrcdoc(documentInput(state, themeData));
+      iframe.srcdoc = studioSrcdoc(documentInput(state, themeData, imageAspect));
       syncOverlay();
       return;
     }
@@ -955,6 +1016,7 @@ export function bindStudio(
     }
     if (token !== drawToken) return;
     clampLayout();
+    exportCode.textContent = designToCode(state, imageAspect, extraFonts());
     paint();
   };
 
@@ -1011,30 +1073,35 @@ export function bindStudio(
     state.cardWidth = next.cardWidth;
     state.cardHeight = next.cardHeight;
     const factor = state.cardWidth / Math.max(1, sizeBase.cardWidth);
-    state.imageWidth = clampImageWidth(sizeBase.imageWidth * factor);
-    const imageFactor = state.imageWidth / Math.max(1, sizeBase.imageWidth);
-    state.imageX = Math.round(sizeBase.imageX * imageFactor);
-    state.imageY = Math.round(sizeBase.imageY * imageFactor);
+    for (const layer of imageLayers()) {
+      const base = sizeBase.images.get(layer.id);
+      if (!base) continue;
+      layer.width = clampImageWidth(base.width * factor);
+      const imageFactor = layer.width / Math.max(1, base.width);
+      layer.x = Math.round(base.x * imageFactor);
+      layer.y = Math.round(base.y * imageFactor);
+    }
     const nextFit = fitScaleFor(state.cardWidth, state.cardHeight);
     if (nextFit > 0 && Number.isFinite(screen) && screen > 0) previewZoom = screen / nextFit;
   }, () => state.cardWidth);
   bindPair(widthRange, widthNumber, (value) => {
     state.cardWidth = clampCardSize(value);
-    state.titleSize = clampFontSize(state.titleSize, state.cardWidth);
-    state.bodySize = clampFontSize(state.bodySize, state.cardWidth);
+    for (const layer of state.layers) {
+      if (isTextLayer(layer)) layer.size = clampFontSize(layer.size, state.cardWidth);
+    }
   }, () => state.cardWidth);
   bindPair(heightRange, heightNumber, (value) => {
     state.cardHeight = value;
   }, () => state.cardHeight);
   bindPair(titleSizeRange, titleSizeNumber, (value) => {
-    state.titleSize = clampFontSize(value, state.cardWidth);
-  }, () => state.titleSize);
+    panelText("title").size = clampFontSize(value, state.cardWidth);
+  }, () => panelText("title").size);
   bindPair(bodySizeRange, bodySizeNumber, (value) => {
-    state.bodySize = clampFontSize(value, state.cardWidth);
-  }, () => state.bodySize);
+    panelText("body").size = clampFontSize(value, state.cardWidth);
+  }, () => panelText("body").size);
   bindPair(imageRange, imageNumber, (value) => {
-    state.imageWidth = value;
-  }, () => state.imageWidth);
+    panelImage().width = value;
+  }, () => panelImage().width);
   const bindSelect = (select: HTMLSelectElement, apply: () => void) => {
     select.addEventListener("focus", () => beginGesture(select));
     select.addEventListener("change", () => {
@@ -1045,10 +1112,10 @@ export function bindStudio(
     select.addEventListener("blur", () => finishGesture(select));
   };
   bindSelect(titleFontSelect, () => {
-    state.titleFontId = titleFontSelect.value;
+    panelText("title").fontId = titleFontSelect.value;
   });
   bindSelect(bodyFontSelect, () => {
-    state.bodyFontId = bodyFontSelect.value;
+    panelText("body").fontId = bodyFontSelect.value;
   });
   const snapshotCard = async (): Promise<string> => {
     const offscreen = document.createElement("canvas");
@@ -1057,7 +1124,7 @@ export function bindStudio(
       const themeData = url ? await themeDataUrl(url) : "";
       await paintForeignObject(
         offscreen,
-        studioFragment(documentInput(state, themeData)),
+        studioFragment(documentInput(state, themeData, imageAspect)),
         state.cardWidth,
         state.cardHeight,
       );
@@ -1110,13 +1177,13 @@ export function bindStudio(
   });
   titleInput.addEventListener("focus", () => beginGesture(titleInput));
   titleInput.addEventListener("input", () => {
-    state.title = titleInput.value;
+    panelText("title").text = titleInput.value;
     void redraw();
   });
   titleInput.addEventListener("blur", () => finishGesture(titleInput));
   bodyInput.addEventListener("focus", () => beginGesture(bodyInput));
   bodyInput.addEventListener("input", () => {
-    state.body = bodyInput.value;
+    panelText("body").text = bodyInput.value;
     void redraw();
   });
   bodyInput.addEventListener("blur", () => finishGesture(bodyInput));
@@ -1152,11 +1219,11 @@ export function bindStudio(
     state.color = hex;
   }, () => state.color);
   bindColor(titleColorInput, titleHexInput, (hex) => {
-    state.titleColor = hex;
-  }, () => state.titleColor);
+    panelText("title").color = hex;
+  }, () => panelText("title").color);
   bindColor(bodyColorInput, bodyHexInput, (hex) => {
-    state.bodyColor = hex;
-  }, () => state.bodyColor);
+    panelText("body").color = hex;
+  }, () => panelText("body").color);
   const applyRadius = (raw: string) => {
     state.radius = clampRadius(Number(raw));
     syncRadiusControls();
@@ -1187,6 +1254,7 @@ export function bindStudio(
     void redraw();
   };
   undoButton.addEventListener("click", () => {
+    endCrop(false);
     finishGesture();
     const prev = undoStack.pop();
     const zoom = undoZoom.pop();
@@ -1199,6 +1267,7 @@ export function bindStudio(
     applyHistory(prev, zoom);
   });
   redoButton.addEventListener("click", () => {
+    endCrop(false);
     finishGesture();
     const next = redoStack.pop();
     const zoom = redoZoom.pop();
@@ -1249,7 +1318,7 @@ export function bindStudio(
   });
 
   root.querySelector("#studio-copy")?.addEventListener("click", async () => {
-    const text = designToCode();
+    const text = designToCode(state, imageAspect, extraFonts());
     exportCode.textContent = text;
     try {
       await navigator.clipboard.writeText(text);
@@ -1281,7 +1350,7 @@ export function bindStudio(
       const offscreen = document.createElement("canvas");
       await paintForeignObject(
         offscreen,
-        studioFragment(documentInput(state, themeData)),
+        studioFragment(documentInput(state, themeData, imageAspect)),
         state.cardWidth,
         state.cardHeight,
       );
@@ -1327,99 +1396,177 @@ export function bindStudio(
   };
   const paintDragStroke = () => {
     if (!drag) return;
-    for (const box of hits) if (drag.kinds.includes(box.kind)) strokeDragBox(box);
+    for (const box of hits) if (drag.start.has(box.id)) strokeDragBox(box);
+  };
+  const paintCropGhost = () => {
+    const ctx = canvas.getContext("2d");
+    if (!cropping || !themeImage || !ctx) return;
+    const { full, box } = cropping;
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.drawImage(themeImage, full.x, full.y, full.w, full.h);
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.rect(box.x, box.y, box.w, box.h);
+    ctx.clip();
+    ctx.drawImage(themeImage, full.x, full.y, full.w, full.h);
+    ctx.restore();
   };
 
   type ImageBox = { x: number; y: number; width: number };
   type Point = { x: number; y: number };
-  let drag: {
-    kind: HitBox["kind"];
-    kinds: HitBox["kind"][];
-    origin: Point;
-    start: Map<HitBox["kind"], Point>;
-    pointerId: number;
-  } | null = null;
+  let drag: { id: string; origin: Point; start: Map<string, Point>; pointerId: number } | null = null;
   let tapStart: { x: number; y: number; moved: boolean; shift: boolean } | null = null;
-  let lastTap: { kind: HitBox["kind"]; time: number; x: number; y: number } | null = null;
+  let lastTap: { id: string; time: number; x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
-  let pinch: { distance: number; mid: { x: number; y: number }; image: ImageBox } | null = null;
+  let pinch: { distance: number; mid: Point; layerId: string; image: ImageBox } | null = null;
+  let longPress: { timer: number; pointerId: number; x: number; y: number } | null = null;
+  let lastPointer: Point | null = null;
+  let panelKey = "";
 
-  const imageBox = (): ImageBox => ({ x: state.imageX, y: state.imageY, width: state.imageWidth });
-  const positionOf = (kind: HitBox["kind"]): Point =>
-    kind === "title" ? { x: state.titleX, y: state.titleY }
-    : kind === "body" ? { x: state.bodyX, y: state.bodyY }
-    : { x: state.imageX, y: state.imageY };
-  const clampPosition = (kind: HitBox["kind"], x: number, y: number): Point =>
-    kind === "title" ? {
-      x: clampTextOffset(x, state.cardWidth, state.titleSize),
-      y: clampTextOffset(y, state.cardHeight, state.titleSize),
+  const imageBox = (layer: ImageLayer): ImageBox => ({ x: layer.x, y: layer.y, width: layer.width });
+  const clampLayerPosition = (layer: StudioLayer, x: number, y: number): Point =>
+    layer.kind === "image"
+      ? {
+          x: clampImageOffset(x, state.cardWidth, layer.width),
+          y: clampImageOffset(y, state.cardHeight, layerHeight(layer)),
+        }
+      : {
+          x: clampTextOffset(x, state.cardWidth, layer.size),
+          y: clampTextOffset(y, state.cardHeight, layer.size),
+        };
+  const positionsOf = (ids: Iterable<string>) => {
+    const start = new Map<string, Point>();
+    for (const id of ids) {
+      const layer = layerById(id);
+      if (layer) start.set(id, { x: layer.x, y: layer.y });
     }
-    : kind === "body" ? {
-      x: clampTextOffset(x, state.cardWidth, state.bodySize),
-      y: clampTextOffset(y, state.cardHeight, state.bodySize),
+    return start;
+  };
+  const moveGroup = (start: Map<string, Point>, dx: number, dy: number) => {
+    // Shrink the shared delta to the most constrained item so the group keeps its spacing at card edges.
+    const nearer = (a: number, b: number) => (Math.abs(b) < Math.abs(a) ? b : a);
+    const moving: { layer: StudioLayer; from: Point }[] = [];
+    for (const [id, from] of start) {
+      const layer = layerById(id);
+      if (layer) moving.push({ layer, from });
     }
-    : {
-      x: clampImageOffset(x, state.cardWidth, state.imageWidth),
-      y: clampImageOffset(y, state.cardHeight, imageDrawHeight()),
-    };
-  const setPosition = (kind: HitBox["kind"], point: Point) => {
-    if (kind === "title") {
-      state.titleX = point.x;
-      state.titleY = point.y;
-    } else if (kind === "body") {
-      state.bodyX = point.x;
-      state.bodyY = point.y;
-    } else {
-      state.imageX = point.x;
-      state.imageY = point.y;
+    for (const { layer, from } of moving) {
+      const clamped = clampLayerPosition(layer, from.x + dx, from.y + dy);
+      dx = nearer(dx, clamped.x - from.x);
+      dy = nearer(dy, clamped.y - from.y);
+    }
+    for (const { layer, from } of moving) {
+      const next = clampLayerPosition(layer, from.x + dx, from.y + dy);
+      layer.x = next.x;
+      layer.y = next.y;
     }
   };
-  const applyImage = (next: ImageBox) => {
-    state.imageWidth = next.width;
-    state.imageX = clampImageOffset(next.x, state.cardWidth, state.imageWidth);
-    state.imageY = clampImageOffset(next.y, state.cardHeight, imageDrawHeight());
+  const applyImage = (layer: ImageLayer, next: ImageBox) => {
+    layer.width = next.width;
+    layer.x = clampImageOffset(next.x, state.cardWidth, layer.width);
+    layer.y = clampImageOffset(next.y, state.cardHeight, layerHeight(layer));
+  };
+  /** Pinch and ctrl+wheel resize the topmost image under the point, else the one the panel edits. */
+  const imageAt = (point: Point): ImageLayer => {
+    for (let index = hits.length - 1; index >= 0; index -= 1) {
+      const box = hits[index];
+      if (!box || box.kind !== "image") continue;
+      if (point.x < box.x || point.y < box.y || point.x > box.x + box.w || point.y > box.y + box.h) continue;
+      const layer = layerById(box.id);
+      if (layer?.kind === "image") return layer;
+    }
+    return panelImage();
   };
   paint = () => {
-    hits = drawCard(canvas, state, themeImage, editing?.kind);
+    for (const id of [...selected]) if (!layerById(id)) selected.delete(id);
+    hits = drawCard(canvas, state, themeImage, editing?.id ?? cropping?.id);
+    paintCropGhost();
     paintDragStroke();
     syncOverlay();
+    const key = [...selected].join(" ");
+    if (key !== panelKey) {
+      panelKey = key;
+      syncForm();
+      syncSizeControls();
+      root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
+    }
   };
 
   const placeAt = (element: HTMLElement, x: number, y: number) => {
     element.style.left = `${x * viewScale}px`;
     element.style.top = `${y * viewScale}px`;
   };
+  const editingLayer = (): TextLayer | null => {
+    const layer = editing ? layerById(editing.id) : undefined;
+    return layer && isTextLayer(layer) ? layer : null;
+  };
   const placeEditor = () => {
-    if (!editing) return;
-    const title = editing.kind === "title";
-    const size = title ? state.titleSize : state.bodySize;
-    const fontPx = size * viewScale;
+    const layer = editingLayer();
+    if (!layer) return;
+    const fontPx = layer.size * viewScale;
     // iOS zooms the page when a focused field is under 16px, so render at 16px+ and scale down.
     const base = Math.max(16, fontPx);
     const shrink = fontPx / base;
-    placeAt(editor, title ? state.titleX : state.bodyX, title ? state.titleY : state.bodyY);
-    editor.style.font = `${title ? 600 : 400} ${base}px ${fontStack(title ? state.titleFontId : state.bodyFontId, extraFonts())}`;
-    editor.style.lineHeight = `${(Math.round(size * 1.25) * viewScale) / shrink}px`;
-    editor.style.color = title ? state.titleColor : state.bodyColor;
+    placeAt(editor, layer.x, layer.y);
+    editor.style.font = `${layer.kind === "title" ? 600 : 400} ${base}px ${fontStack(layer.fontId, extraFonts())}`;
+    editor.style.lineHeight = `${(Math.round(layer.size * 1.25) * viewScale) / shrink}px`;
+    editor.style.color = layer.color;
     editor.style.width = `${(Math.max(1, state.cardWidth - FONT_SIDE_MARGIN * 2) * viewScale) / shrink}px`;
     editor.style.transform = `scale(${shrink})`;
     editor.style.height = "auto";
     editor.style.height = `${editor.scrollHeight}px`;
   };
+  const frameEls = new Map<string, HTMLElement>();
+  const syncCropOverlay = () => {
+    const crop = cropping && !state.code.trim() ? cropping : null;
+    cropFrame.hidden = !crop;
+    for (const handle of cropHandles) handle.hidden = !crop;
+    if (!crop) return;
+    const { box } = crop;
+    placeAt(cropFrame, box.x, box.y);
+    cropFrame.style.width = `${box.w * viewScale}px`;
+    cropFrame.style.height = `${box.h * viewScale}px`;
+    for (const handle of cropHandles) {
+      const edge = handle.dataset.crop ?? "";
+      const x = edge.includes("w") ? box.x : edge.includes("e") ? box.x + box.w : box.x + box.w / 2;
+      const y = edge.includes("n") ? box.y : edge.includes("s") ? box.y + box.h : box.y + box.h / 2;
+      placeAt(handle, x, y);
+    }
+  };
+  const singleImage = (): ImageLayer | null => {
+    const [onlyId] = selected.size === 1 ? [...selected] : [];
+    const layer = onlyId ? layerById(onlyId) : undefined;
+    return layer?.kind === "image" ? layer : null;
+  };
   syncOverlay = () => {
-    const visible = !editing && !state.code.trim();
-    for (const frame of frames) {
-      const box = hits.find((hit) => hit.kind === frame.dataset.frame);
-      const show = visible && Boolean(box) && selected.has(frame.dataset.frame as HitBox["kind"]);
-      frame.hidden = !show;
-      if (show && box) {
+    const visible = !editing && !cropping && !state.code.trim();
+    const shown = new Set<string>();
+    if (visible) {
+      for (const id of selected) {
+        const box = hits.find((hit) => hit.id === id);
+        if (!box) continue;
+        let frame = frameEls.get(id);
+        if (!frame) {
+          frame = document.createElement("div");
+          frame.className = "studio__select-frame";
+          overlay.prepend(frame);
+          frameEls.set(id, frame);
+        }
         placeAt(frame, box.x, box.y);
         frame.style.width = `${box.w * viewScale}px`;
         frame.style.height = `${box.h * viewScale}px`;
+        shown.add(id);
       }
     }
-    const box = hits.find((hit) => hit.kind === "image");
-    const show = visible && selected.size === 1 && selected.has("image") && Boolean(box);
+    for (const [id, frame] of frameEls) {
+      if (shown.has(id)) continue;
+      frame.remove();
+      frameEls.delete(id);
+    }
+    const image = singleImage();
+    const box = image ? hits.find((hit) => hit.id === image.id) : undefined;
+    const show = visible && Boolean(box);
     for (const handle of handles) handle.hidden = !show;
     if (show && box) {
       const inset = 12 / Math.max(viewScale, 0.001);
@@ -1435,13 +1582,15 @@ export function bindStudio(
         else placeAt(handle, clampX(box.x + box.w), cy);
       }
     }
+    syncCropOverlay();
     placeEditor();
   };
 
   for (const handle of handles) {
     handle.addEventListener("pointerdown", (event) => {
-      const box = hits.find((hit) => hit.kind === "image");
-      if (!box) return;
+      const layer = singleImage();
+      const box = layer ? hits.find((hit) => hit.id === layer.id) : undefined;
+      if (!layer || !box) return;
       event.preventDefault();
       try {
         handle.setPointerCapture(event.pointerId);
@@ -1450,7 +1599,8 @@ export function bindStudio(
       }
       beginGesture(handle);
       const edge = handle.dataset.handle;
-      const start = imageBox();
+      const start = imageBox(layer);
+      const ratio = box.h / Math.max(1, box.w);
       const anchor =
         edge === "right" ? { x: box.x, y: box.y + box.h / 2 }
         : edge === "left" ? { x: box.x + box.w, y: box.y + box.h / 2 }
@@ -1465,9 +1615,9 @@ export function bindStudio(
         const width =
           edge === "right" ? box.w + dx
           : edge === "left" ? box.w - dx
-          : edge === "bottom" ? (box.h + dy) / imageAspect
-          : (box.h - dy) / imageAspect;
-        applyImage(scaleImageAround(start, width, anchor.x, anchor.y));
+          : edge === "bottom" ? (box.h + dy) / ratio
+          : (box.h - dy) / ratio;
+        applyImage(layer, scaleImageAround(start, width, anchor.x, anchor.y));
         paint();
       };
       const end = (ev: PointerEvent) => {
@@ -1484,12 +1634,13 @@ export function bindStudio(
     });
   }
 
-  const openEditor = (kind: "title" | "body") => {
+  const openEditor = (layer: TextLayer) => {
     if (state.code.trim()) return;
-    editing = { kind, original: state[kind] };
+    editing = { id: layer.id, original: layer.text };
     selected.clear();
+    selected.add(layer.id);
     beginGesture(editor);
-    editor.value = state[kind];
+    editor.value = layer.text;
     editor.hidden = false;
     paint();
     editor.focus();
@@ -1497,7 +1648,8 @@ export function bindStudio(
   };
   const closeEditor = (commit: boolean) => {
     if (!editing) return;
-    if (!commit) state[editing.kind] = editing.original;
+    const layer = editingLayer();
+    if (!commit && layer) layer.text = editing.original;
     editing = null;
     editor.hidden = true;
     paint();
@@ -1505,8 +1657,9 @@ export function bindStudio(
     void redraw();
   };
   editor.addEventListener("input", () => {
-    if (!editing) return;
-    state[editing.kind] = editing.kind === "title" ? editor.value.replace(/\n/g, " ") : editor.value;
+    const layer = editingLayer();
+    if (!layer) return;
+    layer.text = layer.kind === "title" ? editor.value.replace(/\n/g, " ") : editor.value;
     paint();
     syncForm();
   });
@@ -1515,25 +1668,278 @@ export function bindStudio(
     if (event.key === "Escape") {
       event.preventDefault();
       closeEditor(false);
-    } else if (event.key === "Enter" && (editing?.kind === "title" || event.metaKey || event.ctrlKey)) {
+    } else if (event.key === "Enter" && (editingLayer()?.kind === "title" || event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       closeEditor(true);
     }
   });
   editor.addEventListener("blur", () => closeEditor(true));
 
-  const registerTap = (kind: HitBox["kind"], event: PointerEvent) => {
+  const registerTap = (id: string, event: PointerEvent) => {
     const repeat =
       lastTap &&
-      lastTap.kind === kind &&
+      lastTap.id === id &&
       event.timeStamp - lastTap.time < 400 &&
       Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) < 24;
-    if (repeat && kind !== "image") {
+    const layer = layerById(id);
+    if (repeat && layer && isTextLayer(layer)) {
       lastTap = null;
-      openEditor(kind);
+      openEditor(layer);
       return;
     }
-    lastTap = { kind, time: event.timeStamp, x: event.clientX, y: event.clientY };
+    lastTap = { id, time: event.timeStamp, x: event.clientX, y: event.clientY };
+  };
+
+  const cropOwner = new EventTarget();
+  const onCropOutside = (event: PointerEvent) => {
+    const target = event.target;
+    if (target === canvas || (target instanceof Element && target.closest(".studio__handle--crop"))) return;
+    endCrop(true);
+  };
+  const startCrop = (layer: ImageLayer) => {
+    if (!themeImage || state.code.trim()) return;
+    finishGesture();
+    selected.clear();
+    selected.add(layer.id);
+    cropping = {
+      id: layer.id,
+      full: uncroppedRect(layer, imageAspect),
+      box: { x: layer.x, y: layer.y, w: layer.width, h: layerHeight(layer) },
+    };
+    beginGesture(cropOwner);
+    document.addEventListener("pointerdown", onCropOutside, true);
+    paint();
+  };
+  function endCrop(commit: boolean) {
+    if (!cropping) return;
+    const { id, full, box } = cropping;
+    cropping = null;
+    document.removeEventListener("pointerdown", onCropOutside, true);
+    const layer = layerById(id);
+    if (commit && layer?.kind === "image") {
+      layer.crop = cropFromBox(full, box);
+      layer.width = clampImageWidth(box.w);
+      const next = clampLayerPosition(layer, box.x, box.y);
+      layer.x = next.x;
+      layer.y = next.y;
+    }
+    finishGesture(cropOwner);
+    void redraw();
+  }
+  const dragCrop = (event: PointerEvent, target: HTMLElement, edge: string | null) => {
+    if (!cropping) return;
+    event.preventDefault();
+    try {
+      target.setPointerCapture(event.pointerId);
+    } catch {
+      /* the pointer can already be inactive */
+    }
+    const origin = cardPoint(event);
+    const start = { ...cropping.box };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId || !cropping) return;
+      const point = cardPoint(ev);
+      const dx = point.x - origin.x;
+      const dy = point.y - origin.y;
+      cropping.box = edge ? resizeCropBox(cropping.full, start, edge, dx, dy) : moveCropBox(cropping.full, start, dx, dy);
+      paint();
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", end);
+      target.removeEventListener("pointercancel", end);
+    };
+    target.addEventListener("pointermove", move);
+    target.addEventListener("pointerup", end);
+    target.addEventListener("pointercancel", end);
+  };
+  for (const handle of cropHandles) {
+    handle.addEventListener("pointerdown", (event) => dragCrop(event, handle, handle.dataset.crop ?? null));
+  }
+
+  const commitLayers = (mutate: () => void) => {
+    finishGesture();
+    const owner = new EventTarget();
+    beginGesture(owner);
+    mutate();
+    finishGesture(owner);
+    void redraw();
+  };
+  const copyLayers = () => {
+    const picked = selectedLayers();
+    if (picked.length > 0) layerClipboard = structuredClone(picked);
+  };
+  const pasteLayers = (at: Point | null) => {
+    if (layerClipboard.length === 0) return;
+    commitLayers(() => {
+      const copies = structuredClone(layerClipboard);
+      const dx = at ? at.x - Math.min(...copies.map((layer) => layer.x)) : PASTE_OFFSET;
+      const dy = at ? at.y - Math.min(...copies.map((layer) => layer.y)) : PASTE_OFFSET;
+      selected.clear();
+      for (const layer of copies) {
+        layer.id = newLayerId();
+        const next = clampLayerPosition(layer, layer.x + dx, layer.y + dy);
+        layer.x = next.x;
+        layer.y = next.y;
+        selected.add(layer.id);
+      }
+      state.layers.push(...copies);
+    });
+  };
+  const restack = (toFront: boolean) => {
+    const picked = selectedLayers();
+    if (picked.length === 0) return;
+    commitLayers(() => {
+      const rest = state.layers.filter((layer) => !selected.has(layer.id));
+      state.layers = toFront ? [...rest, ...picked] : [...picked, ...rest];
+    });
+  };
+  // Each kind keeps one layer so the panel always has something to edit.
+  const canDelete = (picked: StudioLayer[]) =>
+    (["title", "body", "image"] as const).every(
+      (kind) =>
+        !picked.some((layer) => layer.kind === kind) ||
+        state.layers.some((layer) => layer.kind === kind && !selected.has(layer.id)),
+    );
+  const deleteLayers = () => {
+    const picked = selectedLayers();
+    if (picked.length === 0 || !canDelete(picked)) return;
+    commitLayers(() => {
+      state.layers = state.layers.filter((layer) => !selected.has(layer.id));
+      selected.clear();
+    });
+  };
+
+  layerMenu?.remove();
+  const shortcut = (key: string) => (IS_MAC ? `⌘${key}` : `Ctrl+${key}`);
+  const menuItems: { action: string; label: string; hint?: string }[] = [
+    { action: "copy", label: "복사", hint: shortcut("C") },
+    { action: "paste", label: "붙여넣기", hint: shortcut("V") },
+    { action: "front", label: "맨 위로 보내기" },
+    { action: "back", label: "맨 밑으로 보내기" },
+    { action: "crop", label: "크롭하기" },
+    { action: "delete", label: "삭제" },
+  ];
+  const menu = document.createElement("div");
+  menu.className = "nav-popover studio-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "객체 메뉴");
+  menu.hidden = true;
+  menu.innerHTML = menuItems
+    .map(
+      (item) =>
+        `<button type="button" class="nav-popover__item" role="menuitem" data-layer-action="${item.action}">${item.label}${
+          item.hint ? `<span class="studio-menu__hint">${item.hint}</span>` : ""
+        }</button>`,
+    )
+    .join("");
+  document.body.append(menu);
+  layerMenu = menu;
+  let menuPoint: Point | null = null;
+  const menuButton = (action: string) => menu.querySelector<HTMLButtonElement>(`[data-layer-action="${action}"]`);
+  const menuButtons = () => [...menu.querySelectorAll<HTMLButtonElement>("[data-layer-action]")].filter((b) => !b.hidden && !b.disabled);
+
+  const onMenuOutside = (event: PointerEvent) => {
+    if (event.target instanceof Node && menu.contains(event.target)) return;
+    closeLayerMenu();
+  };
+  function closeLayerMenu() {
+    if (menu.hidden) return;
+    if (document.activeElement instanceof HTMLElement && menu.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+    menu.hidden = true;
+    document.removeEventListener("pointerdown", onMenuOutside, true);
+  }
+  const openLayerMenu = (clientX: number, clientY: number) => {
+    const point = cardPoint({ clientX, clientY });
+    const hit = hitAt(point.x, point.y);
+    if (!hit) selected.clear();
+    else if (!selected.has(hit.id)) {
+      selected.clear();
+      selected.add(hit.id);
+    }
+    menuPoint = point;
+    paint();
+    const picked = selectedLayers();
+    const enable = (action: string, on: boolean) => {
+      const button = menuButton(action);
+      if (button) button.disabled = !on;
+    };
+    enable("copy", picked.length > 0);
+    enable("paste", layerClipboard.length > 0);
+    enable("front", picked.length > 0);
+    enable("back", picked.length > 0);
+    const crop = menuButton("crop");
+    if (crop) {
+      crop.hidden = !singleImage();
+      crop.disabled = !themeImage;
+    }
+    const remove = menuButton("delete");
+    if (remove) {
+      remove.disabled = picked.length === 0 || !canDelete(picked);
+      remove.title = picked.length > 0 && remove.disabled ? "타이틀·본문·이미지는 하나씩 남아 있어야 합니다." : "";
+    }
+    menu.hidden = false;
+    const margin = 8;
+    const { width, height } = menu.getBoundingClientRect();
+    const left = clientX + width + margin > window.innerWidth ? clientX - width : clientX;
+    const top = clientY + height + margin > window.innerHeight ? clientY - height : clientY;
+    menu.style.left = `${Math.max(margin, left)}px`;
+    menu.style.top = `${Math.max(margin, top)}px`;
+    document.addEventListener("pointerdown", onMenuOutside, true);
+    menuButtons()[0]?.focus({ preventScroll: true });
+  };
+  menu.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-layer-action]") : null;
+    if (!button || button.disabled) return;
+    const at = menuPoint;
+    closeLayerMenu();
+    const action = button.dataset.layerAction;
+    if (action === "copy") copyLayers();
+    else if (action === "paste") pasteLayers(at);
+    else if (action === "front" || action === "back") restack(action === "front");
+    else if (action === "delete") deleteLayers();
+    else if (action === "crop") {
+      const layer = singleImage();
+      if (layer) startCrop(layer);
+    }
+  });
+  menu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" || event.key === "Tab") {
+      event.preventDefault();
+      closeLayerMenu();
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const buttons = menuButtons();
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    buttons[(index + step + buttons.length) % buttons.length]?.focus();
+  });
+  stage.addEventListener("scroll", closeLayerMenu);
+
+  const cancelLongPress = () => {
+    if (longPress) window.clearTimeout(longPress.timer);
+    longPress = null;
+  };
+  const startLongPress = (event: PointerEvent) => {
+    cancelLongPress();
+    const { clientX, clientY, pointerId } = event;
+    const timer = window.setTimeout(() => {
+      longPress = null;
+      if (drag?.pointerId === pointerId) {
+        moveGroup(drag.start, 0, 0);
+        drag = null;
+        delete canvas.dataset.dragging;
+        finishGesture(canvas);
+      }
+      tapStart = null;
+      openLayerMenu(clientX, clientY);
+    }, LONG_PRESS_MS);
+    longPress = { timer, pointerId, x: clientX, y: clientY };
   };
 
   const pinchMetrics = () => {
@@ -1547,17 +1953,31 @@ export function bindStudio(
   const startPinch = () => {
     const metrics = pinchMetrics();
     if (!metrics) return;
+    cancelLongPress();
     drag = null;
     tapStart = null;
     delete canvas.dataset.dragging;
     beginGesture(canvas);
-    pinch = { ...metrics, image: imageBox() };
+    const layer = imageAt(metrics.mid);
+    pinch = { ...metrics, layerId: layer.id, image: imageBox(layer) };
     paint();
   };
 
   canvas.addEventListener("pointerdown", (event) => {
     if (state.code.trim()) return;
+    const mouse = event.pointerType === "mouse";
+    // Right click and macOS ctrl+click open the layer menu through contextmenu instead.
+    if (mouse && (event.button !== 0 || (IS_MAC && event.ctrlKey))) return;
+    closeLayerMenu();
     if (editing) closeEditor(true);
+    if (cropping) {
+      const point = cardPoint(event);
+      const { box } = cropping;
+      const inside = point.x >= box.x && point.y >= box.y && point.x <= box.x + box.w && point.y <= box.y + box.h;
+      if (inside) dragCrop(event, canvas, null);
+      else endCrop(true);
+      return;
+    }
     if (event.pointerType === "touch") {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       try {
@@ -1570,20 +1990,22 @@ export function bindStudio(
         return;
       }
       if (touches.size > 1) return;
+      startLongPress(event);
     }
     const point = cardPoint(event);
     const hit = hitAt(point.x, point.y);
-    const mouse = event.pointerType === "mouse";
-    if (!mouse) selected.clear();
-    else if (event.shiftKey) {
-      if (hit && selected.has(hit.kind)) selected.delete(hit.kind);
-      else if (hit) selected.add(hit.kind);
-    } else if (!hit) selected.clear();
-    else if (!selected.has(hit.kind)) {
+    if (!mouse) {
       selected.clear();
-      selected.add(hit.kind);
+      if (hit) selected.add(hit.id);
+    } else if (event.shiftKey) {
+      if (hit && selected.has(hit.id)) selected.delete(hit.id);
+      else if (hit) selected.add(hit.id);
+    } else if (!hit) selected.clear();
+    else if (!selected.has(hit.id)) {
+      selected.clear();
+      selected.add(hit.id);
     }
-    if (!hit || (mouse && !selected.has(hit.kind))) {
+    if (!hit || (mouse && !selected.has(hit.id))) {
       tapStart = null;
       paint();
       return;
@@ -1595,25 +2017,37 @@ export function bindStudio(
       /* the pointer can already be inactive */
     }
     beginGesture(canvas);
-    const kinds = mouse ? [...selected] : [hit.kind];
     drag = {
-      kind: hit.kind,
-      kinds,
+      id: hit.id,
       origin: point,
-      start: new Map(kinds.map((kind) => [kind, positionOf(kind)])),
+      start: positionsOf(mouse ? selected : [hit.id]),
       pointerId: event.pointerId,
     };
     canvas.dataset.dragging = "true";
     paint();
   });
+  canvas.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    if (state.code.trim() || cropping) return;
+    cancelLongPress();
+    if (editing) closeEditor(true);
+    openLayerMenu(event.clientX, event.clientY);
+  });
   canvas.addEventListener("pointermove", (event) => {
     if (touches.has(event.pointerId)) touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (
+      longPress?.pointerId === event.pointerId &&
+      Math.hypot(event.clientX - longPress.x, event.clientY - longPress.y) > 8
+    ) {
+      cancelLongPress();
+    }
     if (pinch) {
       const metrics = touches.has(event.pointerId) ? pinchMetrics() : null;
-      if (!metrics) return;
+      const layer = layerById(pinch.layerId);
+      if (!metrics || layer?.kind !== "image") return;
       const factor = metrics.distance / Math.max(1, pinch.distance);
       const scaled = scaleImageAround(pinch.image, pinch.image.width * factor, pinch.mid.x, pinch.mid.y);
-      applyImage({
+      applyImage(layer, {
         x: scaled.x + metrics.mid.x - pinch.mid.x,
         y: scaled.y + metrics.mid.y - pinch.mid.y,
         width: scaled.width,
@@ -1623,24 +2057,20 @@ export function bindStudio(
     }
     if (tapStart && Math.hypot(event.clientX - tapStart.x, event.clientY - tapStart.y) > 6) tapStart.moved = true;
     const point = cardPoint(event);
+    lastPointer = point;
     if (!drag || drag.pointerId !== event.pointerId) {
       canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
       return;
     }
-    // Shrink the shared delta to the most constrained item so the group keeps its spacing at card edges.
-    const nearer = (a: number, b: number) => (Math.abs(b) < Math.abs(a) ? b : a);
-    let dx = point.x - drag.origin.x;
-    let dy = point.y - drag.origin.y;
-    for (const [kind, start] of drag.start) {
-      const clamped = clampPosition(kind, start.x + dx, start.y + dy);
-      dx = nearer(dx, clamped.x - start.x);
-      dy = nearer(dy, clamped.y - start.y);
-    }
-    for (const [kind, start] of drag.start) setPosition(kind, clampPosition(kind, start.x + dx, start.y + dy));
+    moveGroup(drag.start, point.x - drag.origin.x, point.y - drag.origin.y);
     paint();
+  });
+  canvas.addEventListener("pointerleave", () => {
+    lastPointer = null;
   });
   const endDrag = (event: PointerEvent) => {
     touches.delete(event.pointerId);
+    if (longPress?.pointerId === event.pointerId) cancelLongPress();
     if (pinch) {
       if (touches.size < 2) {
         pinch = null;
@@ -1650,16 +2080,16 @@ export function bindStudio(
       return;
     }
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const kind = drag.kind;
+    const id = drag.id;
     drag = null;
     delete canvas.dataset.dragging;
     finishGesture(canvas);
     if (event.type === "pointerup" && tapStart && !tapStart.moved && !tapStart.shift) {
       if (selected.size > 1) {
         selected.clear();
-        selected.add(kind);
+        selected.add(id);
       }
-      registerTap(kind, event);
+      registerTap(id, event);
     }
     tapStart = null;
     paint();
@@ -1672,12 +2102,13 @@ export function bindStudio(
   canvas.addEventListener(
     "wheel",
     (event) => {
-      // Trackpad pinch arrives as a ctrl+wheel event in Chromium and Firefox.
-      if (!event.ctrlKey || state.code.trim() || !themeImage) return;
+      // Trackpad pinch arrives as a ctrl+wheel event in Chromium and Firefox; off the Mac, ctrl+wheel zooms the preview.
+      if (!IS_MAC || !event.ctrlKey || state.code.trim() || cropping || !themeImage) return;
       event.preventDefault();
       beginGesture(wheelOwner);
       const point = cardPoint(event);
-      applyImage(scaleImageAround(imageBox(), state.imageWidth * Math.exp(-event.deltaY * 0.01), point.x, point.y));
+      const layer = imageAt(point);
+      applyImage(layer, scaleImageAround(imageBox(layer), layer.width * Math.exp(-event.deltaY * 0.01), point.x, point.y));
       paint();
       window.clearTimeout(wheelTimer);
       wheelTimer = window.setTimeout(() => {
@@ -1688,20 +2119,36 @@ export function bindStudio(
     { passive: false },
   );
 
+  stage.addEventListener(
+    "wheel",
+    (event) => {
+      if (!(IS_MAC ? event.metaKey : event.ctrlKey)) return;
+      event.preventDefault();
+      const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * 33 : event.deltaY;
+      previewZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, previewZoom * Math.exp(-delta * 0.002)));
+      updateScale();
+    },
+    { passive: false },
+  );
+
   type SafariGesture = Event & { scale: number; clientX: number; clientY: number };
   const safariOwner = new EventTarget();
-  let safariPinch: { image: ImageBox; anchor: { x: number; y: number } } | null = null;
+  let safariPinch: { layerId: string; image: ImageBox; anchor: Point } | null = null;
   canvas.addEventListener("gesturestart", (event) => {
     event.preventDefault();
-    if (pinch || state.code.trim() || !themeImage) return;
+    if (pinch || state.code.trim() || cropping || !themeImage) return;
     beginGesture(safariOwner);
-    safariPinch = { image: imageBox(), anchor: cardPoint(event as SafariGesture) };
+    const anchor = cardPoint(event as SafariGesture);
+    const layer = imageAt(anchor);
+    safariPinch = { layerId: layer.id, image: imageBox(layer), anchor };
   });
   canvas.addEventListener("gesturechange", (event) => {
     event.preventDefault();
     if (!safariPinch || pinch) return;
-    const { image, anchor } = safariPinch;
-    applyImage(scaleImageAround(image, image.width * (event as SafariGesture).scale, anchor.x, anchor.y));
+    const { layerId, image, anchor } = safariPinch;
+    const layer = layerById(layerId);
+    if (layer?.kind !== "image") return;
+    applyImage(layer, scaleImageAround(image, image.width * (event as SafariGesture).scale, anchor.x, anchor.y));
     paint();
   });
   canvas.addEventListener("gestureend", (event) => {
@@ -1716,7 +2163,7 @@ export function bindStudio(
     if (event.target === canvas || selected.size === 0) return;
     if (event.target instanceof Element && event.target.closest(".studio__handle")) return;
     selected.clear();
-    syncOverlay();
+    paint();
   });
 
   const applyControlsWidth = (value: number) => {
@@ -1787,6 +2234,67 @@ export function bindStudio(
   };
   document.addEventListener("keydown", historyShortcut);
   stopHistoryShortcut = () => document.removeEventListener("keydown", historyShortcut);
+
+  stopStudioKeys?.();
+  const nudgeOwner = new EventTarget();
+  let nudgeTimer = 0;
+  const arrows: Record<string, Point> = {
+    ArrowLeft: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 },
+    ArrowUp: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 },
+  };
+  const studioKeys = (event: KeyboardEvent) => {
+    if (!canvas.isConnected) return;
+    const mod = (event.metaKey || event.ctrlKey) && !event.altKey;
+    // event.code keeps +/- and C/V working under a Korean IME and covers the numpad keys.
+    const zoom =
+      !mod ? null
+      : event.code === "Equal" || event.code === "NumpadAdd" ? zoomIn
+      : event.code === "Minus" || event.code === "NumpadSubtract" ? zoomOut
+      : null;
+    if (zoom) {
+      event.preventDefault();
+      zoom.click();
+      return;
+    }
+    const target = event.target;
+    const onCard = target === document.body || (target instanceof Node && stage.contains(target));
+    if (!onCard || editing || state.code.trim()) return;
+    if (cropping) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      endCrop(event.key === "Enter");
+      return;
+    }
+    if (mod) {
+      if (window.getSelection()?.toString()) return;
+      if (event.code === "KeyC" && selected.size > 0) {
+        event.preventDefault();
+        copyLayers();
+      } else if (event.code === "KeyV" && layerClipboard.length > 0) {
+        event.preventDefault();
+        pasteLayers(lastPointer);
+      }
+      return;
+    }
+    const arrow = arrows[event.key];
+    if (!arrow || event.altKey || selected.size === 0) return;
+    event.preventDefault();
+    const step = event.shiftKey ? NUDGE_SHIFT_STEP : NUDGE_STEP;
+    beginGesture(nudgeOwner);
+    moveGroup(positionsOf(selected), arrow.x * step, arrow.y * step);
+    // The pending nudge is committed by the undo click itself, so undo must be clickable right away.
+    undoButton.disabled = false;
+    paint();
+    window.clearTimeout(nudgeTimer);
+    nudgeTimer = window.setTimeout(() => {
+      finishGesture(nudgeOwner);
+      void redraw();
+    }, 400);
+  };
+  document.addEventListener("keydown", studioKeys);
+  stopStudioKeys = () => document.removeEventListener("keydown", studioKeys);
 
   splitter.addEventListener("pointerdown", (event) => {
     if (studio.getBoundingClientRect().width < 768) return;

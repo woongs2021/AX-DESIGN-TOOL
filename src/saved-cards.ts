@@ -2,7 +2,7 @@
  * Cards added from the studio. Thumbnails are PNG data URLs, so they live in
  * IndexedDB rather than localStorage. Not written to the vault.
  */
-import type { StudioState } from "./shared/studio.ts";
+import { firstLayer, type StudioState } from "./shared/studio.ts";
 
 export type SavedCard = {
   id: string;
@@ -57,7 +57,7 @@ export async function loadSavedCards(): Promise<void> {
 export async function addSavedCard(state: StudioState, thumbnail: string): Promise<SavedCard | null> {
   const card: SavedCard = {
     id: newCardId(),
-    title: state.title.trim() || "제목 없음",
+    title: firstLayer(state, "title")?.text.trim() || "제목 없음",
     createdAt: new Date().toISOString(),
     state: structuredClone(state),
     thumbnail,
