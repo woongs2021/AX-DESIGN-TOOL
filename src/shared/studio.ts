@@ -34,6 +34,8 @@ export type StudioCrop = { x: number; y: number; w: number; h: number };
 export type StudioRect = { x: number; y: number; w: number; h: number };
 
 export type TextKind = "title" | "body";
+export type TextAlign = "left" | "center" | "right";
+export const TEXT_ALIGNS: readonly TextAlign[] = ["left", "center", "right"];
 export type TextLayer = {
   id: string;
   kind: TextKind;
@@ -43,6 +45,12 @@ export type TextLayer = {
   size: number;
   fontId: string;
   color: string;
+  /** One of TEXT_WEIGHTS. */
+  weight: number;
+  italic: boolean;
+  underline: boolean;
+  /** Lines align inside the block; x stays the block's left edge. */
+  align: TextAlign;
 };
 /** x/y/width describe the cropped part on the card. */
 export type ImageLayer = {
@@ -198,6 +206,7 @@ function defaultLayer(
     size,
     fontId: title ? "montserrat" : "pretendard",
     color: rgbToHex(0, 0, 0),
+    ...textStyle({}, kind),
   };
 }
 
@@ -219,6 +228,30 @@ export function createStudioState(themeSlug: string, color: string): StudioState
 
 export function newLayerId(): string {
   return `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export const TEXT_WEIGHTS = [
+  { value: 300, label: "Light" },
+  { value: 400, label: "Regular" },
+  { value: 500, label: "Medium" },
+  { value: 600, label: "SemiBold" },
+  { value: 700, label: "Bold" },
+] as const;
+export const REGULAR_WEIGHT = 400;
+export const BOLD_WEIGHT = 700;
+
+export function isBold(layer: Pick<TextLayer, "weight">): boolean {
+  return layer.weight >= 600;
+}
+
+function textStyle(value: Record<string, unknown>, kind: TextKind): Pick<TextLayer, "weight" | "italic" | "underline" | "align"> {
+  const weight = TEXT_WEIGHTS.find((item) => item.value === value.weight)?.value;
+  return {
+    weight: weight ?? (kind === "title" ? 600 : REGULAR_WEIGHT),
+    italic: value.italic === true,
+    underline: value.underline === true,
+    align: TEXT_ALIGNS.find((align) => align === value.align) ?? "left",
+  };
 }
 
 export function isTextLayer(layer: StudioLayer): layer is TextLayer {
@@ -347,6 +380,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
     size: num(value.size) ?? (value.kind === "title" ? DEFAULT_TITLE_SIZE : DEFAULT_BODY_SIZE),
     fontId: typeof value.fontId === "string" && value.fontId ? value.fontId : "pretendard",
     color: normalizeHex(String(value.color ?? "")) ?? ink,
+    ...textStyle(value, value.kind),
   };
 }
 
@@ -366,6 +400,7 @@ function legacyLayers(value: Record<string, unknown>, ink: string, theme: string
       size: num(value.bodySize, DEFAULT_BODY_SIZE),
       fontId: text(value.bodyFontId, font) || font,
       color: normalizeHex(text(value.bodyColor, "")) ?? ink,
+      ...textStyle({}, "body"),
     },
     {
       id: "title",
@@ -376,6 +411,7 @@ function legacyLayers(value: Record<string, unknown>, ink: string, theme: string
       size: num(value.titleSize, DEFAULT_TITLE_SIZE),
       fontId: text(value.titleFontId, font) || font,
       color: normalizeHex(text(value.titleColor, "")) ?? ink,
+      ...textStyle({}, "title"),
     },
   ];
 }
@@ -625,8 +661,14 @@ export function designToCode(
     const tag = layer.kind === "title" ? "h1" : "p";
     const text = layer === title ? "{{title}}" : layer === body ? "{{body}}" : escapeHtml(layer.text);
     items.push(`  <${tag} class="${name}">${text}</${tag}>`);
+    const style = [
+      `font-weight: ${layer.weight};`,
+      layer.italic ? "font-style: italic;" : "",
+      layer.underline ? "text-decoration: underline;" : "",
+      layer.align !== "left" ? `text-align: ${layer.align};` : "",
+    ].filter(Boolean).join(" ");
     rules.push(
-      `  .studio-card .${name} { ${place} font-size: ${px(layer.size)}; font-family: ${fontStack(layer.fontId, extras)}; color: ${layer.color}; }`,
+      `  .studio-card .${name} { ${place} font-size: ${px(layer.size)}; font-family: ${fontStack(layer.fontId, extras)}; color: ${layer.color}; ${style} }`,
     );
   });
   return `<article class="studio-card">
@@ -650,8 +692,6 @@ ${items.join("\n")}
   .studio-card .studio-crop { overflow: hidden; }
   .studio-card h1:empty, .studio-card p:empty { display: none; }
   .studio-card h1, .studio-card p { position: absolute; margin: 0; line-height: 1.25; }
-  .studio-card h1 { font-weight: 600; }
-  .studio-card p { font-weight: 400; }
 ${rules.join("\n")}
 </style>`;
 }
@@ -724,7 +764,7 @@ export function studioSrcdoc(input: StudioDocumentInput): string {
 <head>
 <meta charset="utf-8" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&family=Roboto:wght@400;600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300..700;1,300..700&family=Roboto:ital,wght@0,300..700;1,300..700&display=swap" />
 <style>
   html, body { margin: 0; width: 100%; height: 100%; background: transparent; }
 </style>

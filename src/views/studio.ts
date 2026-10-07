@@ -16,6 +16,11 @@ import {
   designToCode,
   ensureLayer,
   isUploadSrc,
+  TEXT_ALIGNS,
+  BOLD_WEIGHT,
+  isBold,
+  REGULAR_WEIGHT,
+  TEXT_WEIGHTS,
   fontLabelFromPath,
   fontStack,
   FONT_SIDE_MARGIN,
@@ -44,6 +49,7 @@ import {
   type StudioLayer,
   type StudioRect,
   type StudioState,
+  type TextAlign,
   type TextKind,
   type TextLayer,
 } from "../shared/studio.ts";
@@ -162,6 +168,10 @@ const localFontUrls = import.meta.glob("../../fonts/*.{woff2,woff,ttf,otf}", {
 }) as Record<string, string>;
 
 type FontChoice = { id: string; label: string; stack: string };
+
+function textFont(layer: TextLayer, size: number, extras: FontChoice[]): string {
+  return `${layer.italic ? "italic " : ""}${layer.weight} ${size}px ${fontStack(layer.fontId, extras)}`;
+}
 type HitBox = { id: string; kind: LayerKind; x: number; y: number; w: number; h: number };
 
 const installedFonts = new Set<string>();
@@ -291,13 +301,19 @@ function drawCard(
   const paintText = (layer: TextLayer): void => {
     if (!layer.text.trim()) return;
     ctx.fillStyle = layer.color;
-    ctx.font = `${layer.kind === "title" ? 600 : 400} ${layer.size}px ${fontStack(layer.fontId, extras)}`;
+    ctx.font = textFont(layer, layer.size, extras);
     const lines = wrapText(layer.text.trim(), maxText, (value) => ctx.measureText(value).width);
     const lineHeight = Math.round(layer.size * 1.25);
-    let widest = 0;
+    const widths = lines.map((line) => ctx.measureText(line).width);
+    const widest = Math.max(0, ...widths);
+    const underline = Math.max(1, Math.round(layer.size / 16));
     lines.forEach((line, index) => {
-      if (layer.id !== hiddenId) ctx.fillText(line, layer.x, layer.y + index * lineHeight);
-      widest = Math.max(widest, ctx.measureText(line).width);
+      if (layer.id === hiddenId) return;
+      const lineWidth = widths[index] ?? 0;
+      const x = layer.x + (layer.align === "center" ? (widest - lineWidth) / 2 : layer.align === "right" ? widest - lineWidth : 0);
+      const y = layer.y + index * lineHeight;
+      ctx.fillText(line, x, y);
+      if (layer.underline) ctx.fillRect(x, y + layer.size * 0.98, lineWidth, underline);
     });
     hits.push({
       id: layer.id,
@@ -380,6 +396,50 @@ function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLE
 }
 
 const THEME_DRAG = "application/x-ax-studio-image";
+
+const TEXT_TOGGLES = [
+  { style: "bold", label: "볼드", glyph: "B" },
+  { style: "italic", label: "이탤릭", glyph: "I" },
+  { style: "underline", label: "밑줄", glyph: "U" },
+] as const;
+const ALIGN_LABELS: Record<TextAlign, string> = { left: "왼쪽 정렬", center: "가운데 정렬", right: "오른쪽 정렬" };
+const ALIGN_PATHS: Record<TextAlign, string> = {
+  left: "M4 6h16M4 10h10M4 14h16M4 18h10",
+  center: "M4 6h16M7 10h10M4 14h16M7 18h10",
+  right: "M4 6h16M10 10h10M4 14h16M10 18h10",
+};
+
+type TextToggle = (typeof TEXT_TOGGLES)[number]["style"];
+
+function styleOn(layer: TextLayer, style: TextToggle): boolean {
+  return style === "bold" ? isBold(layer) : layer[style];
+}
+
+function weightOptions(weight: number): string {
+  return TEXT_WEIGHTS.map(
+    (item) => `<option value="${item.value}"${item.value === weight ? " selected" : ""}>${item.label} · ${item.value}</option>`,
+  ).join("");
+}
+
+function textStyleControls(kind: TextKind, name: string, layer: TextLayer): string {
+  const pressed = (on: boolean) => `aria-pressed="${on ? "true" : "false"}"`;
+  const toggles = TEXT_TOGGLES.map(
+    (item) =>
+      `<button type="button" class="studio__style-btn studio__style-btn--${item.style}" data-text-kind="${kind}" data-text-style="${item.style}" ${pressed(styleOn(layer, item.style))} aria-label="${name} ${item.label}" title="${item.label}">${item.glyph}</button>`,
+  ).join("");
+  const aligns = TEXT_ALIGNS.map(
+    (align) =>
+      `<button type="button" class="studio__style-btn" data-text-kind="${kind}" data-text-align="${align}" ${pressed(layer.align === align)} aria-label="${name} ${ALIGN_LABELS[align]}" title="${ALIGN_LABELS[align]}"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ALIGN_PATHS[align]}" /></svg></button>`,
+  ).join("");
+  return `
+          <div class="studio__field">
+            <span id="studio-${kind}-style-label">${name} 스타일</span>
+            <div class="studio__text-style" role="group" aria-labelledby="studio-${kind}-style-label">
+              <div class="studio__style-set">${toggles}</div>
+              <div class="studio__style-set">${aligns}</div>
+            </div>
+          </div>`;
+}
 
 function themeOptions(captures: CaptureRecord[], activeSrc: string): string {
   const option = (src: string, image: string, label: string) => {
@@ -515,6 +575,11 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <select id="studio-title-font" class="studio__control">${fontOptions(title.fontId)}</select>
           </div>
           <div class="studio__field">
+            <label for="studio-title-weight">타이틀 굵기</label>
+            <select id="studio-title-weight" class="studio__control">${weightOptions(title.weight)}</select>
+          </div>
+          ${textStyleControls("title", "타이틀", title)}
+          <div class="studio__field">
             <label for="studio-body">본문</label>
             <textarea id="studio-body" class="studio__control studio__control--area" placeholder="본문">${escapeHtml(body.text)}</textarea>
           </div>
@@ -536,6 +601,11 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-body-font">본문 폰트</label>
             <select id="studio-body-font" class="studio__control">${fontOptions(body.fontId)}</select>
           </div>
+          <div class="studio__field">
+            <label for="studio-body-weight">본문 굵기</label>
+            <select id="studio-body-weight" class="studio__control">${weightOptions(body.weight)}</select>
+          </div>
+          ${textStyleControls("body", "본문", body)}
           <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮기고, 더블 클릭(탭)해 바로 수정할 수 있습니다.</p>
           <div class="studio__field">
             <span id="studio-theme-label">아카이브 테마</span>
@@ -660,6 +730,8 @@ export function bindStudio(
   const bodySizeNumber = root.querySelector<HTMLInputElement>("#studio-body-size-number");
   const titleFontSelect = root.querySelector<HTMLSelectElement>("#studio-title-font");
   const bodyFontSelect = root.querySelector<HTMLSelectElement>("#studio-body-font");
+  const titleWeightSelect = root.querySelector<HTMLSelectElement>("#studio-title-weight");
+  const bodyWeightSelect = root.querySelector<HTMLSelectElement>("#studio-body-weight");
   const imageRange = root.querySelector<HTMLInputElement>("#studio-image-width");
   const imageNumber = root.querySelector<HTMLInputElement>("#studio-image-width-number");
   const colorInput = root.querySelector<HTMLInputElement>("#studio-color");
@@ -712,6 +784,8 @@ export function bindStudio(
     !bodySizeNumber ||
     !titleFontSelect ||
     !bodyFontSelect ||
+    !titleWeightSelect ||
+    !bodyWeightSelect ||
     !imageRange ||
     !imageNumber ||
     !colorInput ||
@@ -997,6 +1071,14 @@ export function bindStudio(
     }
     titleFontSelect.value = title.fontId;
     bodyFontSelect.value = body.fontId;
+    titleWeightSelect.value = String(title.weight);
+    bodyWeightSelect.value = String(body.weight);
+    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-text-kind]")) {
+      const layer = button.dataset.textKind === "title" ? title : body;
+      const style = button.dataset.textStyle as TextToggle | undefined;
+      const on = style ? styleOn(layer, style) : layer.align === button.dataset.textAlign;
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    }
     if (document.activeElement !== codeInput) codeInput.value = state.code;
     markTheme(panelImage().src);
   };
@@ -1024,15 +1106,13 @@ export function bindStudio(
       safe.hidden = true;
     }
 
-    const loadFace = (fontId: string, weight: number, size: number) => {
-      const family = fontStack(fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
+    const loadFace = (layer: TextLayer) => {
+      const family = fontStack(layer.fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
       if (!family) return Promise.resolve();
-      return document.fonts.load(`${weight} ${size}px "${family}"`);
+      return document.fonts.load(`${layer.italic ? "italic " : ""}${layer.weight} ${layer.size}px "${family}"`);
     };
     try {
-      await Promise.all(
-        state.layers.filter(isTextLayer).map((layer) => loadFace(layer.fontId, layer.kind === "title" ? 600 : 400, layer.size)),
-      );
+      await Promise.all(state.layers.filter(isTextLayer).map(loadFace));
     } catch {
       /* the canvas stack falls through to the next family */
     }
@@ -1155,6 +1235,25 @@ export function bindStudio(
   bindSelect(bodyFontSelect, () => {
     panelText("body").fontId = bodyFontSelect.value;
   });
+  bindSelect(titleWeightSelect, () => {
+    panelText("title").weight = Number(titleWeightSelect.value);
+  });
+  bindSelect(bodyWeightSelect, () => {
+    panelText("body").weight = Number(bodyWeightSelect.value);
+  });
+  for (const button of root.querySelectorAll<HTMLButtonElement>("[data-text-kind]")) {
+    button.addEventListener("click", () => {
+      const layer = panelText(button.dataset.textKind === "body" ? "body" : "title");
+      const style = button.dataset.textStyle as TextToggle | undefined;
+      const align = TEXT_ALIGNS.find((item) => item === button.dataset.textAlign);
+      beginGesture(button);
+      if (style === "bold") layer.weight = isBold(layer) ? REGULAR_WEIGHT : BOLD_WEIGHT;
+      else if (style) layer[style] = !layer[style];
+      else if (align) layer.align = align;
+      finishGesture(button);
+      void redraw();
+    });
+  }
   const snapshotCard = async (): Promise<string> => {
     const offscreen = document.createElement("canvas");
     if (state.code.trim()) {
@@ -1590,7 +1689,8 @@ export function bindStudio(
     const base = Math.max(16, fontPx);
     const shrink = fontPx / base;
     placeAt(editor, layer.x, layer.y);
-    editor.style.font = `${layer.kind === "title" ? 600 : 400} ${base}px ${fontStack(layer.fontId, extraFonts())}`;
+    editor.style.font = textFont(layer, base, extraFonts());
+    editor.style.textDecoration = layer.underline ? "underline" : "none";
     editor.style.lineHeight = `${(Math.round(layer.size * 1.25) * viewScale) / shrink}px`;
     editor.style.color = layer.color;
     editor.style.width = `${(Math.max(1, state.cardWidth - FONT_SIDE_MARGIN * 2) * viewScale) / shrink}px`;
