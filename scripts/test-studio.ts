@@ -154,6 +154,30 @@ assert.deepEqual(partial.layers.map((layer) => layer.kind), ["image", "title", "
 assert.equal(firstLayer(partial, "title")?.id, "t2");
 assert.equal(firstLayer(partial, "image")?.src, "x");
 
+// Text style: the title starts SemiBold, the body Regular, everything else off and left-aligned.
+assert.deepEqual(
+  { weight: homeTitle.weight, italic: homeTitle.italic, underline: homeTitle.underline, align: homeTitle.align },
+  { weight: 600, italic: false, underline: false, align: "left" },
+);
+assert.equal(homeBody.weight, 400);
+assert.equal(firstLayer(legacy, "title")?.weight, 600);
+assert.equal(firstLayer(partial, "title")?.weight, 600);
+const weighted = normalizeStudioState({ themeSlug: "x", color: "#ffffff", layers: [{ id: "w", kind: "body", text: "a", x: 0, y: 0, size: 20, fontId: "pretendard", color: "#000000", weight: 300 }, { id: "v", kind: "title", text: "a", x: 0, y: 0, size: 20, fontId: "pretendard", color: "#000000", weight: 650 }] });
+assert.equal(firstLayer(weighted!, "body")?.weight, 300);
+assert.equal(firstLayer(weighted!, "title")?.weight, 600);
+const styled = normalizeStudioState({ themeSlug: "x", color: "#ffffff", layers: [{ id: "b", kind: "body", text: "a", x: 0, y: 0, size: 20, fontId: "pretendard", color: "#000000", weight: 700, italic: true, underline: true, align: "center" }, { id: "t", kind: "title", text: "b", x: 0, y: 0, size: 20, fontId: "pretendard", color: "#000000", weight: 400, align: "sideways" }] });
+assert.ok(styled);
+const styledBody = firstLayer(styled, "body");
+assert.deepEqual(
+  { weight: styledBody?.weight, italic: styledBody?.italic, underline: styledBody?.underline, align: styledBody?.align },
+  { weight: 700, italic: true, underline: true, align: "center" },
+);
+assert.equal(firstLayer(styled, "title")?.weight, 400);
+assert.equal(firstLayer(styled, "title")?.align, "left");
+const styledCode = designToCode(styled);
+assert.match(styledCode, /font-weight: 700; font-style: italic; text-decoration: underline; text-align: center;/);
+assert.match(styledCode, /font-weight: 400;/);
+
 // Each image keeps its own source; the theme only follows the bottom image.
 const sources = createStudioState("x", "#ffffff");
 const extra: ImageLayer = { ...ensureLayer(sources, "image"), id: "extra", src: "upload:abc" };
