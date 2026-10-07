@@ -1,0 +1,15 @@
+---
+description: Deploy GitHub Pages after merging to main
+alwaysApply: true
+---
+
+# Pages deploy
+
+After merging to `main` on the `ax` remote (https://github.com/woongs2021/AX-DESIGN-TOOL.git), always deploy GitHub Pages too. Do not wait to be asked.
+
+1. `npm run build:site -- --target=public`, then `npm run check:public-leak`.
+2. Check out `ax/gh-pages` in a temporary worktree, `rsync -a --checksum --delete --exclude .git dist/app/` into it, touch `.nojekyll`, commit, and `git push ax HEAD:gh-pages`.
+3. Wait for `gh api repos/woongs2021/AX-DESIGN-TOOL/pages/builds/latest` to report `built` for the new commit. If it stays `building` for more than about 10 minutes, request a fresh build with `gh api -X POST repos/woongs2021/AX-DESIGN-TOOL/pages/builds`.
+4. Confirm https://woongs2021.github.io/AX-DESIGN-TOOL/ serves the new bundle.
+
+Never push product work to `origin`.

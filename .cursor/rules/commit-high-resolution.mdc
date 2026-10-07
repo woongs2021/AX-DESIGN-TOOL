@@ -1,0 +1,10 @@
+---
+description: Include image-pic-high-resolution when committing studio or capture changes
+alwaysApply: true
+---
+
+# High-resolution sources
+
+When the user asks to commit, include `image-pic-high-resolution/` if it has new or changed files. Those 4K PNGs are the source images for the Hermes capture assets.
+
+Do not add `image-pick/` or `image-pick-hermes/` unless the user asks for those folders.
