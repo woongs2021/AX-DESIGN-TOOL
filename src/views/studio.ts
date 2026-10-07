@@ -15,6 +15,7 @@ import {
   cropFromBox,
   designToCode,
   ensureLayer,
+  isUploadSrc,
   fontLabelFromPath,
   fontStack,
   FONT_SIDE_MARGIN,
@@ -48,6 +49,7 @@ import {
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
 import { confirmProceed, showToast } from "../feedback.ts";
+import { addUpload, getUploads, removeUpload, uploadBySrc, uploadSrc } from "../studio-uploads.ts";
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
@@ -209,7 +211,12 @@ function roundedPath(
   ctx.roundRect(0, 0, width, height, r);
 }
 
-function documentInput(state: StudioState, themeImage: string, aspect: number): StudioDocumentInput {
+function documentInput(
+  state: StudioState,
+  themeImage: string,
+  images: Record<string, string>,
+  aspect: (layer: ImageLayer) => number,
+): StudioDocumentInput {
   const title = ensureLayer(state, "title");
   const body = ensureLayer(state, "body");
   const image = ensureLayer(state, "image");
@@ -218,6 +225,7 @@ function documentInput(state: StudioState, themeImage: string, aspect: number): 
     title: title.text,
     body: body.text,
     themeImage,
+    images,
     design: designToCode(state, aspect, extras),
     color: state.color,
     radius: state.radius,
@@ -243,7 +251,7 @@ function documentInput(state: StudioState, themeImage: string, aspect: number): 
 function drawCard(
   canvas: HTMLCanvasElement,
   state: StudioState,
-  image: HTMLImageElement | null,
+  imageOf: (layer: ImageLayer) => HTMLImageElement | null,
   hiddenId?: string,
 ): HitBox[] {
   const ctx = canvas.getContext("2d");
@@ -263,12 +271,10 @@ function drawCard(
   const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
   ctx.textBaseline = "top";
   const extras = extraFonts();
-  const source = image && image.naturalWidth > 0 ? image : null;
-  const aspect = source ? source.naturalHeight / source.naturalWidth : 1;
-
   const paintImage = (layer: ImageLayer): void => {
+    const source = imageOf(layer);
     if (!source) return;
-    const height = imageLayerHeight(layer, aspect);
+    const height = imageLayerHeight(layer, source.naturalHeight / source.naturalWidth);
     if (layer.id !== hiddenId) {
       const crop = layer.crop;
       if (crop) {
@@ -373,6 +379,40 @@ function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLE
   return place;
 }
 
+const THEME_DRAG = "application/x-ax-studio-image";
+
+function themeOptions(captures: CaptureRecord[], activeSrc: string): string {
+  const option = (src: string, image: string, label: string) => {
+    const selected = src === activeSrc;
+    return `
+      <button
+        type="button"
+        class="studio__theme"
+        role="radio"
+        data-theme-slug="${escapeHtml(src)}"
+        aria-checked="${selected ? "true" : "false"}"
+        tabindex="${selected ? "0" : "-1"}"
+        draggable="true"
+      >
+        <img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" draggable="false" />
+      </button>
+    `;
+  };
+  const archive = captures.map((capture) =>
+    option(capture.slug, assetUrl(capture.asset.thumbPath ?? capture.asset.path), capture.title),
+  );
+  const uploads = getUploads().map(
+    (upload) => `
+      <div class="studio__theme-item">
+        ${option(uploadSrc(upload), upload.url, upload.name)}
+        <button type="button" class="studio__theme-remove" data-upload-remove="${escapeHtml(upload.id)}" aria-label="${escapeHtml(upload.name)} 삭제" title="삭제">×</button>
+      </div>
+    `,
+  );
+  const add = `<button type="button" class="studio__theme studio__theme--add" id="studio-theme-add" aria-label="이미지 추가" title="이미지 추가">+</button>`;
+  return [...archive, ...uploads, add].join("");
+}
+
 export function renderStudio(state: StudioState, captures: CaptureRecord[]): string {
   if (captures.length === 0) {
     return `
@@ -391,23 +431,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
     (item) =>
       `<option value="${escapeHtml(item.id)}"${item.id === preset.id ? " selected" : ""}>${escapeHtml(item.name)} · ${item.width}×${item.height}</option>`,
   ).join("");
-  const themes = captures
-    .map((capture) => {
-      const selected = capture.slug === state.themeSlug;
-      return `
-        <button
-          type="button"
-          class="studio__theme"
-          role="radio"
-          data-theme-slug="${escapeHtml(capture.slug)}"
-          aria-checked="${selected ? "true" : "false"}"
-          tabindex="${selected ? "0" : "-1"}"
-        >
-          <img src="${escapeHtml(assetUrl(capture.asset.thumbPath ?? capture.asset.path))}" alt="${escapeHtml(capture.title)}" />
-        </button>
-      `;
-    })
-    .join("");
+  const themes = themeOptions(captures, image.src);
   const designSelected = state.panel === "design";
   const fonts = fontChoices();
   const fontMax = maxFontSize(state.cardWidth);
@@ -516,6 +540,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <div class="studio__field">
             <span id="studio-theme-label">아카이브 테마</span>
             <div class="studio__themes" role="radiogroup" aria-labelledby="studio-theme-label">${themes}</div>
+            <input type="file" id="studio-theme-file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden />
           </div>
           <div class="studio__field">
             <label for="studio-image-width">카드 이미지 크기</label>
@@ -717,9 +742,31 @@ export function bindStudio(
     return;
   }
 
-  const themeUrl = () => {
-    const capture = captures.find((item) => item.slug === state.themeSlug) ?? captures[0];
+  /** Uploads come from this browser; a source that is gone falls back to the theme. */
+  const srcUrl = (src: string): string => {
+    const upload = uploadBySrc(src);
+    if (upload) return upload.url;
+    const capture =
+      captures.find((item) => item.slug === src) ?? captures.find((item) => item.slug === state.themeSlug) ?? captures[0];
     return capture ? assetUrl(capture.asset.path) : "";
+  };
+  const imageOf = (layer: ImageLayer): HTMLImageElement | null => {
+    const image = imageCache.get(srcUrl(layer.src));
+    return image?.complete && image.naturalWidth > 0 ? image : null;
+  };
+  const aspectOf = (layer: ImageLayer): number => {
+    const image = imageOf(layer);
+    return image ? image.naturalHeight / image.naturalWidth : 1;
+  };
+  const codeDocument = async (): Promise<StudioDocumentInput> => {
+    const dataOf = (src: string) => {
+      const url = srcUrl(src);
+      return url ? themeDataUrl(url).catch(() => "") : Promise.resolve("");
+    };
+    const others = [...new Set(state.layers.flatMap((layer) => (layer.kind === "image" && layer.src !== state.themeSlug ? [layer.src] : [])))];
+    const [themeData, ...otherData] = await Promise.all([dataOf(state.themeSlug), ...others.map(dataOf)]);
+    const images = Object.fromEntries(others.map((src, index) => [src, otherData[index] ?? ""]));
+    return documentInput(state, themeData ?? "", images, aspectOf);
   };
 
   let drawToken = 0;
@@ -748,6 +795,7 @@ export function bindStudio(
     return ensureLayer(state, "image");
   };
   const imageLayers = () => state.layers.filter((layer): layer is ImageLayer => layer.kind === "image");
+  const hasImage = () => imageLayers().some((layer) => imageOf(layer));
 
   const syncZoom = () => {
     if (!Number.isFinite(previewZoom) || previewZoom <= 0) previewZoom = 1;
@@ -853,11 +901,9 @@ export function bindStudio(
     sizeBase = { cardWidth: state.cardWidth, images: imageSnapshot() };
   };
 
-  let themeImage: HTMLImageElement | null = null;
-  let imageAspect = 1;
   let hits: HitBox[] = [];
 
-  const layerHeight = (layer: ImageLayer) => imageLayerHeight(layer, imageAspect);
+  const layerHeight = (layer: ImageLayer) => imageLayerHeight(layer, aspectOf(layer));
 
   const clampLayout = () => {
     state.cardWidth = clampCardSize(state.cardWidth);
@@ -899,14 +945,21 @@ export function bindStudio(
     root.style.setProperty("--studio-card-radius", `${state.radius}px`);
   };
 
-  const selectTheme = (slug: string, focus: boolean) => {
-    state.themeSlug = slug;
+  const markTheme = (src: string, focus = false) => {
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")) {
-      const selected = button.dataset.themeSlug === slug;
+      const selected = button.dataset.themeSlug === src;
       button.setAttribute("aria-checked", selected ? "true" : "false");
       button.tabIndex = selected ? 0 : -1;
       if (selected && focus) button.focus();
     }
+  };
+  /** A theme goes on the selected images, or on the bottom image when none is selected. */
+  const selectTheme = (src: string, focus: boolean) => {
+    const picked = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image");
+    for (const layer of picked.length > 0 ? picked : [ensureLayer(state, "image")]) layer.src = src;
+    const bottom = ensureLayer(state, "image");
+    if (!isUploadSrc(bottom.src)) state.themeSlug = bottom.src;
+    markTheme(src, focus);
     void redraw();
   };
 
@@ -945,11 +998,7 @@ export function bindStudio(
     titleFontSelect.value = title.fontId;
     bodyFontSelect.value = body.fontId;
     if (document.activeElement !== codeInput) codeInput.value = state.code;
-    for (const button of root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")) {
-      const selected = button.dataset.themeSlug === state.themeSlug;
-      button.setAttribute("aria-checked", selected ? "true" : "false");
-      button.tabIndex = selected ? 0 : -1;
-    }
+    markTheme(panelImage().src);
   };
 
   const redraw = async (): Promise<void> => {
@@ -962,7 +1011,7 @@ export function bindStudio(
     const matchesPreset = state.cardWidth === preset.width && state.cardHeight === preset.height;
     const safeNote = matchesPreset && preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
     meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}${safeNote}`;
-    exportCode.textContent = designToCode(state, imageAspect, extraFonts());
+    exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     fitCodeInput();
     syncRadiusControls();
     updateScale();
@@ -989,34 +1038,23 @@ export function bindStudio(
     }
     if (token !== drawToken) return;
 
-    const url = themeUrl();
     if (state.code.trim()) {
       canvas.hidden = true;
       iframe.hidden = false;
-      const themeData = url ? await themeDataUrl(url) : "";
+      const input = await codeDocument();
       if (token !== drawToken) return;
-      iframe.srcdoc = studioSrcdoc(documentInput(state, themeData, imageAspect));
+      iframe.srcdoc = studioSrcdoc(input);
       syncOverlay();
       return;
     }
 
     iframe.hidden = true;
     canvas.hidden = false;
-    if (url) {
-      try {
-        themeImage = await loadImage(url);
-        if (themeImage.naturalWidth > 0) imageAspect = themeImage.naturalHeight / themeImage.naturalWidth;
-      } catch {
-        themeImage = null;
-        imageAspect = 1;
-      }
-    } else {
-      themeImage = null;
-      imageAspect = 1;
-    }
+    const urls = new Set(imageLayers().map((layer) => srcUrl(layer.src)).filter(Boolean));
+    await Promise.all([...urls].map((url) => loadImage(url).catch(() => null)));
     if (token !== drawToken) return;
     clampLayout();
-    exportCode.textContent = designToCode(state, imageAspect, extraFonts());
+    exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     paint();
   };
 
@@ -1120,16 +1158,14 @@ export function bindStudio(
   const snapshotCard = async (): Promise<string> => {
     const offscreen = document.createElement("canvas");
     if (state.code.trim()) {
-      const url = themeUrl();
-      const themeData = url ? await themeDataUrl(url) : "";
       await paintForeignObject(
         offscreen,
-        studioFragment(documentInput(state, themeData, imageAspect)),
+        studioFragment(await codeDocument()),
         state.cardWidth,
         state.cardHeight,
       );
     } else {
-      drawCard(offscreen, state, themeImage);
+      drawCard(offscreen, state, imageOf);
     }
     const maxEdge = 1080;
     const edge = Math.max(state.cardWidth, state.cardHeight);
@@ -1292,33 +1328,78 @@ export function bindStudio(
     root.querySelector<HTMLButtonElement>(next === "design" ? "#studio-tab-design" : "#studio-tab-code")?.focus();
   });
 
-  const themes = [...root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")];
-  for (const button of themes) {
-    button.addEventListener("click", () => {
-      const slug = button.dataset.themeSlug;
-      if (!slug || slug === state.themeSlug) return;
-      beginGesture(button);
-      selectTheme(slug, false);
-      finishGesture(button);
-    });
-  }
-  root.querySelector(".studio__themes")?.addEventListener("keydown", (event) => {
-    if (!(event instanceof KeyboardEvent)) return;
+  const themeGrid = root.querySelector<HTMLElement>(".studio__themes");
+  const themeFile = root.querySelector<HTMLInputElement>("#studio-theme-file");
+  const themeButtons = () => [...root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")];
+  const renderThemes = () => {
+    if (themeGrid) themeGrid.innerHTML = themeOptions(captures, panelImage().src);
+  };
+  const pickTheme = (button: HTMLButtonElement, focus: boolean) => {
+    const src = button.dataset.themeSlug;
+    if (!src) return;
+    beginGesture(button);
+    selectTheme(src, focus);
+    finishGesture(button);
+  };
+  const deleteUpload = async (id: string) => {
+    const upload = getUploads().find((item) => item.id === id);
+    if (!upload || !(await confirmProceed(`"${upload.name}" 이미지를 테마에서 지울까요? 이 이미지를 쓰던 레이어는 테마 이미지로 바뀝니다.`))) return;
+    if (!(await removeUpload(id))) {
+      showToast("이미지를 지우지 못했습니다.");
+      return;
+    }
+    renderThemes();
+    void redraw();
+  };
+  themeGrid?.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const remove = target?.closest<HTMLButtonElement>("[data-upload-remove]");
+    if (remove) {
+      void deleteUpload(remove.dataset.uploadRemove ?? "");
+      return;
+    }
+    if (target?.closest("#studio-theme-add")) {
+      themeFile?.click();
+      return;
+    }
+    const button = target?.closest<HTMLButtonElement>("[data-theme-slug]");
+    if (button) pickTheme(button, false);
+  });
+  themeGrid?.addEventListener("keydown", (event) => {
     const key = event.key;
     if (!["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(key)) return;
+    if (!(event.target instanceof Element && event.target.matches("[data-theme-slug]"))) return;
     event.preventDefault();
-    const index = themes.findIndex((button) => button.dataset.themeSlug === state.themeSlug);
+    const themes = themeButtons();
+    const index = themes.findIndex((button) => button === event.target);
     const delta = key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1;
     const next = themes[(index + delta + themes.length) % themes.length];
-    const slug = next?.dataset.themeSlug;
-    if (!slug || slug === state.themeSlug) return;
-    beginGesture(next);
-    selectTheme(slug, true);
-    finishGesture(next);
+    if (next) pickTheme(next, true);
+  });
+  themeFile?.addEventListener("change", () => {
+    const files = [...(themeFile.files ?? [])].filter((file) => file.type.startsWith("image/"));
+    themeFile.value = "";
+    if (files.length === 0) return;
+    void (async () => {
+      const added = (await Promise.all(files.map((file) => addUpload(file)))).filter((item) => item !== null);
+      if (added.length < files.length) showToast("이미지를 저장하지 못했습니다.");
+      if (added.length === 0) return;
+      renderThemes();
+      root.querySelector<HTMLButtonElement>("#studio-theme-add")?.focus();
+    })();
+  });
+  themeGrid?.addEventListener("dragstart", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-theme-slug]") : null;
+    const src = button?.dataset.themeSlug;
+    if (!button || !src || !event.dataTransfer) return;
+    event.dataTransfer.setData(THEME_DRAG, src);
+    event.dataTransfer.effectAllowed = "copy";
+    const image = button.querySelector("img");
+    if (image) event.dataTransfer.setDragImage(image, image.width / 2, image.height / 2);
   });
 
   root.querySelector("#studio-copy")?.addEventListener("click", async () => {
-    const text = designToCode(state, imageAspect, extraFonts());
+    const text = designToCode(state, aspectOf, extraFonts());
     exportCode.textContent = text;
     try {
       await navigator.clipboard.writeText(text);
@@ -1345,12 +1426,10 @@ export function bindStudio(
         downloadCanvas(canvas, filename);
         return;
       }
-      const url = themeUrl();
-      const themeData = url ? await themeDataUrl(url) : "";
       const offscreen = document.createElement("canvas");
       await paintForeignObject(
         offscreen,
-        studioFragment(documentInput(state, themeData, imageAspect)),
+        studioFragment(await codeDocument()),
         state.cardWidth,
         state.cardHeight,
       );
@@ -1400,16 +1479,18 @@ export function bindStudio(
   };
   const paintCropGhost = () => {
     const ctx = canvas.getContext("2d");
-    if (!cropping || !themeImage || !ctx) return;
+    const layer = cropping ? layerById(cropping.id) : undefined;
+    const source = layer?.kind === "image" ? imageOf(layer) : null;
+    if (!cropping || !source || !ctx) return;
     const { full, box } = cropping;
     ctx.save();
     ctx.globalAlpha = 0.35;
-    ctx.drawImage(themeImage, full.x, full.y, full.w, full.h);
+    ctx.drawImage(source, full.x, full.y, full.w, full.h);
     ctx.globalAlpha = 1;
     ctx.beginPath();
     ctx.rect(box.x, box.y, box.w, box.h);
     ctx.clip();
-    ctx.drawImage(themeImage, full.x, full.y, full.w, full.h);
+    ctx.drawImage(source, full.x, full.y, full.w, full.h);
     ctx.restore();
   };
 
@@ -1480,7 +1561,7 @@ export function bindStudio(
   };
   paint = () => {
     for (const id of [...selected]) if (!layerById(id)) selected.delete(id);
-    hits = drawCard(canvas, state, themeImage, editing?.id ?? cropping?.id);
+    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id);
     paintCropGhost();
     paintDragStroke();
     syncOverlay();
@@ -1697,13 +1778,13 @@ export function bindStudio(
     endCrop(true);
   };
   const startCrop = (layer: ImageLayer) => {
-    if (!themeImage || state.code.trim()) return;
+    if (!imageOf(layer) || state.code.trim()) return;
     finishGesture();
     selected.clear();
     selected.add(layer.id);
     cropping = {
       id: layer.id,
-      full: uncroppedRect(layer, imageAspect),
+      full: uncroppedRect(layer, aspectOf(layer)),
       box: { x: layer.x, y: layer.y, w: layer.width, h: layerHeight(layer) },
     };
     beginGesture(cropOwner);
@@ -1819,7 +1900,7 @@ export function bindStudio(
     { action: "front", label: "맨 위로 보내기" },
     { action: "back", label: "맨 밑으로 보내기" },
     { action: "crop", label: "크롭하기" },
-    { action: "delete", label: "삭제" },
+    { action: "delete", label: "삭제", hint: IS_MAC ? "⌫" : "Delete" },
   ];
   const menu = document.createElement("div");
   menu.className = "nav-popover studio-menu";
@@ -1874,7 +1955,8 @@ export function bindStudio(
     const crop = menuButton("crop");
     if (crop) {
       crop.hidden = !singleImage();
-      crop.disabled = !themeImage;
+      const image = singleImage();
+      crop.disabled = !image || !imageOf(image);
     }
     const remove = menuButton("delete");
     if (remove) {
@@ -1968,6 +2050,7 @@ export function bindStudio(
     const mouse = event.pointerType === "mouse";
     // Right click and macOS ctrl+click open the layer menu through contextmenu instead.
     if (mouse && (event.button !== 0 || (IS_MAC && event.ctrlKey))) return;
+    window.getSelection()?.removeAllRanges();
     closeLayerMenu();
     if (editing) closeEditor(true);
     if (cropping) {
@@ -1985,7 +2068,7 @@ export function bindStudio(
       } catch {
         /* the pointer can already be inactive */
       }
-      if (touches.size === 2 && themeImage) {
+      if (touches.size === 2 && hasImage()) {
         startPinch();
         return;
       }
@@ -2103,7 +2186,7 @@ export function bindStudio(
     "wheel",
     (event) => {
       // Trackpad pinch arrives as a ctrl+wheel event in Chromium and Firefox; off the Mac, ctrl+wheel zooms the preview.
-      if (!IS_MAC || !event.ctrlKey || state.code.trim() || cropping || !themeImage) return;
+      if (!IS_MAC || !event.ctrlKey || state.code.trim() || cropping || !hasImage()) return;
       event.preventDefault();
       beginGesture(wheelOwner);
       const point = cardPoint(event);
@@ -2136,7 +2219,7 @@ export function bindStudio(
   let safariPinch: { layerId: string; image: ImageBox; anchor: Point } | null = null;
   canvas.addEventListener("gesturestart", (event) => {
     event.preventDefault();
-    if (pinch || state.code.trim() || cropping || !themeImage) return;
+    if (pinch || state.code.trim() || cropping || !hasImage()) return;
     beginGesture(safariOwner);
     const anchor = cardPoint(event as SafariGesture);
     const layer = imageAt(anchor);
@@ -2165,6 +2248,41 @@ export function bindStudio(
     selected.clear();
     paint();
   });
+
+  const insertImage = async (src: string, at: Point) => {
+    const url = srcUrl(src);
+    const image = url ? await loadImage(url).catch(() => null) : null;
+    const aspect = image && image.naturalWidth > 0 ? image.naturalHeight / image.naturalWidth : 1;
+    if (editing) closeEditor(true);
+    if (cropping) endCrop(true);
+    commitLayers(() => {
+      const width = clampImageWidth(state.cardWidth / 2);
+      const layer: ImageLayer = { id: newLayerId(), kind: "image", src, x: 0, y: 0, width, crop: null };
+      Object.assign(layer, clampLayerPosition(layer, at.x - width / 2, at.y - (width * aspect) / 2));
+      state.layers.push(layer);
+      selected.clear();
+      selected.add(layer.id);
+    });
+  };
+  const dragsTheme = (event: DragEvent) => !state.code.trim() && !!event.dataTransfer?.types.includes(THEME_DRAG);
+  stage.addEventListener("dragover", (event) => {
+    if (!dragsTheme(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    stage.dataset.dropping = "true";
+  });
+  stage.addEventListener("dragleave", (event) => {
+    if (!(event.relatedTarget instanceof Node && stage.contains(event.relatedTarget))) delete stage.dataset.dropping;
+  });
+  stage.addEventListener("drop", (event) => {
+    delete stage.dataset.dropping;
+    if (!dragsTheme(event)) return;
+    const src = event.dataTransfer?.getData(THEME_DRAG);
+    if (!src) return;
+    event.preventDefault();
+    void insertImage(src, cardPoint(event));
+  });
+  themeGrid?.addEventListener("dragend", () => delete stage.dataset.dropping);
 
   const applyControlsWidth = (value: number) => {
     const studioWidth = studio.getBoundingClientRect().width;
@@ -2260,15 +2378,20 @@ export function bindStudio(
     }
     const target = event.target;
     const onCard = target === document.body || (target instanceof Node && stage.contains(target));
-    if (!onCard || editing || state.code.trim()) return;
-    if (cropping) {
-      if (event.key !== "Enter" && event.key !== "Escape") return;
+    if (editing || state.code.trim()) return;
+    const typing =
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target.matches("textarea, input:not([type=range], [type=color], [type=radio], [type=checkbox], [type=button], [type=file])"));
+    // Backspace is the Delete key on Mac keyboards.
+    if (!mod && !cropping && !typing && (event.key === "Delete" || event.key === "Backspace") && selected.size > 0) {
       event.preventDefault();
-      endCrop(event.key === "Enter");
+      if (canDelete(selectedLayers())) deleteLayers();
+      else showToast("타이틀·본문·이미지는 하나씩 남아 있어야 합니다.");
       return;
     }
-    if (mod) {
-      if (window.getSelection()?.toString()) return;
+    if (mod && !cropping) {
+      if (typing || window.getSelection()?.toString()) return;
       if (event.code === "KeyC" && selected.size > 0) {
         event.preventDefault();
         copyLayers();
@@ -2278,6 +2401,14 @@ export function bindStudio(
       }
       return;
     }
+    if (!onCard) return;
+    if (cropping) {
+      if (event.key !== "Enter" && event.key !== "Escape") return;
+      event.preventDefault();
+      endCrop(event.key === "Enter");
+      return;
+    }
+    if (mod) return;
     const arrow = arrows[event.key];
     if (!arrow || event.altKey || selected.size === 0) return;
     event.preventDefault();

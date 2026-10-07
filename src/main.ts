@@ -7,6 +7,7 @@ import {
   DEFAULT_THEME_SLUG,
   normalizeHex,
   normalizeStudioState,
+  setStudioTheme,
   parseRgb,
   rgbToHex,
   type StudioState,
@@ -14,6 +15,7 @@ import {
 import { readPins, togglePin } from "./pins.ts";
 import { clearBaseline, readBaseline, writeBaseline } from "./studio-baseline.ts";
 import { addSavedCard, getSavedCards, loadSavedCards } from "./saved-cards.ts";
+import { loadUploads } from "./studio-uploads.ts";
 import { confirmProceed, showToast } from "./feedback.ts";
 import { hrefFor, isLegacyStudioHash, onRouteChange, parseHash, type Route } from "./router.ts";
 import {
@@ -124,7 +126,7 @@ function ensureStudio(
           valid ?? knownTheme(DEFAULT_THEME_SLUG, captures) ?? captures[0]?.slug ?? "",
           defaultStudioColor(),
         );
-    if (baseline && valid) studioState.themeSlug = valid;
+    if (baseline && valid) setStudioTheme(studioState, valid);
     if (baseline && !knownTheme(studioState.themeSlug, captures)) {
       studioState.themeSlug = valid ?? captures[0]?.slug ?? "";
     }
@@ -132,7 +134,7 @@ function ensureStudio(
     return studioState;
   }
   if (theme && theme !== appliedTheme && valid) {
-    studioState.themeSlug = valid;
+    setStudioTheme(studioState, valid);
     appliedTheme = theme;
   }
   return studioState;
@@ -335,7 +337,7 @@ async function loadIndex(): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
       const index = await readIndex();
-      await loadSavedCards();
+      await Promise.all([loadSavedCards(), loadUploads()]);
       loadState = { status: "ready", index };
       render();
       return;

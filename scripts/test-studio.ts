@@ -29,6 +29,7 @@ import {
   pickInk,
   sanitizeStudioCode,
   scaleImageAround,
+  setStudioTheme,
   substituteStudioCode,
   wrapText,
   type ImageLayer,
@@ -151,9 +152,30 @@ const partial = normalizeStudioState({ themeSlug: "x", color: "#ffffff", layers:
 assert.ok(partial);
 assert.deepEqual(partial.layers.map((layer) => layer.kind), ["image", "title", "body"]);
 assert.equal(firstLayer(partial, "title")?.id, "t2");
+assert.equal(firstLayer(partial, "image")?.src, "x");
+
+// Each image keeps its own source; the theme only follows the bottom image.
+const sources = createStudioState("x", "#ffffff");
+const extra: ImageLayer = { ...ensureLayer(sources, "image"), id: "extra", src: "upload:abc" };
+sources.layers.push(extra);
+setStudioTheme(sources, "y");
+assert.equal(sources.themeSlug, "y");
+assert.equal(firstLayer(sources, "image")?.src, "y");
+assert.equal(extra.src, "upload:abc");
+const sourceCode = designToCode(sources, (layer) => (layer.src === "y" ? 1 : 0.5));
+assert.match(sourceCode, /\{\{themeImage\}\}/);
+assert.match(sourceCode, /\{\{image:upload:abc\}\}/);
+const sourceRendered = substituteStudioCode(sourceCode, {
+  title: "",
+  body: "",
+  themeImage: "data:image/png;base64,theme",
+  images: { "upload:abc": "data:image/png;base64,extra" },
+});
+assert.match(sourceRendered, /base64,theme/);
+assert.match(sourceRendered, /base64,extra/);
 
 // Crop keeps the source so it can grow back out.
-const cropImage: ImageLayer = { id: "i", kind: "image", x: 100, y: 50, width: 400, crop: null };
+const cropImage: ImageLayer = { id: "i", kind: "image", src: "x", x: 100, y: 50, width: 400, crop: null };
 const full = uncroppedRect(cropImage, 0.5);
 assert.deepEqual(full, { x: 100, y: 50, w: 400, h: 200 });
 assert.equal(cropFromBox(full, full), null);

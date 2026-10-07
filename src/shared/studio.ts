@@ -44,10 +44,12 @@ export type TextLayer = {
   fontId: string;
   color: string;
 };
-/** Every image layer shows the theme image. x/y/width describe the cropped part on the card. */
+/** x/y/width describe the cropped part on the card. */
 export type ImageLayer = {
   id: string;
   kind: "image";
+  /** A capture slug, or upload:<id> for an image added in this browser. */
+  src: string;
   x: number;
   y: number;
   width: number;
@@ -173,12 +175,17 @@ export function fontStack(fontId: string, extras: { id: string; stack: string }[
   return extras.find((font) => font.id === fontId)?.stack ?? BUILTIN_FONTS[0].stack;
 }
 
-function defaultLayer(kind: "image", cardWidth?: number, cardHeight?: number): ImageLayer;
-function defaultLayer(kind: TextKind, cardWidth?: number, cardHeight?: number): TextLayer;
-function defaultLayer(kind: LayerKind, cardWidth?: number, cardHeight?: number): StudioLayer;
-function defaultLayer(kind: LayerKind, cardWidth = presetById(DEFAULT_PRESET_ID).width, cardHeight = presetById(DEFAULT_PRESET_ID).height): StudioLayer {
+function defaultLayer(kind: "image", src: string, cardWidth?: number, cardHeight?: number): ImageLayer;
+function defaultLayer(kind: TextKind, src: string, cardWidth?: number, cardHeight?: number): TextLayer;
+function defaultLayer(kind: LayerKind, src: string, cardWidth?: number, cardHeight?: number): StudioLayer;
+function defaultLayer(
+  kind: LayerKind,
+  src: string,
+  cardWidth = presetById(DEFAULT_PRESET_ID).width,
+  cardHeight = presetById(DEFAULT_PRESET_ID).height,
+): StudioLayer {
   if (kind === "image") {
-    return { id: "image", kind, x: 0, y: 0, width: clampImageWidth(cardWidth), crop: null };
+    return { id: "image", kind, src, x: 0, y: 0, width: clampImageWidth(cardWidth), crop: null };
   }
   const title = kind === "title";
   const size = clampFontSize(title ? DEFAULT_TITLE_SIZE : DEFAULT_BODY_SIZE, cardWidth);
@@ -206,7 +213,7 @@ export function createStudioState(themeSlug: string, color: string): StudioState
     code: "",
     panel: "design",
     controlsWidth: CONTROLS_DEFAULT,
-    layers: [defaultLayer("image"), defaultLayer("body"), defaultLayer("title")],
+    layers: [defaultLayer("image", themeSlug), defaultLayer("body", themeSlug), defaultLayer("title", themeSlug)],
   };
 }
 
@@ -216,6 +223,19 @@ export function newLayerId(): string {
 
 export function isTextLayer(layer: StudioLayer): layer is TextLayer {
   return layer.kind !== "image";
+}
+
+export const UPLOAD_PREFIX = "upload:";
+
+export function isUploadSrc(src: string): boolean {
+  return src.startsWith(UPLOAD_PREFIX);
+}
+
+/** Show a theme on the bottom image. The other image layers keep their own source. */
+export function setStudioTheme(state: StudioState, slug: string): void {
+  state.themeSlug = slug;
+  const image = firstLayer(state, "image");
+  if (image) image.src = slug;
 }
 
 export function firstLayer(state: StudioState, kind: "image"): ImageLayer | undefined;
@@ -230,7 +250,7 @@ export function ensureLayer(state: StudioState, kind: TextKind): TextLayer;
 export function ensureLayer(state: StudioState, kind: LayerKind): StudioLayer {
   const found = state.layers.find((layer) => layer.kind === kind);
   if (found) return found;
-  const layer = defaultLayer(kind, state.cardWidth, state.cardHeight);
+  const layer = defaultLayer(kind, state.themeSlug, state.cardWidth, state.cardHeight);
   layer.id = newLayerId();
   if (kind === "image") state.layers.unshift(layer);
   else state.layers.push(layer);
@@ -294,7 +314,7 @@ export function moveCropBox(full: StudioRect, box: StudioRect, dx: number, dy: n
   };
 }
 
-function parseLayer(raw: unknown, ink: string): StudioLayer | null {
+function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   const num = (field: unknown) => (typeof field === "number" && Number.isFinite(field) ? field : null);
@@ -310,6 +330,7 @@ function parseLayer(raw: unknown, ink: string): StudioLayer | null {
     return {
       id,
       kind: "image",
+      src: typeof value.src === "string" && value.src ? value.src : theme,
       x,
       y,
       width: clampImageWidth(num(value.width) ?? IMAGE_MIN),
@@ -330,12 +351,12 @@ function parseLayer(raw: unknown, ink: string): StudioLayer | null {
 }
 
 /** Before layers, the card kept one title, one body, and one image as flat fields. */
-function legacyLayers(value: Record<string, unknown>, ink: string): StudioLayer[] {
+function legacyLayers(value: Record<string, unknown>, ink: string, theme: string): StudioLayer[] {
   const num = (field: unknown, fallback: number) => (typeof field === "number" && Number.isFinite(field) ? field : fallback);
   const text = (field: unknown, fallback: string) => (typeof field === "string" ? field : fallback);
   const font = text(value.fontId, "pretendard");
   return [
-    { id: "image", kind: "image", x: num(value.imageX, 0), y: num(value.imageY, 0), width: clampImageWidth(num(value.imageWidth, IMAGE_MIN)), crop: null },
+    { id: "image", kind: "image", src: theme, x: num(value.imageX, 0), y: num(value.imageY, 0), width: clampImageWidth(num(value.imageWidth, IMAGE_MIN)), crop: null },
     {
       id: "body",
       kind: "body",
@@ -377,8 +398,10 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
     panel: value.panel === "code" ? "code" : "design",
     controlsWidth: num(value.controlsWidth, base.controlsWidth),
     layers: Array.isArray(value.layers)
-      ? value.layers.map((layer) => parseLayer(layer, ink)).filter((layer): layer is StudioLayer => layer !== null)
-      : legacyLayers(value, ink),
+      ? value.layers
+          .map((layer) => parseLayer(layer, ink, value.themeSlug as string))
+          .filter((layer): layer is StudioLayer => layer !== null)
+      : legacyLayers(value, ink, value.themeSlug),
   };
   ensureLayer(state, "image");
   ensureLayer(state, "body");
@@ -554,6 +577,8 @@ export type StudioSubstitution = {
   title: string;
   body: string;
   themeImage: string;
+  /** Image URLs for {{image:<src>}}, keyed by layer src. */
+  images?: Record<string, string>;
 };
 
 export function substituteStudioCode(code: string, values: StudioSubstitution): string {
@@ -561,7 +586,8 @@ export function substituteStudioCode(code: string, values: StudioSubstitution): 
   return safe
     .replaceAll("{{title}}", escapeHtml(values.title))
     .replaceAll("{{body}}", escapeHtml(values.body))
-    .replaceAll("{{themeImage}}", escapeHtml(values.themeImage));
+    .replaceAll("{{themeImage}}", escapeHtml(values.themeImage))
+    .replace(/\{\{image:([^}]+)\}\}/g, (_, src: string) => escapeHtml(values.images?.[src] ?? ""));
 }
 
 /**
@@ -570,9 +596,10 @@ export function substituteStudioCode(code: string, values: StudioSubstitution): 
  */
 export function designToCode(
   state: StudioState,
-  aspect = 1,
+  aspect: number | ((layer: ImageLayer) => number) = 1,
   extras: { id: string; stack: string }[] = [],
 ): string {
+  const aspectOf = (layer: ImageLayer) => (typeof aspect === "number" ? aspect : aspect(layer));
   const px = (value: number) => `${Math.round(value * 100) / 100}px`;
   const title = firstLayer(state, "title");
   const body = firstLayer(state, "body");
@@ -582,13 +609,15 @@ export function designToCode(
     const name = `layer-${index + 1}`;
     const place = `left: ${px(layer.x)}; top: ${px(layer.y)};`;
     if (layer.kind === "image") {
+      const src = layer.src === state.themeSlug ? "{{themeImage}}" : `{{image:${escapeHtml(layer.src)}}}`;
+      const ratio = aspectOf(layer);
       if (layer.crop) {
-        const full = uncroppedRect(layer, aspect);
-        items.push(`  <div class="studio-crop ${name}"><img src="{{themeImage}}" alt="" /></div>`);
-        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, aspect))}; }`);
+        const full = uncroppedRect(layer, ratio);
+        items.push(`  <div class="studio-crop ${name}"><img src="${src}" alt="" /></div>`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; }`);
         rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
       } else {
-        items.push(`  <img class="${name}" src="{{themeImage}}" alt="" />`);
+        items.push(`  <img class="${name}" src="${src}" alt="" />`);
         rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; }`);
       }
       return;
