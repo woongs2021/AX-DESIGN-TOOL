@@ -178,6 +178,14 @@ export const CONTRAST_PAIRS: ContrastPair[] = [
     note: "Large headings on tint empty-state panels",
   },
   {
+    id: "fg-on-surface-muted-dark",
+    foreground: "--fg",
+    background: "--surface-muted",
+    criterion: "body",
+    mode: "dark",
+    note: "Pin/Saved empty-state text on the dark gray panel",
+  },
+  {
     id: "mid-on-bg-light",
     foreground: "--mid",
     background: "--bg",

@@ -51,4 +51,5 @@ html[data-mode="dark"] {
   --stroke: rgba(252, 252, 255, 0.72);
   --focus-ring: #a1d0f6;
   --media-matte: #000000;
+  --surface-muted: #2a2a2e;
 }

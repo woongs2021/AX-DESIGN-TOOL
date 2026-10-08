@@ -12,6 +12,7 @@ import {
   rgbToHex,
   type StudioState,
 } from "./shared/studio.ts";
+import { DEFAULT_PRESET_ID } from "./shared/studio-presets.ts";
 import { readPins, togglePin } from "./pins.ts";
 import { clearBaseline, readBaseline, writeBaseline } from "./studio-baseline.ts";
 import { addSavedCard, getSavedCards, loadSavedCards } from "./saved-cards.ts";
@@ -119,7 +120,7 @@ function ensureStudio(
   }
   if (!cardId) appliedCard = null;
   if (!studioState) {
-    const baseline = readBaseline();
+    const baseline = readBaseline(DEFAULT_PRESET_ID);
     studioState = baseline
       ? structuredClone(baseline)
       : createStudioState(
@@ -247,13 +248,20 @@ function render(): void {
     bindStudio(app, studioState, loadState.index.captures, {
       onReset: () => {
         if (!studioState) return;
-        applyStudioBaseline(studioState, readBaseline(), defaultStudioColor());
+        applyStudioBaseline(studioState, readBaseline(studioState.presetId), defaultStudioColor());
         render();
         document.querySelector<HTMLButtonElement>("#studio-reset")?.focus();
       },
       onSetBaseline: () => {
         if (!studioState) return;
         writeBaseline(structuredClone(studioState));
+      },
+      onLoadPreset: (presetId) => {
+        const baseline = readBaseline(presetId);
+        if (!studioState || !baseline) return false;
+        applyStudioBaseline(studioState, baseline, defaultStudioColor());
+        render();
+        return true;
       },
       onAddToLibrary: (thumbnail) => {
         if (!studioState) return Promise.resolve(false);

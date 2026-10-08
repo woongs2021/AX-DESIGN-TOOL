@@ -62,6 +62,13 @@ code {
   outline-offset: 3px;
 }
 
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 1.5px solid color-mix(in srgb, var(--primary) 60%, transparent);
+  outline-offset: 1px;
+}
+
 .top-nav {
   position: sticky;
   top: 0;
@@ -391,6 +398,15 @@ html[data-mode="dark"] .confirm-dialog {
 .state-panel__text {
   margin: 0 0 24px;
   font-size: 20px;
+}
+
+.state-panel--empty .state-panel__title {
+  font-size: 24px;
+}
+
+html[data-mode="dark"] .state-panel--empty {
+  background: var(--surface-muted);
+  color: var(--fg);
 }
 
 .gallery__header {
@@ -1242,7 +1258,9 @@ html[data-mode="dark"] .spider-callout {
 .studio__panel-scroll {
   height: 100%;
   overflow: auto;
-  padding-bottom: 32px;
+  /* Room for focus rings, which the scroll box would otherwise clip. */
+  margin-inline: -4px;
+  padding: 4px 4px 32px;
   scrollbar-width: none;
 }
 
@@ -1449,6 +1467,82 @@ html[data-mode="light"] .studio__radius input[type="range"] {
 
 .studio__control--number {
   width: 84px;
+}
+
+.studio__steps {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.studio__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: var(--line-width) solid var(--line-color);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.studio__presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.studio__preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 11px 10px;
+  border: var(--line-width) solid var(--line-color);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio__preset[aria-checked="true"] {
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.studio__preset-frame {
+  display: flex;
+  width: 28px;
+  margin-bottom: 4px;
+}
+
+.studio__preset-shape {
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+
+.studio__preset[aria-checked="true"] .studio__preset-shape {
+  border-color: var(--primary);
+}
+
+.studio__preset-name {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.studio__preset-size {
+  margin-top: 4px;
+  color: var(--fg-muted);
+  font-size: 11px;
 }
 
 .studio__themes {
@@ -1968,7 +2062,8 @@ html[data-mode="dark"] .studio__export {
     height: 22px;
   }
 
-  .studio__style-btn {
+  .studio__style-btn,
+  .studio__step {
     width: 48px;
     height: 48px;
   }

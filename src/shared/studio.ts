@@ -210,8 +210,8 @@ function defaultLayer(
   };
 }
 
-export function createStudioState(themeSlug: string, color: string): StudioState {
-  const preset = presetById(DEFAULT_PRESET_ID);
+export function createStudioState(themeSlug: string, color: string, presetId = DEFAULT_PRESET_ID): StudioState {
+  const preset = presetById(presetId);
   return {
     presetId: preset.id,
     cardWidth: preset.width,
@@ -222,7 +222,11 @@ export function createStudioState(themeSlug: string, color: string): StudioState
     code: "",
     panel: "design",
     controlsWidth: CONTROLS_DEFAULT,
-    layers: [defaultLayer("image", themeSlug), defaultLayer("body", themeSlug), defaultLayer("title", themeSlug)],
+    layers: [
+      defaultLayer("image", themeSlug, preset.width, preset.height),
+      defaultLayer("body", themeSlug, preset.width, preset.height),
+      defaultLayer("title", themeSlug, preset.width, preset.height),
+    ],
   };
 }
 
@@ -445,9 +449,9 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
   return state;
 }
 
-/** Restore the card to its starting values. The chosen theme and panel width stay. */
+/** Restore the card to its starting values. The chosen theme, size preset, and panel width stay. */
 export function resetStudioState(state: StudioState, color: string): void {
-  const next = createStudioState(state.themeSlug, color);
+  const next = createStudioState(state.themeSlug, color, state.presetId);
   next.controlsWidth = state.controlsWidth;
   next.panel = state.panel;
   Object.assign(state, next);
@@ -459,7 +463,8 @@ export function applyStudioBaseline(state: StudioState, baseline: StudioState | 
     resetStudioState(state, color);
     return;
   }
-  Object.assign(state, structuredClone(baseline));
+  const { controlsWidth, panel } = state;
+  Object.assign(state, structuredClone(baseline), { controlsWidth, panel });
 }
 
 export function normalizeHex(value: string): string | null {
