@@ -173,13 +173,13 @@ export function renderArchive(
         ${
           tab === "saved"
             ? savedCards.length === 0
-              ? `<section class="state-panel state-panel--tint">
+              ? `<section class="state-panel state-panel--tint state-panel--empty">
                   <h2 class="state-panel__title">저장된 카드가 없습니다</h2>
                   <p class="state-panel__text">스튜디오에서 그래픽 라이브러리에 추가를 누르면 이 탭에 모입니다.</p>
                 </section>`
               : `<div class="capture-grid">${savedCards.map((card) => renderSavedCard(card)).join("")}</div>`
             : filtered.length === 0
-            ? `<section class="state-panel state-panel--tint">
+            ? `<section class="state-panel state-panel--tint state-panel--empty">
                 <h2 class="state-panel__title">${tab === "pin" ? "No pinned captures" : "No captures"}</h2>
                 <p class="state-panel__text">${
                   tab === "pin"

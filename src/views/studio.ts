@@ -396,6 +396,16 @@ function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLE
 }
 
 const THEME_DRAG = "application/x-ax-studio-image";
+const PRESET_SHAPE = 28;
+const STEP = 2;
+const STEP_SHIFT = 10;
+
+function stepButtons(name: string): string {
+  return `<span class="studio__steps">
+                <button type="button" class="studio__step" data-step="-1" aria-label="${name} 줄이기" title="${STEP}px 줄이기 · Shift ${STEP_SHIFT}px">−</button>
+                <button type="button" class="studio__step" data-step="1" aria-label="${name} 키우기" title="${STEP}px 키우기 · Shift ${STEP_SHIFT}px">+</button>
+              </span>`;
+}
 
 const TEXT_TOGGLES = [
   { style: "bold", label: "볼드", glyph: "B" },
@@ -487,10 +497,16 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
   const body = ensureLayer(state, "body");
   const image = ensureLayer(state, "image");
   const preset = presetById(state.presetId);
-  const options = STUDIO_PRESETS.map(
-    (item) =>
-      `<option value="${escapeHtml(item.id)}"${item.id === preset.id ? " selected" : ""}>${escapeHtml(item.name)} · ${item.width}×${item.height}</option>`,
-  ).join("");
+  const presets = STUDIO_PRESETS.map((item) => {
+    const selected = item.id === preset.id;
+    const scale = PRESET_SHAPE / Math.max(item.width, item.height);
+    return `
+      <button type="button" class="studio__preset" role="radio" data-preset-id="${escapeHtml(item.id)}" aria-checked="${selected ? "true" : "false"}" tabindex="${selected ? "0" : "-1"}">
+        <span class="studio__preset-frame" aria-hidden="true"><span class="studio__preset-shape" style="width:${(item.width * scale).toFixed(2)}px;height:${(item.height * scale).toFixed(2)}px"></span></span>
+        <span class="studio__preset-name">${escapeHtml(item.name)}</span>
+        <span class="studio__preset-size">${item.width}×${item.height}</span>
+      </button>`;
+  }).join("");
   const themes = themeOptions(captures, image.src);
   const designSelected = state.panel === "design";
   const fonts = fontChoices();
@@ -528,13 +544,14 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
         <div class="studio__panel-scroll" id="studio-panel-scroll">
         <div id="studio-panel-design" role="tabpanel" aria-labelledby="studio-tab-design"${designSelected ? "" : " hidden"}>
           <div class="studio__field">
-            <label for="studio-preset">카드 크기 프리셋</label>
-            <select id="studio-preset" class="studio__control">${options}</select>
+            <span id="studio-preset-label">카드 크기 프리셋</span>
+            <div class="studio__presets" role="radiogroup" aria-labelledby="studio-preset-label">${presets}</div>
           </div>
           <div class="studio__field">
             <label for="studio-size">너비·높이 함께</label>
             <div class="studio__radius">
               <input id="studio-size" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" />
+              ${stepButtons("너비·높이 함께")}
               <input id="studio-size-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" aria-label="너비·높이 함께 수치" />
             </div>
           </div>
@@ -542,6 +559,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-width">카드 너비</label>
             <div class="studio__radius">
               <input id="studio-width" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" />
+              ${stepButtons("카드 너비")}
               <input id="studio-width-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" aria-label="카드 너비 수치" />
             </div>
           </div>
@@ -549,6 +567,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-height">카드 높이</label>
             <div class="studio__radius">
               <input id="studio-height" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardHeight}" />
+              ${stepButtons("카드 높이")}
               <input id="studio-height-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardHeight}" aria-label="카드 높이 수치" />
             </div>
           </div>
@@ -567,6 +586,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-title-size">타이틀 폰트 크기</label>
             <div class="studio__radius">
               <input id="studio-title-size" type="range" min="5" max="${fontMax}" step="1" value="${title.size}" />
+              ${stepButtons("타이틀 폰트 크기")}
               <input id="studio-title-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${title.size}" aria-label="타이틀 폰트 크기 수치" />
             </div>
           </div>
@@ -594,6 +614,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-body-size">본문 폰트 크기</label>
             <div class="studio__radius">
               <input id="studio-body-size" type="range" min="5" max="${fontMax}" step="1" value="${body.size}" />
+              ${stepButtons("본문 폰트 크기")}
               <input id="studio-body-size-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${body.size}" aria-label="본문 폰트 크기 수치" />
             </div>
           </div>
@@ -616,6 +637,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-image-width">카드 이미지 크기</label>
             <div class="studio__radius">
               <input id="studio-image-width" type="range" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${image.width}" />
+              ${stepButtons("카드 이미지 크기")}
               <input id="studio-image-width-number" class="studio__control studio__control--number" type="number" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${image.width}" aria-label="카드 이미지 크기 수치" />
             </div>
           </div>
@@ -631,6 +653,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <label for="studio-radius">카드 radius</label>
             <div class="studio__radius">
               <input id="studio-radius" type="range" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${state.radius}" aria-valuemin="${RADIUS_MIN}" aria-valuemax="${RADIUS_MAX}" aria-valuenow="${state.radius}" />
+              ${stepButtons("카드 radius")}
               <input id="studio-radius-number" class="studio__control studio__control--number" type="number" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${state.radius}" aria-label="카드 radius 수치" />
             </div>
           </div>
@@ -707,11 +730,13 @@ export function bindStudio(
   actions: {
     onReset: () => void;
     onSetBaseline: () => void;
+    /** Loads the preset's saved baseline and re-renders. False when it has none. */
+    onLoadPreset: (presetId: string) => boolean;
     onAddToLibrary: (thumbnail: string) => Promise<boolean>;
   },
 ): void {
   if (captures.length === 0) return;
-  const presetSelect = root.querySelector<HTMLSelectElement>("#studio-preset");
+  const presetButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-preset-id]")];
   const sizeRange = root.querySelector<HTMLInputElement>("#studio-size");
   const sizeNumber = root.querySelector<HTMLInputElement>("#studio-size-number");
   const widthRange = root.querySelector<HTMLInputElement>("#studio-width");
@@ -765,7 +790,6 @@ export function bindStudio(
     !overlay ||
     !cropFrame ||
     !editor ||
-    !presetSelect ||
     !sizeRange ||
     !sizeNumber ||
     !widthRange ||
@@ -960,6 +984,25 @@ export function bindStudio(
     gestureZoom = previewZoom;
     gestureOwner = owner ?? null;
   };
+  /** One undo step around a change that re-renders the studio (초기화, loading a preset's baseline). */
+  const recordChange = (change: () => boolean): boolean => {
+    finishGesture();
+    const before = cloneStudio(state);
+    const beforeZoom = previewZoom;
+    if (!change()) return false;
+    if (!sameStudio(before, state) || beforeZoom !== previewZoom) {
+      undoStack.push(before);
+      undoZoom.push(beforeZoom);
+      if (undoStack.length > HISTORY_LIMIT) {
+        undoStack.shift();
+        undoZoom.shift();
+      }
+      redoStack = [];
+      redoZoom = [];
+    }
+    syncHistoryButtons();
+    return true;
+  };
   const paintRangeFill = (range: HTMLInputElement) => {
     const min = Number(range.min);
     const max = Number(range.max);
@@ -1054,7 +1097,11 @@ export function bindStudio(
   const syncForm = () => {
     const title = panelText("title");
     const body = panelText("body");
-    presetSelect.value = state.presetId;
+    for (const button of presetButtons) {
+      const selected = button.dataset.presetId === state.presetId;
+      button.setAttribute("aria-checked", selected ? "true" : "false");
+      button.tabIndex = selected ? 0 : -1;
+    }
     if (document.activeElement !== titleInput) titleInput.value = title.text;
     if (document.activeElement !== bodyInput) bodyInput.value = body.text;
     if (document.activeElement !== titleHexInput) {
@@ -1138,12 +1185,28 @@ export function bindStudio(
     paint();
   };
 
+  /** Shift+click steps by STEP_SHIFT. Each click is one undo step. */
+  const bindSteps = (range: HTMLInputElement, apply: (value: number) => void, read: () => number, before?: () => void) => {
+    for (const button of range.parentElement?.querySelectorAll<HTMLButtonElement>("[data-step]") ?? []) {
+      button.addEventListener("click", (event) => {
+        before?.();
+        const delta = Number(button.dataset.step) * (event.shiftKey ? STEP_SHIFT : STEP);
+        beginGesture(button);
+        apply(Math.min(Number(range.max), Math.max(Number(range.min), read() + delta)));
+        clampLayout();
+        finishGesture(button);
+        void redraw();
+      });
+    }
+  };
   const bindPair = (
     range: HTMLInputElement,
     number: HTMLInputElement,
     apply: (value: number) => void,
     read: () => number,
+    before?: () => void,
   ) => {
+    bindSteps(range, apply, read, before);
     range.addEventListener("pointerdown", () => beginGesture(range));
     range.addEventListener("keydown", () => beginGesture(range));
     range.addEventListener("pointerup", () => finishGesture(range));
@@ -1168,16 +1231,31 @@ export function bindStudio(
     number.addEventListener("blur", commitNumber);
   };
 
-  presetSelect.addEventListener("focus", () => beginGesture(presetSelect));
-  presetSelect.addEventListener("change", () => {
-    const preset = presetById(presetSelect.value);
+  const pickPreset = (button: HTMLButtonElement) => {
+    const preset = presetById(button.dataset.presetId ?? "");
+    if (recordChange(() => actions.onLoadPreset(preset.id))) {
+      document.querySelector<HTMLButtonElement>(`[data-preset-id="${preset.id}"]`)?.focus();
+      return;
+    }
+    beginGesture(button);
     state.presetId = preset.id;
     state.cardWidth = preset.width;
     state.cardHeight = preset.height;
-    finishGesture(presetSelect);
+    finishGesture(button);
     void redraw();
-  });
-  presetSelect.addEventListener("blur", () => finishGesture(presetSelect));
+  };
+  for (const button of presetButtons) {
+    button.addEventListener("click", () => pickPreset(button));
+    button.addEventListener("keydown", (event) => {
+      const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+      if (!delta) return;
+      event.preventDefault();
+      const next = presetButtons[(presetButtons.indexOf(button) + delta + presetButtons.length) % presetButtons.length];
+      if (!next) return;
+      pickPreset(next);
+      if (next.isConnected) next.focus();
+    });
+  }
   sizeRange.addEventListener("pointerdown", captureSizeRatio);
   sizeRange.addEventListener("keydown", captureSizeRatio);
   sizeNumber.addEventListener("focus", captureSizeRatio);
@@ -1201,7 +1279,7 @@ export function bindStudio(
     }
     const nextFit = fitScaleFor(state.cardWidth, state.cardHeight);
     if (nextFit > 0 && Number.isFinite(screen) && screen > 0) previewZoom = screen / nextFit;
-  }, () => state.cardWidth);
+  }, () => state.cardWidth, captureSizeRatio);
   bindPair(widthRange, widthNumber, (value) => {
     state.cardWidth = clampCardSize(value);
     for (const layer of state.layers) {
@@ -1294,21 +1372,10 @@ export function bindStudio(
     })();
   });
   root.querySelector("#studio-reset")?.addEventListener("click", () => {
-    finishGesture();
-    const before = cloneStudio(state);
-    const beforeZoom = previewZoom;
-    actions.onReset();
-    if (!sameStudio(before, state) || beforeZoom !== previewZoom) {
-      undoStack.push(before);
-      undoZoom.push(beforeZoom);
-      if (undoStack.length > HISTORY_LIMIT) {
-        undoStack.shift();
-        undoZoom.shift();
-      }
-      redoStack = [];
-      redoZoom = [];
-    }
-    syncHistoryButtons();
+    recordChange(() => {
+      actions.onReset();
+      return true;
+    });
   });
   titleInput.addEventListener("focus", () => beginGesture(titleInput));
   titleInput.addEventListener("input", () => {
@@ -1364,6 +1431,10 @@ export function bindStudio(
     syncRadiusControls();
     void redraw();
   };
+  bindSteps(radiusRange, (value) => {
+    state.radius = clampRadius(value);
+    syncRadiusControls();
+  }, () => state.radius);
   radiusRange.addEventListener("pointerdown", () => beginGesture(radiusRange));
   radiusRange.addEventListener("keydown", () => beginGesture(radiusRange));
   radiusRange.addEventListener("pointerup", () => finishGesture(radiusRange));

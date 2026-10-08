@@ -126,6 +126,22 @@ applyStudioBaseline(draft, null, "#ffffff");
 assert.equal(titleText(draft), DEFAULT_TITLE);
 assert.equal(draft.themeSlug, "capsule-pattern");
 
+// Each size preset resets inside its own size, and a baseline keeps the panel as it is.
+const story = createStudioState("capsule-pattern", "#ffffff", "ig-story");
+assert.deepEqual([story.presetId, story.cardWidth, story.cardHeight], ["ig-story", 1080, 1920]);
+story.cardWidth = 900;
+ensureLayer(story, "title").text = "바꿈";
+resetStudioState(story, "#ffffff");
+assert.deepEqual([story.presetId, story.cardWidth, story.cardHeight], ["ig-story", 1080, 1920]);
+assert.equal(titleText(story), DEFAULT_TITLE);
+const storyBaseline = createStudioState("capsule-pattern", "#ffffff", "ig-story");
+storyBaseline.controlsWidth = 500;
+ensureLayer(storyBaseline, "title").text = "스토리";
+story.controlsWidth = 420;
+applyStudioBaseline(story, storyBaseline, "#ffffff");
+assert.equal(titleText(story), "스토리");
+assert.equal(story.controlsWidth, 420);
+
 // Cards and baselines saved before layers keep their content.
 const legacy = normalizeStudioState({
   themeSlug: "capsule-pattern",
