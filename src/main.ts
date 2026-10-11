@@ -150,7 +150,7 @@ function shell(mainHtml: string): string {
       <a class="wordmark" href="#/">AX Design Studio</a>
       <nav class="nav-menu" aria-label="Primary">
         ${navLink("Graphic Library", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
-        ${navLink("Online Marketing Studio", hrefFor({ name: "studio", theme: null, card: null }), route.name === "studio")}
+        ${navLink("Online Studio", hrefFor({ name: "studio", theme: null, card: null }), route.name === "studio")}
         ${navLink("History", hrefFor({ name: "history" }), route.name === "history")}
       </nav>
       <div class="nav-actions">

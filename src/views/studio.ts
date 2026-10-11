@@ -63,6 +63,14 @@ import {
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
 import { confirmProceed, showToast } from "../feedback.ts";
+import thumbIgFeedSquare from "../styles/presets/ig-feed-square.webp";
+import thumbIgFeedPortrait from "../styles/presets/ig-feed-portrait.webp";
+import thumbIgStory from "../styles/presets/ig-story.webp";
+import thumbFbFeed from "../styles/presets/fb-feed.webp";
+import thumbFbCover from "../styles/presets/fb-cover.webp";
+import thumbYtThumbnail from "../styles/presets/yt-thumbnail.webp";
+import thumbYtBanner from "../styles/presets/yt-banner.webp";
+import thumbYtShorts from "../styles/presets/yt-shorts.webp";
 import { addUpload, getUploads, removeUpload, uploadBySrc, uploadSrc } from "../studio-uploads.ts";
 
 const ZOOM_MIN = 0.5;
@@ -410,7 +418,17 @@ function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLE
 }
 
 const THEME_DRAG = "application/x-ax-studio-image";
-const PRESET_SHAPE = 28;
+const PRESET_SHAPE = 56;
+const PRESET_THUMBS: Record<string, string> = {
+  "ig-feed-square": thumbIgFeedSquare,
+  "ig-feed-portrait": thumbIgFeedPortrait,
+  "ig-story": thumbIgStory,
+  "fb-feed": thumbFbFeed,
+  "fb-cover": thumbFbCover,
+  "yt-thumbnail": thumbYtThumbnail,
+  "yt-banner": thumbYtBanner,
+  "yt-shorts": thumbYtShorts,
+};
 const STEP = 2;
 const STEP_SHIFT = 10;
 
@@ -537,9 +555,15 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
   const presets = STUDIO_PRESETS.map((item) => {
     const selected = item.id === preset.id;
     const scale = PRESET_SHAPE / Math.max(item.width, item.height);
+    const shapeWidth = (item.width * scale).toFixed(2);
+    const shapeHeight = (item.height * scale).toFixed(2);
+    const thumb = PRESET_THUMBS[item.id];
+    const shape = thumb
+      ? `<img class="studio__preset-shape" alt="" src="${escapeHtml(thumb)}" style="width:${shapeWidth}px;height:${shapeHeight}px">`
+      : `<span class="studio__preset-shape" style="width:${shapeWidth}px;height:${shapeHeight}px"></span>`;
     return `
       <button type="button" class="studio__preset" role="radio" data-preset-id="${escapeHtml(item.id)}" aria-checked="${selected ? "true" : "false"}" tabindex="${selected ? "0" : "-1"}">
-        <span class="studio__preset-frame" aria-hidden="true"><span class="studio__preset-shape" style="width:${(item.width * scale).toFixed(2)}px;height:${(item.height * scale).toFixed(2)}px"></span></span>
+        <span class="studio__preset-frame" style="width:${PRESET_SHAPE}px" aria-hidden="true">${shape}</span>
         <span class="studio__preset-name">${escapeHtml(item.name)}</span>
         <span class="studio__preset-size">${item.width}×${item.height}</span>
       </button>`;
@@ -737,6 +761,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
         </div>
         <div class="studio__stage" id="studio-stage">
+          <p class="studio__loading" id="studio-loading" role="status" hidden>이미지를 로딩중입니다...</p>
           <div class="studio__stage-frame">
             <div class="studio__fit" id="studio-fit">
               <div class="studio__scaler" id="studio-scaler">
@@ -832,6 +857,7 @@ export function bindStudio(
   const scaler = root.querySelector<HTMLElement>("#studio-scaler");
   const fit = root.querySelector<HTMLElement>("#studio-fit");
   const stage = root.querySelector<HTMLElement>("#studio-stage");
+  const imageLoading = root.querySelector<HTMLElement>("#studio-loading");
   const alignBar = root.querySelector<HTMLElement>("#studio-align");
   const zoomOut = root.querySelector<HTMLButtonElement>("#studio-zoom-out");
   const zoomIn = root.querySelector<HTMLButtonElement>("#studio-zoom-in");
@@ -890,6 +916,7 @@ export function bindStudio(
     !scaler ||
     !fit ||
     !stage ||
+    !imageLoading ||
     !zoomOut ||
     !zoomIn ||
     !zoomLabel ||
@@ -967,6 +994,15 @@ export function bindStudio(
     return ensureLayer(state, "image");
   };
   const imageLayers = () => state.layers.filter((layer): layer is ImageLayer => layer.kind === "image");
+  const imageReady = (url: string) => {
+    const image = imageCache.get(url);
+    return Boolean(image?.complete && image.naturalWidth > 0);
+  };
+  const setImageLoading = (on: boolean) => {
+    imageLoading.hidden = !on;
+    if (on) stage.dataset.loading = "true";
+    else delete stage.dataset.loading;
+  };
   const hasImage = () => imageLayers().some((layer) => imageOf(layer));
 
   const syncZoom = () => {
@@ -1248,6 +1284,7 @@ export function bindStudio(
     if (token !== drawToken) return;
 
     if (state.code.trim()) {
+      setImageLoading(false);
       canvas.hidden = true;
       iframe.hidden = false;
       const input = await codeDocument();
@@ -1259,12 +1296,14 @@ export function bindStudio(
 
     iframe.hidden = true;
     canvas.hidden = false;
-    const urls = new Set(imageLayers().map((layer) => srcUrl(layer.src)).filter(Boolean));
-    await Promise.all([...urls].map((url) => loadImage(url).catch(() => null)));
+    const urls = [...new Set(imageLayers().map((layer) => srcUrl(layer.src)).filter(Boolean))];
+    setImageLoading(urls.some((url) => !imageReady(url)));
+    await Promise.all(urls.map((url) => loadImage(url).catch(() => null)));
     if (token !== drawToken) return;
     clampLayout();
     exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     paint();
+    setImageLoading(false);
   };
 
   /** Shift+click steps by STEP_SHIFT. Each click is one undo step. */

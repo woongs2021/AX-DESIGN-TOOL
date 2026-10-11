@@ -52,7 +52,7 @@ Manual keyboard checklist (human, mouse off):
 1. Tab through nav → mode toggle → Archive search → All/Pin tabs → card link
 2. Enter opens capture detail; Tab to Pin / Archive
 3. Pin from detail; return to Archive Pin tab to confirm
-4. Online Marketing Studio: change size, type title, pick a theme, download
+4. Online Studio: change size, type title, pick a theme, download
 5. Confirm :focus-visible rings on each interactive control
 6. Escape in Archive search clears filters
 `);

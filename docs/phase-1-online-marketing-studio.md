@@ -1,4 +1,4 @@
-# Phase 1 — Online Marketing Studio
+# Phase 1 — Online Studio
 
 목표: Archive에 쌓인 35개 디자인 작업물을 테마로 골라, 인스타그램·페이스북·유튜브 커버·쇼츠 같은 **온라인 마케팅 브랜드 에셋**을 만들고 PNG로 다운로드하는 툴을 만든다.
 
@@ -17,9 +17,9 @@
 
 | 현재 | Phase 1 이후 |
 |---|---|
-| Archive / Intake / Design System / Stats / History | **Graphic Library / Online Marketing Studio / History** |
+| Archive / Intake / Design System / Stats / History | **Graphic Library / Online Studio / History** |
 | `#/intake`, `#/design-system`, `#/stats` | 세 라우트는 `#/studio`로 리다이렉트한다. 예전 북마크가 새 툴로 이어진다. |
-| — | `#/studio` = Online Marketing Studio 진입점 |
+| — | `#/studio` = Online Studio 진입점 |
 
 - 제거 대상 UI: `src/views/intake.ts`, `src/views/design-system.ts`, `src/views/stats.ts`, `src/local-intake.ts`와 관련 CSS.
 - 유지 대상: 로컬 CLI `npm run ingest`, `npm run design-system`은 UI 탭과 별개로 남긴다. 아카이브를 채우는 경로로 계속 쓴다.
@@ -154,12 +154,12 @@ flowchart LR
 
 | 작업 | 계획 | 검증 |
 |---|---|---|
-| IA 정리 | 네비를 Graphic Library / Online Marketing Studio / History로 바꾸고 `#/studio` 라우트를 추가한다. `#/intake`·`#/design-system`·`#/stats`는 `#/studio`로 리다이렉트한다. Intake·Design System·Stats 뷰와 CSS를 제거한다. | 상단 네비에 세 탭만 보인다. 예전 세 URL이 스튜디오로 열린다. `npm run audit` 통과. |
+| IA 정리 | 네비를 Graphic Library / Online Studio / History로 바꾸고 `#/studio` 라우트를 추가한다. `#/intake`·`#/design-system`·`#/stats`는 `#/studio`로 리다이렉트한다. Intake·Design System·Stats 뷰와 CSS를 제거한다. | 상단 네비에 세 탭만 보인다. 예전 세 URL이 스튜디오로 열린다. `npm run audit` 통과. |
 | 레이아웃 셸 | 좌측 컨트롤 패널 + 분할 바 + 우측 프리뷰. 768px 이상에서 바를 드래그하거나 화살표 키로 너비를 조절한다. 767px 이하는 세로로 쌓고 바를 숨긴다. | 1440px과 820px에서 2단, 분할 드래그가 프리뷰 맞춤을 다시 계산한다. 390px에서 1단이고 바가 없으며 가로 스크롤이 생기지 않는다. |
 | 상태 모델 | `StudioState`에 프리셋, 카드 너비·높이, 타이틀·본문과 각각의 크기·위치, 폰트, 이미지 너비·위치, 테마, 컬러, radius, 코드, 패널, 컨트롤 너비를 둔다. URL 쿼리(`?theme=`)로 테마 초기값을 받는다. | 컨트롤을 바꿀 때마다 프리뷰가 한 번 다시 그려진다. 새로고침하면 기본값으로 돌아온다. |
-| 카드 크기 프리셋 | `studio-presets.ts`에 위 8개 규격을 데이터로 둔다. 기본값 `ig-feed-square`. 너비·높이 바로 100~4000px을 직접 지정할 수 있다. 프리셋은 2열 그리드(라디오 그룹)이고, 각 칸의 이름 위에 실제 가로세로 비율의 작은 네모가 있다. |  진입 시 1080 × 1080이 선택되어 있다. 프리셋은 너비와 높이를 함께 바꾼다. 99는 100, 4001은 4000이 된다. |
+| 카드 크기 프리셋 | `studio-presets.ts`에 위 8개 규격을 데이터로 둔다. 기본값 `ig-feed-square`. 너비·높이 바로 100~4000px을 직접 지정할 수 있다. 프리셋은 2열 그리드(라디오 그룹)이고, 각 칸의 이름 위에 그 프리셋 초기화 레이아웃을 실제 비율로 줄인 이미지가 있다. |  진입 시 1080 × 1080이 선택되어 있다. 프리셋은 너비와 높이를 함께 바꾼다. 99는 100, 4001은 4000이 된다. |
 | 텍스트 입력 | 타이틀 input, 본문 textarea, 각각의 폰트 크기 바(5px~카드 너비−20). 프리뷰에서 타이틀과 본문을 드래그해 옮긴다. | 긴 본문이 카드 폭 안에서 줄바꿈된다. 빈 타이틀은 그리지 않는다. 드래그한 위치가 프리뷰와 PNG에 같다. |
-| 아카이브 테마 | `index.json`의 캡처 35건을 썸네일 라디오 그룹으로 보여 준다. 키보드 화살표로 이동하고 Enter/Space로 선택한다. | 35개가 모두 보이고, 선택한 이미지가 프리뷰에 반영된다. 키보드만으로 선택할 수 있다. |
+| 아카이브 테마 | `index.json`의 캡처 35건을 썸네일 라디오 그룹으로 보여 준다. 키보드 화살표로 이동하고 Enter/Space로 선택한다. 원본 이미지가 아직 없으면 오른쪽 회색 프리뷰 가운데에 로딩 문구를 보여 준다. | 35개가 모두 보이고, 선택한 이미지가 프리뷰에 반영된다. 키보드만으로 선택할 수 있다. |
 | 카드 컬러 | 컬러 피커와 hex 입력을 동기화한다. 기본값은 런타임에 `--soft` 토큰을 `getComputedStyle`로 읽어 정한다. 타이틀·본문 시작색은 대비 계산으로 흑/백을 고르고, 이후에는 각각의 피커로 바꾼다. | 소스 코드에 hex 리터럴이 늘지 않아 `check:hex`가 통과한다. 시작 글자색은 카드 컬러와 4.5:1 이상이다. |
 | 카드 radius | range(0~120) + number 입력을 동기화하고, 범위 밖 입력은 경계값으로 맞춘다. | 바를 움직이면 숫자가, 숫자를 입력하면 바가 따라온다. 150을 입력하면 120으로 맞춰진다. |
 | 폰트 | 기본 셀렉트는 Roboto, Pretendard, Montserrat. `fonts/`의 폰트 파일을 빌드 시 목록에 붙인다. | 세 기본 폰트가 프리뷰에 반영된다. `fonts/`에 파일을 넣고 다시 빌드하면 셀렉트에 한 줄이 더 생긴다. |
@@ -213,6 +213,10 @@ flowchart LR
 | 테마 해상도 | 스튜디오가 카드에 그리는 아카이브 테마와 상세 화면의 원본 다운로드를 3072 정사각 PNG로 낮췄다. 그래픽 라이브러리 목록과 상세에 보이는 이미지는 기존 저화질 썸네일이다. 4K 원본은 `image-pic-high-resolution`에 둔다. |
 | 폰트 크기 함께 | 텍스트를 두 개 이상 선택하면 가장 큰 글자 크기를 기준으로 선택된 글자가 같은 비율로 커지거나 줄어든다. |
 | 기본 기준 | 이날 8개 프리셋에 세팅한 초기화 기준을 `src/shared/studio-defaults.json`에 내장했다. 브라우저에 저장한 기준이 없으면 이 내장 기준을 쓴다. 그래서 처음 열 때, 프리셋을 누를 때, 초기화와 설정 메뉴의 리셋 뒤에도 이 레이아웃이 나온다. 초기화로 세팅을 다시 누르면 그 브라우저에서는 새로 저장한 기준이 우선하고, 리셋하면 내장 기준으로 돌아간다. |
+| 프리셋 썸네일 | 카드 크기 프리셋의 비율 네모를 내장 초기화 레이아웃을 줄인 이미지로 바꿨다. 긴 변은 56px이고, 각 프리셋의 가로세로 비율을 유지한다. |
+| 이름 | 네비와 그래픽 라이브러리 소개문의 Online Marketing Studio를 Online Studio로 바꿨다. |
+| 라이브러리 테두리 | 그래픽 라이브러리 카드 테두리를 공통 선보다 연하게 했다. |
+| 이미지 로딩 | 아카이브 테마 원본이 아직 없으면 오른쪽 회색 프리뷰 한가운데에 `이미지를 로딩중입니다...`를 14px로 보여 주고, 글자 투명도가 반복해서 변한다. 이미지가 그려지면 문구는 사라진다. |
 
 ### 2026-10-05
 
@@ -226,7 +230,7 @@ flowchart LR
 
 ## 통과 기준
 
-- 네비는 Graphic Library / Online Marketing Studio / History 세 탭이다.
+- 네비는 Graphic Library / Online Studio / History 세 탭이다.
 - 스튜디오 진입 시 Instagram Feed 1080 × 1080이 기본으로 선택되어 있고, 8개 SNS 규격으로 바꿀 수 있다. 너비와 높이는 100~4000px 범위에서 바로도 조절된다.
 - 768px 이상에서 컨트롤 패널과 프리뷰 사이 바를 드래그하면 두 영역의 비율이 바뀐다.
 - 35개 아카이브 작업물 중 하나를 테마로 골라 카드 비주얼에 쓸 수 있다. 이미지 너비와 위치도 조절된다.

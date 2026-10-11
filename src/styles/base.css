@@ -581,7 +581,7 @@ html[data-mode="dark"] .state-panel--empty {
   width: 100%;
   margin: 0 0 24px;
   overflow: hidden;
-  border: var(--line-width) solid var(--line-color);
+  border: var(--line-width) solid color-mix(in srgb, var(--stroke) 32%, transparent);
   border-radius: 28px;
   background: var(--bg);
   color: var(--fg);
@@ -1536,14 +1536,15 @@ html[data-mode="light"] .studio__radius input[type="range"] {
 
 .studio__preset-frame {
   display: flex;
-  width: 28px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .studio__preset-shape {
+  display: block;
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--fg) 30%, transparent);
   border-radius: 2px;
+  object-fit: cover;
   background: color-mix(in srgb, var(--fg) 22%, transparent);
 }
 
@@ -1757,11 +1758,44 @@ html[data-mode="dark"] .studio__export {
 }
 
 .studio__stage {
+  position: relative;
   display: block;
   flex: 1;
   min-height: 0;
   overflow: auto;
   background: color-mix(in srgb, var(--tint) 35%, var(--bg));
+}
+
+.studio__stage[data-loading="true"] {
+  display: grid;
+  place-items: center;
+}
+
+.studio__stage[data-loading="true"] .studio__stage-frame {
+  display: none;
+}
+
+.studio__loading {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1.4;
+  animation: studio-loading 1.2s ease-in-out infinite;
+}
+
+.studio__loading[hidden] {
+  display: none;
+}
+
+@keyframes studio-loading {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .studio__stage-frame {

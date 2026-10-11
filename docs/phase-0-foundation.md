@@ -1,6 +1,6 @@
 # Phase 0 — Archive Foundation (기존 Phase 0~8 통합)
 
-목표: 디자인 이미지를 Obsidian vault에 아카이빙하고, 빌드된 JSON만 읽는 정적 웹에서 탐색하는 기반을 만든다. Phase 1 Online Marketing Studio는 이 기반 위에서 아카이브 이미지를 소재로 쓴다.
+목표: 디자인 이미지를 Obsidian vault에 아카이빙하고, 빌드된 JSON만 읽는 정적 웹에서 탐색하는 기반을 만든다. Phase 1 Online Studio는 이 기반 위에서 아카이브 이미지를 소재로 쓴다.
 
 참조 결정: `D-01`~`D-17` ([decisions.md](decisions.md))
 
@@ -18,7 +18,7 @@
 | 5 A11y/Deploy | 대비·키보드·터치 감사, public 누출 점검, Pages 용량, 수동 배포 | 완료 |
 | 6 Intake/Ingest | 로컬 `npm run ingest`로 vault 영구 저장 + LLM 분석 초안 | CLI 구현. Intake 탭은 Phase 1에서 제거 예정 |
 | 7 Design System | `npm run design-system`으로 `design-system.md`·`tokens.json` 초안 생성 | CLI 구현. Design System 탭은 Phase 1에서 제거 예정 |
-| 8 Marketing Image | 디자인 시스템 기반 마케팅 이미지 생성 | 계획만 있었고, Phase 1 Online Marketing Studio로 대체 |
+| 8 Marketing Image | 디자인 시스템 기반 마케팅 이미지 생성 | 계획만 있었고, Phase 1 Online Studio로 대체 |
 
 ## 핵심 계약
 
@@ -33,7 +33,7 @@
 ## 현재 제품 상태 (Phase 1 착수 전)
 
 - 브랜드: 헤더 타이틀 **AX DESIGN STUDIO**.
-- 네비: Graphic Library / Online Marketing Studio / History. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+- 네비: Graphic Library / Online Studio / History. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 - Archive: All/Pin 탭 + 1:1 카드 그리드(이미지 cover 채움). 검색창과 필터 패널은 없다. 카드 kind 뱃지는 motion만 표시.
 - 상세 뷰: 왼쪽 Back 버튼, 이미지 contain + 남는 영역 light 흰색 / dark 검정(`--media-matte`), 분석 본문과 `Graphic asset` 설명.
 - 데이터: `image-pick-hermes` 그래픽 에셋 스터디 35건(모두 public). 사이트에 쓰는 PNG는 3072 정사각이고, 4K 원본은 `image-pic-high-resolution`에 둔다. 더미 캡처는 삭제했다.
