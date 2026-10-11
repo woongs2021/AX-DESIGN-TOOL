@@ -13,6 +13,7 @@ captures:
   - woven-modular-block-grid
   - coral-black-stripe-block
   - textile-vertical-bar-grid
+  - diagonal-textile-stripe-bands
 ---
 
 # 기하 구조

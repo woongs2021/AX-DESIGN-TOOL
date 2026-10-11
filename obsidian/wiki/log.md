@@ -2,6 +2,18 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-10-11] update | 스튜디오 테마를 3072로 낮춤
+
+스튜디오에 쓰는 아카이브 테마와 상세 화면의 원본 다운로드는 3072 정사각 PNG다. 그래픽 라이브러리 목록과 상세에 보이는 이미지는 기존 저화질 썸네일을 그대로 쓴다.
+
+## [2026-10-11] update | Graphic Library와 스튜디오 테마에 그래픽 5점 추가
+
+찢긴 종이 콜라주, 둥근 오버프린트 색면, 아이보리 엠보싱, 코발트·블랙 찢긴 가장자리, 대각 직물 밴드를 더해 모두 35점이 되었다. 스튜디오 테마도 같은 이미지를 쓴다. 기본 테마는 블랙 마운틴 그대로다.
+
+## [2026-10-11] ingest | hermes visual studies 31–35
+
+image-pic-high-resolution 31–35를 캡처 5건으로 추가했다: torn-burgundy-olive-collage, rounded-overprint-color-blocks, ivory-blind-emboss-relief, torn-cobalt-black-paper-edge, diagonal-textile-stripe-bands. 분석은 보이는 색, 형태, 여백, 재질만 적었다. hermes-gallery(35건), geometric-structures(대각 밴드), warm-earth-surfaces(콜라주·엠보싱)와 Hermes studies 페이지에 연결했다. 둥근 색면과 코발트 찢김은 기존 컬렉션 설명에 맞지 않아 갤러리에만 두었다.
+
 ## [2026-10-05] update | 초기화 기준 세팅, 리셋, 라이브러리 저장
 
 스튜디오에서 초기화로 세팅을 누르면 그 레이아웃이 다음 방문의 시작값이자 초기화 지점이 된다. 상단 설정에서 리셋하면 그 기준이 지워진다. 그래픽 라이브러리에 추가하면 Pin 옆 Saved 탭에 PNG 썸네일로 쌓이고, 누르면 그 상태로 다시 고칠 수 있다. 세 동작 모두 진행 확인 뒤에 실행된다.

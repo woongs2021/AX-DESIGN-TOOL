@@ -1,0 +1,128 @@
+{
+  "ig-feed-square": {
+    "presetId": "ig-feed-square",
+    "cardWidth": 1080,
+    "cardHeight": 1080,
+    "themeSlug": "black-mountain-red-horizon",
+    "color": "#1f1e1b",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "black-mountain-red-horizon", "x": 0, "y": 0, "width": 1080, "crop": null },
+      { "id": "body", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 77, "y": 209, "size": 32, "fontId": "pretendard", "color": "#000000", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "title", "kind": "title", "text": "Hello", "x": 71, "y": 99, "size": 100, "fontId": "montserrat", "color": "#000000", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "ig-feed-portrait": {
+    "presetId": "ig-feed-portrait",
+    "cardWidth": 1080,
+    "cardHeight": 1350,
+    "themeSlug": "monochrome-architectural-block",
+    "color": "#000000",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "monochrome-architectural-block", "x": 0, "y": -100, "width": 1080, "crop": null },
+      { "id": "body", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 75.5, "y": 1168, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "title", "kind": "title", "text": "Hello", "x": 68.5, "y": 1058, "size": 100, "fontId": "montserrat", "color": "#ffffff", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "ig-story": {
+    "presetId": "ig-story",
+    "cardWidth": 1080,
+    "cardHeight": 1920,
+    "themeSlug": "warm-horizon-brush-field",
+    "color": "#0d1b1d",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "warm-horizon-brush-field", "x": 0, "y": -100, "width": 1080, "crop": null },
+      { "id": "body", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 74.5, "y": 1168, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "title", "kind": "title", "text": "Hello", "x": 67.5, "y": 1058, "size": 100, "fontId": "montserrat", "color": "#ffffff", "weight": 600, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23offv-wutpdb", "kind": "body", "text": "이 내용은 테스트를 위한 텍스트 내용입니다.\n에이전트로 만든 그래픽을 브랜드 에셋으로 재해석합니다.", "x": 74, "y": 1291.5, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23q36a-9ui5y5", "kind": "body", "text": "이 화면은 모두 바이브 코딩으로 제작되었습니다.\n지속적으로 디자인 및 인터페이스 개선 예정입니다. ", "x": 72, "y": 1435, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "fb-feed": {
+    "presetId": "fb-feed",
+    "cardWidth": 1200,
+    "cardHeight": 630,
+    "themeSlug": "torn-cobalt-black-paper-edge",
+    "color": "#0d1b1d",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "torn-cobalt-black-paper-edge", "x": -15.5, "y": -602.5, "width": 1238, "crop": null },
+      { "id": "body", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 74.5, "y": 1168, "size": 26, "fontId": "pretendard", "color": "#519afb", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "title", "kind": "title", "text": "Hello", "x": 67.5, "y": 1058, "size": 100, "fontId": "montserrat", "color": "#519afb", "weight": 600, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23offv-wutpdb", "kind": "body", "text": "이 내용은 테스트를 위한 텍스트 내용입니다.\n에이전트로 만든 그래픽을 브랜드 에셋으로 재해석합니다.", "x": 74, "y": 1291.5, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23q36a-9ui5y5", "kind": "body", "text": "이 화면은 모두 바이브 코딩으로 제작되었습니다.\n지속적으로 디자인 및 인터페이스 개선 예정입니다. ", "x": 72, "y": 1435, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-xux3t3", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 402, "y": 183, "size": 32, "fontId": "pretendard", "color": "#519afb", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-vttcyq", "kind": "title", "text": "Hello", "x": 396, "y": 73, "size": 100, "fontId": "montserrat", "color": "#519afb", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "fb-cover": {
+    "presetId": "fb-cover",
+    "cardWidth": 1640,
+    "cardHeight": 624,
+    "themeSlug": "deep-blue-halo-disc",
+    "color": "#00182e",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "deep-blue-halo-disc", "x": -13, "y": -26, "width": 651, "crop": null },
+      { "id": "body", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 74.5, "y": 1168, "size": 26, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "title", "kind": "title", "text": "Hello", "x": 67.5, "y": 1058, "size": 100, "fontId": "montserrat", "color": "#ffffff", "weight": 600, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23offv-wutpdb", "kind": "body", "text": "이 내용은 테스트를 위한 텍스트 내용입니다.\n에이전트로 만든 그래픽을 브랜드 에셋으로 재해석합니다.", "x": 74, "y": 1291.5, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23q36a-9ui5y5", "kind": "body", "text": "이 화면은 모두 바이브 코딩으로 제작되었습니다.\n지속적으로 디자인 및 인터페이스 개선 예정입니다. ", "x": 72, "y": 1435, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-xux3t3", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 704.5, "y": 485, "size": 32, "fontId": "pretendard", "color": "#f2d6bf", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-vttcyq", "kind": "title", "text": "Hello", "x": 698.5, "y": 375, "size": 100, "fontId": "montserrat", "color": "#f2d6bf", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "yt-thumbnail": {
+    "presetId": "yt-thumbnail",
+    "cardWidth": 1280,
+    "cardHeight": 720,
+    "themeSlug": "iridescent-chrome-field",
+    "color": "#050502",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "iridescent-chrome-field", "x": 33.5, "y": 34.5, "width": 376, "radius": 24, "crop": null },
+      { "id": "body", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 74.5, "y": 1168, "size": 26, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "title", "kind": "title", "text": "Hello", "x": 67.5, "y": 1058, "size": 100, "fontId": "montserrat", "color": "#ffffff", "weight": 600, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23offv-wutpdb", "kind": "body", "text": "이 내용은 테스트를 위한 텍스트 내용입니다.\n에이전트로 만든 그래픽을 브랜드 에셋으로 재해석합니다.", "x": 74, "y": 1291.5, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv23q36a-9ui5y5", "kind": "body", "text": "이 화면은 모두 바이브 코딩으로 제작되었습니다.\n지속적으로 디자인 및 인터페이스 개선 예정입니다. ", "x": 72, "y": 1435, "size": 32, "fontId": "pretendard", "color": "#ffffff", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-xux3t3", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 674, "y": 586.5, "size": 32, "fontId": "pretendard", "color": "#ec7636", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-vttcyq", "kind": "title", "text": "Hello", "x": 668.5, "y": 476.5, "size": 100, "fontId": "montserrat", "color": "#ec7636", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "yt-shorts": {
+    "presetId": "yt-shorts",
+    "cardWidth": 1080,
+    "cardHeight": 1920,
+    "themeSlug": "coral-black-stripe-block",
+    "color": "#f0d9bb",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "coral-black-stripe-block", "x": -432.5, "y": -194, "width": 1572, "radius": 24, "crop": null },
+      { "id": "layer-mv3oigji-xux3t3", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 62.5, "y": 1568, "size": 38, "fontId": "pretendard", "color": "#d65034", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-vttcyq", "kind": "title", "text": "Hello", "x": 57, "y": 1449, "size": 106, "fontId": "montserrat", "color": "#d65034", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  },
+  "yt-banner": {
+    "presetId": "yt-banner",
+    "cardWidth": 2560,
+    "cardHeight": 1440,
+    "themeSlug": "diagonal-textile-stripe-bands",
+    "color": "#050502",
+    "radius": 28,
+    "code": "",
+    "layers": [
+      { "id": "image", "kind": "image", "src": "diagonal-textile-stripe-bands", "x": -126, "y": -1127, "width": 2705, "radius": 24, "crop": null },
+      { "id": "layer-mv3oigji-xux3t3", "kind": "body", "text": "헤르메스의 대표 브랜드 에셋입니다.\n에이전트의 그래픽 결과물을 합성하였습니다.", "x": 1553.5, "y": 1245.5, "size": 55, "fontId": "pretendard", "color": "#f59a27", "weight": 400, "italic": false, "underline": false, "align": "left" },
+      { "id": "layer-mv3oigji-vttcyq", "kind": "title", "text": "Hello", "x": 1543.5, "y": 1046, "size": 181, "fontId": "montserrat", "color": "#f59a27", "weight": 600, "italic": false, "underline": false, "align": "left" }
+    ]
+  }
+}

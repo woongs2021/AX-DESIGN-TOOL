@@ -21,10 +21,11 @@ function mediaBlock(capture: CaptureRecord): string {
       </video>
     `;
   }
+  const preview = capture.asset.thumbPath ?? capture.asset.path;
   return `
     <img
       class="detail-media"
-      src="${escapeHtml(assetUrl(capture.asset.path))}"
+      src="${escapeHtml(assetUrl(preview))}"
       alt=""
       width="${capture.asset.width}"
       height="${capture.asset.height}"

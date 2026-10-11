@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import BUILTIN_BASELINES from "../src/shared/studio-defaults.json";
 import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
+  alignOffsets,
   clampCardSize,
   scaleCardSize,
   createStudioState,
@@ -18,6 +21,7 @@ import {
   ensureLayer,
   firstLayer,
   fontLabelFromPath,
+  IMAGE_RADIUS_DEFAULT,
   imageLayerHeight,
   moveCropBox,
   newLayerId,
@@ -28,6 +32,7 @@ import {
   maxFontSize,
   pickInk,
   sanitizeStudioCode,
+  scaleFontSizes,
   scaleImageAround,
   setStudioTheme,
   substituteStudioCode,
@@ -44,8 +49,16 @@ assert.deepEqual(
   STUDIO_PRESETS.find((preset) => preset.id === DEFAULT_PRESET_ID),
   { id: "ig-feed-square", name: "Instagram Feed", width: 1080, height: 1080 },
 );
-assert.deepEqual(presetById("yt-banner").safe, { width: 1546, height: 423 });
+assert.equal(presetById("yt-banner").width, 2560);
+assert.equal(presetById("yt-banner").height, 1440);
 assert.equal(presetById("missing").id, DEFAULT_PRESET_ID);
+for (const preset of STUDIO_PRESETS) {
+  const builtin = normalizeStudioState((BUILTIN_BASELINES as Record<string, unknown>)[preset.id]);
+  assert.ok(builtin, `built-in baseline for ${preset.id}`);
+  assert.equal(builtin.presetId, preset.id);
+  assert.deepEqual([builtin.cardWidth, builtin.cardHeight], [preset.width, preset.height]);
+  assert.ok(existsSync(`obsidian/captures/${builtin.themeSlug}/capture.png`), `theme ${builtin.themeSlug}`);
+}
 
 assert.equal(clampRadius(28), 28);
 assert.equal(clampRadius(150), 120);
@@ -68,6 +81,12 @@ assert.equal(clampTextOffset(-0.5, 1080, 100), 0);
 assert.equal(clampImageOffset(-10.5, 1080, 1080), -10.5);
 assert.equal(clampImageOffset(1040.5, 1080, 1080), 1040);
 assert.equal(maxFontSize(1080), 1060);
+assert.deepEqual(scaleFontSizes([100, 32], 200, 1080), [200, 64]);
+assert.deepEqual(scaleFontSizes([100, 50], 150, 1080), [150, 75]);
+assert.deepEqual(scaleFontSizes([100, 5], 50, 1080), [100, 5]);
+assert.deepEqual(scaleFontSizes([80, 40], 10, 1080), [10, 5]);
+assert.deepEqual(scaleFontSizes([1000, 200], 2000, 1080), [1060, 212]);
+assert.deepEqual(scaleFontSizes([], 40, 1080), []);
 assert.deepEqual(scaleImageAround({ x: 0, y: 0, width: 1000 }, 500, 0, 0), { x: 0, y: 0, width: 500 });
 assert.deepEqual(scaleImageAround({ x: 0, y: 0, width: 1000 }, 500, 1000, 400), { x: 500, y: 200, width: 500 });
 assert.deepEqual(scaleImageAround({ x: 100, y: 100, width: 200 }, 50, 200, 200), { x: 150, y: 150, width: 100 });
@@ -125,6 +144,28 @@ ensureLayer(draft, "title").text = "다시";
 applyStudioBaseline(draft, null, "#ffffff");
 assert.equal(titleText(draft), DEFAULT_TITLE);
 assert.equal(draft.themeSlug, "capsule-pattern");
+
+// Alignment lines each box up on the card, including a single selection.
+const card = { x: 0, y: 0, w: 1080, h: 1080 };
+const alignBoxes = [
+  { x: 100, y: 50, w: 200, h: 100 },
+  { x: 400, y: 300, w: 100, h: 40 },
+];
+assert.deepEqual(alignOffsets(alignBoxes, "left", card), [{ dx: -100, dy: 0 }, { dx: -400, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "right", card), [{ dx: 780, dy: 0 }, { dx: 580, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "hcenter", card), [{ dx: 340, dy: 0 }, { dx: 90, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "top", card), [{ dx: 0, dy: -50 }, { dx: 0, dy: -300 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "bottom", card), [{ dx: 0, dy: 930 }, { dx: 0, dy: 740 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "vcenter", card), [{ dx: 0, dy: 440 }, { dx: 0, dy: 220 }]);
+assert.deepEqual(alignOffsets([{ x: 71, y: 99, w: 280, h: 125 }], "hcenter", card), [{ dx: 329, dy: 0 }]);
+// Even spacing keeps the outer boxes and gives every gap the same size, in position order.
+const spaceBoxes = [
+  { x: 600, y: 0, w: 100, h: 100 },
+  { x: 0, y: 500, w: 100, h: 300 },
+  { x: 150, y: 120, w: 50, h: 50 },
+];
+assert.deepEqual(alignOffsets(spaceBoxes, "hspace", card), [{ dx: 0, dy: 0 }, { dx: 0, dy: 0 }, { dx: 175, dy: 0 }]);
+assert.deepEqual(alignOffsets(spaceBoxes, "vspace", card), [{ dx: 0, dy: 0 }, { dx: 0, dy: 0 }, { dx: 0, dy: 155 }]);
 
 // Each size preset resets inside its own size, and a baseline keeps the panel as it is.
 const story = createStudioState("capsule-pattern", "#ffffff", "ig-story");
@@ -213,9 +254,15 @@ const sourceRendered = substituteStudioCode(sourceCode, {
 });
 assert.match(sourceRendered, /base64,theme/);
 assert.match(sourceRendered, /base64,extra/);
+assert.equal(ensureLayer(sources, "image")?.radius, IMAGE_RADIUS_DEFAULT);
+assert.match(sourceCode, /border-radius: 12px/);
+const rounded = normalizeStudioState({ themeSlug: "x", color: "#ffffff", layers: [{ id: "i", kind: "image", src: "x", x: 0, y: 0, width: 200, radius: 40 }] });
+assert.equal(firstLayer(rounded!, "image")?.radius, 40);
+const legacyRadius = normalizeStudioState({ themeSlug: "x", color: "#ffffff", layers: [{ id: "i", kind: "image", src: "x", x: 0, y: 0, width: 200 }] });
+assert.equal(firstLayer(legacyRadius!, "image")?.radius, 12);
 
 // Crop keeps the source so it can grow back out.
-const cropImage: ImageLayer = { id: "i", kind: "image", src: "x", x: 100, y: 50, width: 400, crop: null };
+const cropImage: ImageLayer = { id: "i", kind: "image", src: "x", x: 100, y: 50, width: 400, radius: 12, crop: null };
 const full = uncroppedRect(cropImage, 0.5);
 assert.deepEqual(full, { x: 100, y: 50, w: 400, h: 200 });
 assert.equal(cropFromBox(full, full), null);

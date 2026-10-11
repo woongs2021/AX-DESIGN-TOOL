@@ -3,6 +3,7 @@ import { DEFAULT_PRESET_ID, presetById } from "./studio-presets.ts";
 export const RADIUS_MIN = 0;
 export const RADIUS_MAX = 120;
 export const RADIUS_DEFAULT = 28;
+export const IMAGE_RADIUS_DEFAULT = 12;
 export const CARD_MIN = 100;
 export const CARD_MAX = 4000;
 export const FONT_MIN = 5;
@@ -61,6 +62,8 @@ export type ImageLayer = {
   x: number;
   y: number;
   width: number;
+  /** Corner radius in card pixels, same range as the card radius. */
+  radius: number;
   crop: StudioCrop | null;
 };
 export type StudioLayer = TextLayer | ImageLayer;
@@ -112,6 +115,27 @@ export function scaleCardSize(
     cardHeight = clampCardSize(Math.round(cardWidth * ratio));
   }
   return { cardWidth, cardHeight };
+}
+
+/**
+ * Scale every selected font by one factor.
+ * nextLargest is the new size of the largest font; the others keep the same ratio.
+ * The factor stops when any font would pass the minimum or the card's maximum.
+ */
+export function scaleFontSizes(sizes: readonly number[], nextLargest: number, cardWidth: number): number[] {
+  if (sizes.length === 0) return [];
+  const bases = sizes.map((size) => Math.max(1, size));
+  const baseLargest = Math.max(...bases);
+  const max = maxFontSize(cardWidth);
+  let minFactor = FONT_MIN / baseLargest;
+  let maxFactor = max / baseLargest;
+  for (const base of bases) {
+    minFactor = Math.max(minFactor, FONT_MIN / base);
+    maxFactor = Math.min(maxFactor, max / base);
+  }
+  const requested = (Number.isFinite(nextLargest) ? nextLargest : baseLargest) / baseLargest;
+  const factor = minFactor > maxFactor ? requested : Math.min(maxFactor, Math.max(minFactor, requested));
+  return bases.map((base) => clampFontSize(base * factor, cardWidth));
 }
 
 /** Largest font that still keeps 10px clear on the left and right of the card. */
@@ -193,7 +217,7 @@ function defaultLayer(
   cardHeight = presetById(DEFAULT_PRESET_ID).height,
 ): StudioLayer {
   if (kind === "image") {
-    return { id: "image", kind, src, x: 0, y: 0, width: clampImageWidth(cardWidth), crop: null };
+    return { id: "image", kind, src, x: 0, y: 0, width: clampImageWidth(cardWidth), radius: IMAGE_RADIUS_DEFAULT, crop: null };
   }
   const title = kind === "title";
   const size = clampFontSize(title ? DEFAULT_TITLE_SIZE : DEFAULT_BODY_SIZE, cardWidth);
@@ -371,6 +395,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
       x,
       y,
       width: clampImageWidth(num(value.width) ?? IMAGE_MIN),
+      radius: clampRadius(num(value.radius) ?? IMAGE_RADIUS_DEFAULT),
       crop: cx !== null && cy !== null && cw && ch ? { x: cx, y: cy, w: cw, h: ch } : null,
     };
   }
@@ -394,7 +419,7 @@ function legacyLayers(value: Record<string, unknown>, ink: string, theme: string
   const text = (field: unknown, fallback: string) => (typeof field === "string" ? field : fallback);
   const font = text(value.fontId, "pretendard");
   return [
-    { id: "image", kind: "image", src: theme, x: num(value.imageX, 0), y: num(value.imageY, 0), width: clampImageWidth(num(value.imageWidth, IMAGE_MIN)), crop: null },
+    { id: "image", kind: "image", src: theme, x: num(value.imageX, 0), y: num(value.imageY, 0), width: clampImageWidth(num(value.imageWidth, IMAGE_MIN)), radius: IMAGE_RADIUS_DEFAULT, crop: null },
     {
       id: "body",
       kind: "body",
@@ -652,14 +677,15 @@ export function designToCode(
     if (layer.kind === "image") {
       const src = layer.src === state.themeSlug ? "{{themeImage}}" : `{{image:${escapeHtml(layer.src)}}}`;
       const ratio = aspectOf(layer);
+      const corner = `border-radius: ${px(clampRadius(layer.radius))};`;
       if (layer.crop) {
         const full = uncroppedRect(layer, ratio);
         items.push(`  <div class="studio-crop ${name}"><img src="${src}" alt="" /></div>`);
-        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; }`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; ${corner} }`);
         rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
       } else {
         items.push(`  <img class="${name}" src="${src}" alt="" />`);
-        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; }`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; ${corner} }`);
       }
       return;
     }
@@ -776,4 +802,50 @@ export function studioSrcdoc(input: StudioDocumentInput): string {
 </head>
 <body>${fragment}</body>
 </html>`;
+}
+
+export type LayerAlign = "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom" | "hspace" | "vspace";
+export const LAYER_ALIGNS: readonly LayerAlign[] = ["left", "hcenter", "right", "top", "vcenter", "bottom"];
+export const LAYER_DISTRIBUTES: readonly LayerAlign[] = ["hspace", "vspace"];
+
+/** Equal gaps along one axis; the bounds of the boxes stay put. */
+function spaceOffsets(boxes: readonly StudioRect[], axis: "x" | "y"): number[] {
+  const size = axis === "x" ? "w" : "h";
+  const order = boxes.map((_, index) => index).sort((a, b) => boxes[a]![axis] - boxes[b]![axis]);
+  const first = boxes[order[0]!]!;
+  const end = Math.max(...boxes.map((box) => box[axis] + box[size]));
+  const total = boxes.reduce((sum, box) => sum + box[size], 0);
+  const gap = (end - first[axis] - total) / Math.max(1, boxes.length - 1);
+  const offsets = boxes.map(() => 0);
+  let at = first[axis];
+  for (const index of order) {
+    const box = boxes[index]!;
+    offsets[index] = at - box[axis];
+    at += box[size] + gap;
+  }
+  return offsets;
+}
+
+/** How far each box moves to line up on one edge or center of `bounds`, or to space the boxes evenly inside their own span. */
+export function alignOffsets(boxes: readonly StudioRect[], align: LayerAlign, bounds: StudioRect): { dx: number; dy: number }[] {
+  if (align === "hspace" || align === "vspace") {
+    const offsets = spaceOffsets(boxes, align === "hspace" ? "x" : "y");
+    return offsets.map((value) => (align === "hspace" ? { dx: value, dy: 0 } : { dx: 0, dy: value }));
+  }
+  const left = bounds.x;
+  const top = bounds.y;
+  const right = bounds.x + bounds.w;
+  const bottom = bounds.y + bounds.h;
+  return boxes.map((box) => ({
+    dx:
+      align === "left" ? left - box.x
+      : align === "right" ? right - box.w - box.x
+      : align === "hcenter" ? (left + right - box.w) / 2 - box.x
+      : 0,
+    dy:
+      align === "top" ? top - box.y
+      : align === "bottom" ? bottom - box.h - box.y
+      : align === "vcenter" ? (top + bottom - box.h) / 2 - box.y
+      : 0,
+  }));
 }
