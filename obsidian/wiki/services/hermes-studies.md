@@ -27,3 +27,8 @@ visibility: public
 - [[electric-blue-pinch-fold]]
 - [[textile-vertical-bar-grid]]
 - [[warm-horizon-brush-field]]
+- [[torn-burgundy-olive-collage]]
+- [[rounded-overprint-color-blocks]]
+- [[ivory-blind-emboss-relief]]
+- [[torn-cobalt-black-paper-edge]]
+- [[diagonal-textile-stripe-bands]]

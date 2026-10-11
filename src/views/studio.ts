@@ -17,14 +17,20 @@ import {
   ensureLayer,
   isUploadSrc,
   TEXT_ALIGNS,
+  alignOffsets,
+  LAYER_ALIGNS,
+  LAYER_DISTRIBUTES,
+  type LayerAlign,
   BOLD_WEIGHT,
   isBold,
   REGULAR_WEIGHT,
   TEXT_WEIGHTS,
   fontLabelFromPath,
   fontStack,
+  FONT_MIN,
   FONT_SIDE_MARGIN,
   IMAGE_MAX,
+  IMAGE_RADIUS_DEFAULT,
   imageLayerHeight,
   IMAGE_MIN,
   isTextLayer,
@@ -32,12 +38,14 @@ import {
   moveCropBox,
   newLayerId,
   normalizeHex,
+  rgbToHex,
   PREVIEW_MIN,
   SPLITTER_WIDTH,
   RADIUS_MAX,
   RADIUS_MIN,
   resizeCropBox,
   scaleCardSize,
+  scaleFontSizes,
   scaleImageAround,
   studioFragment,
   studioSrcdoc,
@@ -286,6 +294,11 @@ function drawCard(
     if (!source) return;
     const height = imageLayerHeight(layer, source.naturalHeight / source.naturalWidth);
     if (layer.id !== hiddenId) {
+      const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2));
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(layer.x, layer.y, layer.width, height, radius);
+      ctx.clip();
       const crop = layer.crop;
       if (crop) {
         const sw = source.naturalWidth;
@@ -294,6 +307,7 @@ function drawCard(
       } else {
         ctx.drawImage(source, layer.x, layer.y, layer.width, height);
       }
+      ctx.restore();
     }
     hits.push({ id: layer.id, kind: "image", x: layer.x, y: layer.y, w: layer.width, h: height });
   };
@@ -418,6 +432,29 @@ const ALIGN_PATHS: Record<TextAlign, string> = {
   center: "M4 6h16M7 10h10M4 14h16M7 18h10",
   right: "M4 6h16M10 10h10M4 14h16M10 18h10",
 };
+
+const LAYER_ALIGN_LABELS: Record<LayerAlign, string> = {
+  left: "왼쪽 정렬",
+  hcenter: "수평 가운데 정렬",
+  right: "오른쪽 정렬",
+  top: "위쪽 정렬",
+  vcenter: "수직 가운데 정렬",
+  bottom: "아래쪽 정렬",
+  hspace: "가로 균등 정렬",
+  vspace: "세로 균등 정렬",
+};
+const LAYER_ALIGN_PATHS: Record<LayerAlign, string> = {
+  left: "M4 3v18M8 6h11v4H8zM8 14h7v4H8z",
+  hcenter: "M12 3v18M6 6h12v4H6zM8.5 14h7v4h-7z",
+  right: "M20 3v18M5 6h11v4H5zM9 14h7v4H9z",
+  top: "M3 4h18M6 8h4v11H6zM14 8h4v7h-4z",
+  vcenter: "M3 12h18M6 6h4v12H6zM14 8.5h4v7h-4z",
+  bottom: "M3 20h18M6 5h4v11H6zM14 9h4v7h-4z",
+  hspace: "M4 3v18M20 3v18M9.5 7h5v10h-5z",
+  vspace: "M3 4h18M3 20h18M7 9.5h10v5H7z",
+};
+const layerAlignButton = (align: LayerAlign) =>
+  `<button type="button" class="studio__zoom-btn" data-layer-align="${align}" aria-label="${LAYER_ALIGN_LABELS[align]}" title="${LAYER_ALIGN_LABELS[align]}"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${LAYER_ALIGN_PATHS[align]}" /></svg></button>`;
 
 type TextToggle = (typeof TEXT_TOGGLES)[number]["style"];
 
@@ -571,6 +608,14 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <input id="studio-height-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardHeight}" aria-label="카드 높이 수치" />
             </div>
           </div>
+          <div class="studio__field" id="studio-font-scale-field" hidden>
+            <label for="studio-font-scale">폰트 크기 함께</label>
+            <div class="studio__radius">
+              <input id="studio-font-scale" type="range" min="5" max="${fontMax}" step="1" value="${Math.max(title.size, body.size)}" />
+              ${stepButtons("폰트 크기 함께")}
+              <input id="studio-font-scale-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${Math.max(title.size, body.size)}" aria-label="폰트 크기 함께 수치" />
+            </div>
+          </div>
           <div class="studio__field">
             <label for="studio-title">카드 타이틀</label>
             <input id="studio-title" class="studio__control" type="text" value="${escapeHtml(title.text)}" placeholder="타이틀" />
@@ -641,6 +686,14 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <input id="studio-image-width-number" class="studio__control studio__control--number" type="number" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${image.width}" aria-label="카드 이미지 크기 수치" />
             </div>
           </div>
+          <div class="studio__field">
+            <label for="studio-image-radius">이미지 radius</label>
+            <div class="studio__radius">
+              <input id="studio-image-radius" type="range" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${image.radius}" aria-valuemin="${RADIUS_MIN}" aria-valuemax="${RADIUS_MAX}" aria-valuenow="${image.radius}" />
+              ${stepButtons("이미지 radius")}
+              <input id="studio-image-radius-number" class="studio__control studio__control--number" type="number" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${image.radius}" aria-label="이미지 radius 수치" />
+            </div>
+          </div>
           <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮기고, 핀치하거나 클릭 후 가장자리 핸들을 끌어 크기를 조절할 수 있습니다.</p>
           <div class="studio__field">
             <label for="studio-color">카드 컬러</label>
@@ -678,13 +731,17 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
       <div class="studio__splitter" id="studio-splitter" role="separator" aria-orientation="vertical" aria-label="컨트롤 패널과 프리뷰 너비" aria-valuemin="${CONTROLS_MIN}" aria-valuenow="${state.controlsWidth}" tabindex="0"></div>
 
       <div class="studio__preview">
+        <div class="studio__align" id="studio-align" role="toolbar" aria-label="선택한 객체 정렬" hidden>
+          ${LAYER_ALIGNS.map(layerAlignButton).join("")}
+          <span class="studio__align-divider" aria-hidden="true"></span>
+          ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
+        </div>
         <div class="studio__stage" id="studio-stage">
           <div class="studio__stage-frame">
             <div class="studio__fit" id="studio-fit">
               <div class="studio__scaler" id="studio-scaler">
                 <canvas id="studio-canvas" aria-label="카드 프리뷰"></canvas>
                 <iframe id="studio-iframe" title="카드 코드 프리뷰" sandbox="" referrerpolicy="no-referrer" hidden></iframe>
-                <div class="studio__safe" id="studio-safe" hidden></div>
               </div>
               <div class="studio__overlay" id="studio-overlay">
                 <span class="studio__handle" data-handle="top" hidden></span>
@@ -746,6 +803,9 @@ export function bindStudio(
   const titleInput = root.querySelector<HTMLInputElement>("#studio-title");
   const titleColorInput = root.querySelector<HTMLInputElement>("#studio-title-color");
   const titleHexInput = root.querySelector<HTMLInputElement>("#studio-title-hex");
+  const fontScaleField = root.querySelector<HTMLElement>("#studio-font-scale-field");
+  const fontScaleRange = root.querySelector<HTMLInputElement>("#studio-font-scale");
+  const fontScaleNumber = root.querySelector<HTMLInputElement>("#studio-font-scale-number");
   const titleSizeRange = root.querySelector<HTMLInputElement>("#studio-title-size");
   const titleSizeNumber = root.querySelector<HTMLInputElement>("#studio-title-size-number");
   const bodyInput = root.querySelector<HTMLTextAreaElement>("#studio-body");
@@ -759,6 +819,8 @@ export function bindStudio(
   const bodyWeightSelect = root.querySelector<HTMLSelectElement>("#studio-body-weight");
   const imageRange = root.querySelector<HTMLInputElement>("#studio-image-width");
   const imageNumber = root.querySelector<HTMLInputElement>("#studio-image-width-number");
+  const imageRadiusRange = root.querySelector<HTMLInputElement>("#studio-image-radius");
+  const imageRadiusNumber = root.querySelector<HTMLInputElement>("#studio-image-radius-number");
   const colorInput = root.querySelector<HTMLInputElement>("#studio-color");
   const hexInput = root.querySelector<HTMLInputElement>("#studio-hex");
   const radiusRange = root.querySelector<HTMLInputElement>("#studio-radius");
@@ -767,10 +829,10 @@ export function bindStudio(
   const canvas = root.querySelector<HTMLCanvasElement>("#studio-canvas");
   const iframe = root.querySelector<HTMLIFrameElement>("#studio-iframe");
   const meta = root.querySelector<HTMLElement>("#studio-meta");
-  const safe = root.querySelector<HTMLElement>("#studio-safe");
   const scaler = root.querySelector<HTMLElement>("#studio-scaler");
   const fit = root.querySelector<HTMLElement>("#studio-fit");
   const stage = root.querySelector<HTMLElement>("#studio-stage");
+  const alignBar = root.querySelector<HTMLElement>("#studio-align");
   const zoomOut = root.querySelector<HTMLButtonElement>("#studio-zoom-out");
   const zoomIn = root.querySelector<HTMLButtonElement>("#studio-zoom-in");
   const zoomLabel = root.querySelector<HTMLElement>("#studio-zoom-label");
@@ -799,6 +861,9 @@ export function bindStudio(
     !titleInput ||
     !titleColorInput ||
     !titleHexInput ||
+    !fontScaleField ||
+    !fontScaleRange ||
+    !fontScaleNumber ||
     !titleSizeRange ||
     !titleSizeNumber ||
     !bodyInput ||
@@ -812,6 +877,8 @@ export function bindStudio(
     !bodyWeightSelect ||
     !imageRange ||
     !imageNumber ||
+    !imageRadiusRange ||
+    !imageRadiusNumber ||
     !colorInput ||
     !hexInput ||
     !radiusRange ||
@@ -820,7 +887,6 @@ export function bindStudio(
     !canvas ||
     !iframe ||
     !meta ||
-    !safe ||
     !scaler ||
     !fit ||
     !stage ||
@@ -839,6 +905,14 @@ export function bindStudio(
   ) {
     return;
   }
+
+  let dropper = false;
+  let blockPresetClick = false;
+  const setDropper = (on: boolean) => {
+    dropper = on;
+    if (on) studio.dataset.dropper = "true";
+    else delete studio.dataset.dropper;
+  };
 
   /** Uploads come from this browser; a source that is gone falls back to the theme. */
   const srcUrl = (src: string): string => {
@@ -956,8 +1030,11 @@ export function bindStudio(
     if (redo) redo.disabled = redoStack.length === 0;
   };
   let gestureOwner: EventTarget | null = null;
+  /** Sizes at the start of one 폰트 크기 함께 gesture, so each step uses the same ratio. */
+  let fontBase: { id: string; size: number }[] | null = null;
   const finishGesture = (owner?: EventTarget) => {
     if (owner && gestureOwner !== owner) return;
+    fontBase = null;
     if (!gesture) {
       gestureOwner = null;
       return;
@@ -1025,7 +1102,10 @@ export function bindStudio(
   const clampLayout = () => {
     state.cardWidth = clampCardSize(state.cardWidth);
     state.cardHeight = clampCardSize(state.cardHeight);
-    for (const layer of imageLayers()) layer.width = clampImageWidth(layer.width);
+    for (const layer of imageLayers()) {
+      layer.width = clampImageWidth(layer.width);
+      layer.radius = clampRadius(layer.radius);
+    }
   };
 
   const writeControl = (range: HTMLInputElement, number: HTMLInputElement, value: number) => {
@@ -1052,7 +1132,17 @@ export function bindStudio(
     writeControl(heightRange, heightNumber, state.cardHeight);
     writeControl(titleSizeRange, titleSizeNumber, title.size);
     writeControl(bodySizeRange, bodySizeNumber, body.size);
+    const selectedSizes = selectedLayers().filter(isTextLayer).map((layer) => layer.size);
+    const fontScale = selectedSizes.length > 0 ? Math.max(...selectedSizes) : FONT_MIN;
+    const fontScaleMax = String(Math.max(fontCap, fontScale));
+    fontScaleRange.min = String(FONT_MIN);
+    fontScaleNumber.min = String(FONT_MIN);
+    fontScaleRange.max = fontScaleMax;
+    fontScaleNumber.max = fontScaleMax;
+    writeControl(fontScaleRange, fontScaleNumber, fontScale);
     writeControl(imageRange, imageNumber, panelImage().width);
+    writeControl(imageRadiusRange, imageRadiusNumber, panelImage().radius);
+    imageRadiusRange.setAttribute("aria-valuenow", String(panelImage().radius));
   };
 
   const syncRadiusControls = () => {
@@ -1081,6 +1171,7 @@ export function bindStudio(
   };
 
   const showPanel = (panel: StudioState["panel"]) => {
+    if (panel !== "design") setDropper(false);
     state.panel = panel;
     const design = panel === "design";
     root.querySelector("#studio-panel-design")?.toggleAttribute("hidden", !design);
@@ -1102,6 +1193,7 @@ export function bindStudio(
       button.setAttribute("aria-checked", selected ? "true" : "false");
       button.tabIndex = selected ? 0 : -1;
     }
+    fontScaleField.hidden = selectedLayers().filter(isTextLayer).length < 2;
     if (document.activeElement !== titleInput) titleInput.value = title.text;
     if (document.activeElement !== bodyInput) bodyInput.value = body.text;
     if (document.activeElement !== titleHexInput) {
@@ -1137,21 +1229,11 @@ export function bindStudio(
     syncSizeControls();
     root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
     const preset = presetById(state.presetId);
-    const matchesPreset = state.cardWidth === preset.width && state.cardHeight === preset.height;
-    const safeNote = matchesPreset && preset.safe ? ` · 안전 영역 ${preset.safe.width} × ${preset.safe.height}` : "";
-    meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}${safeNote}`;
+    meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}`;
     exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     fitCodeInput();
     syncRadiusControls();
     updateScale();
-
-    if (matchesPreset && preset.safe) {
-      safe.hidden = false;
-      safe.style.width = `${preset.safe.width}px`;
-      safe.style.height = `${preset.safe.height}px`;
-    } else {
-      safe.hidden = true;
-    }
 
     const loadFace = (layer: TextLayer) => {
       const family = fontStack(layer.fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
@@ -1289,6 +1371,26 @@ export function bindStudio(
   bindPair(heightRange, heightNumber, (value) => {
     state.cardHeight = value;
   }, () => state.cardHeight);
+  const selectedTextSizes = () => selectedLayers().filter(isTextLayer).map((layer) => layer.size);
+  bindPair(fontScaleRange, fontScaleNumber, (value) => {
+    if (!fontBase) {
+      fontBase = selectedLayers()
+        .filter(isTextLayer)
+        .map((layer) => ({ id: layer.id, size: layer.size }));
+    }
+    const next = scaleFontSizes(
+      fontBase.map((item) => item.size),
+      value,
+      state.cardWidth,
+    );
+    fontBase.forEach((item, index) => {
+      const layer = layerById(item.id);
+      if (layer && isTextLayer(layer)) layer.size = next[index] ?? layer.size;
+    });
+  }, () => {
+    const sizes = selectedTextSizes();
+    return sizes.length > 0 ? Math.max(...sizes) : FONT_MIN;
+  });
   bindPair(titleSizeRange, titleSizeNumber, (value) => {
     panelText("title").size = clampFontSize(value, state.cardWidth);
   }, () => panelText("title").size);
@@ -1298,6 +1400,9 @@ export function bindStudio(
   bindPair(imageRange, imageNumber, (value) => {
     panelImage().width = value;
   }, () => panelImage().width);
+  bindPair(imageRadiusRange, imageRadiusNumber, (value) => {
+    panelImage().radius = clampRadius(value);
+  }, () => panelImage().radius);
   const bindSelect = (select: HTMLSelectElement, apply: () => void) => {
     select.addEventListener("focus", () => beginGesture(select));
     select.addEventListener("change", () => {
@@ -1666,7 +1771,8 @@ export function bindStudio(
 
   type ImageBox = { x: number; y: number; width: number };
   type Point = { x: number; y: number };
-  let drag: { id: string; origin: Point; start: Map<string, Point>; pointerId: number } | null = null;
+  /** copy: the first move duplicates the selection and drags the copies (Option/Alt drag). */
+  let drag: { id: string; origin: Point; start: Map<string, Point>; pointerId: number; copy: boolean } | null = null;
   let tapStart: { x: number; y: number; moved: boolean; shift: boolean } | null = null;
   let lastTap: { id: string; time: number; x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
@@ -1815,6 +1921,15 @@ export function bindStudio(
       if (shown.has(id)) continue;
       frame.remove();
       frameEls.delete(id);
+    }
+    if (alignBar) {
+      alignBar.hidden = shown.size < 1;
+      for (const align of LAYER_DISTRIBUTES) {
+        const button = alignBar.querySelector<HTMLButtonElement>(`[data-layer-align="${align}"]`);
+        if (!button) continue;
+        button.disabled = shown.size < 3;
+        button.title = shown.size < 3 ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택` : LAYER_ALIGN_LABELS[align];
+      }
     }
     const image = singleImage();
     const box = image ? hits.find((hit) => hit.id === image.id) : undefined;
@@ -2047,6 +2162,35 @@ export function bindStudio(
       state.layers = toFront ? [...rest, ...picked] : [...picked, ...rest];
     });
   };
+  const alignLayers = (align: LayerAlign) => {
+    const boxes = hits.filter((box) => selected.has(box.id));
+    if (boxes.length === 0) return;
+    const offsets = alignOffsets(boxes, align, { x: 0, y: 0, w: state.cardWidth, h: state.cardHeight });
+    commitLayers(() => {
+      boxes.forEach((box, index) => {
+        const layer = layerById(box.id);
+        const offset = offsets[index];
+        if (!layer || !offset) return;
+        Object.assign(layer, clampLayerPosition(layer, layer.x + offset.dx, layer.y + offset.dy));
+      });
+    });
+  };
+  alignBar?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-layer-align]") : null;
+    if (button && !button.disabled) alignLayers(button.dataset.layerAlign as LayerAlign);
+  });
+  /** Copies stack on top in their original order; the copies become the selection and the drag moves them. */
+  const duplicateDragged = (current: NonNullable<typeof drag>) => {
+    const copies = state.layers
+      .filter((layer) => current.start.has(layer.id))
+      .map((layer) => ({ from: layer.id, layer: { ...structuredClone(layer), id: newLayerId() } }));
+    state.layers.push(...copies.map((item) => item.layer));
+    selected.clear();
+    for (const { layer } of copies) selected.add(layer.id);
+    current.id = copies.find((item) => item.from === current.id)?.layer.id ?? current.id;
+    current.start = positionsOf(selected);
+    current.copy = false;
+  };
   // Each kind keeps one layer so the panel always has something to edit.
   const canDelete = (picked: StudioLayer[]) =>
     (["title", "body", "image"] as const).every(
@@ -2216,6 +2360,41 @@ export function bindStudio(
     paint();
   };
 
+  const sampleDropper = (point: { x: number; y: number }) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx || canvas.width < 1 || canvas.height < 1) return;
+    const x = Math.min(canvas.width - 1, Math.max(0, Math.floor(point.x)));
+    const y = Math.min(canvas.height - 1, Math.max(0, Math.floor(point.y)));
+    let pixel: Uint8ClampedArray;
+    try {
+      pixel = ctx.getImageData(x, y, 1, 1).data;
+    } catch {
+      showToast("이 색은 읽을 수 없습니다.");
+      setDropper(false);
+      return;
+    }
+    if ((pixel[3] ?? 0) === 0) return;
+    const hex = rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
+    const texts = selectedLayers().filter(isTextLayer);
+    recordChange(() => {
+      if (texts.length === 0) {
+        if (state.color === hex) return false;
+        state.color = hex;
+        return true;
+      }
+      let changed = false;
+      for (const layer of texts) {
+        if (layer.color === hex) continue;
+        layer.color = hex;
+        changed = true;
+      }
+      return changed;
+    });
+    syncForm();
+    setDropper(false);
+    void redraw();
+  };
+
   canvas.addEventListener("pointerdown", (event) => {
     if (state.code.trim()) return;
     const mouse = event.pointerType === "mouse";
@@ -2276,6 +2455,7 @@ export function bindStudio(
       origin: point,
       start: positionsOf(mouse ? selected : [hit.id]),
       pointerId: event.pointerId,
+      copy: mouse && event.altKey,
     };
     canvas.dataset.dragging = "true";
     paint();
@@ -2315,6 +2495,10 @@ export function bindStudio(
     if (!drag || drag.pointerId !== event.pointerId) {
       canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
       return;
+    }
+    if (drag.copy) {
+      if (!tapStart?.moved) return;
+      duplicateDragged(drag);
     }
     moveGroup(drag.start, point.x - drag.origin.x, point.y - drag.origin.y);
     paint();
@@ -2428,7 +2612,7 @@ export function bindStudio(
     if (cropping) endCrop(true);
     commitLayers(() => {
       const width = clampImageWidth(state.cardWidth / 2);
-      const layer: ImageLayer = { id: newLayerId(), kind: "image", src, x: 0, y: 0, width, crop: null };
+      const layer: ImageLayer = { id: newLayerId(), kind: "image", src, x: 0, y: 0, width, radius: IMAGE_RADIUS_DEFAULT, crop: null };
       Object.assign(layer, clampLayerPosition(layer, at.x - width / 2, at.y - (width * aspect) / 2));
       state.layers.push(layer);
       selected.clear();
@@ -2554,6 +2738,18 @@ export function bindStudio(
       target instanceof HTMLElement &&
       (target.isContentEditable ||
         target.matches("textarea, input:not([type=range], [type=color], [type=radio], [type=checkbox], [type=button], [type=file])"));
+    if (dropper && event.key === "Escape" && !mod && !event.altKey) {
+      event.preventDefault();
+      setDropper(false);
+      return;
+    }
+    if (!mod && !event.altKey && !event.shiftKey && !cropping && !typing && event.code === "KeyI") {
+      event.preventDefault();
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused.closest(".studio__preset")) focused.blur();
+      setDropper(!dropper);
+      return;
+    }
     // Backspace is the Delete key on Mac keyboards.
     if (!mod && !cropping && !typing && (event.key === "Delete" || event.key === "Backspace") && selected.size > 0) {
       event.preventDefault();
@@ -2595,8 +2791,54 @@ export function bindStudio(
       void redraw();
     }, 400);
   };
+  const presetTarget = (event: Event) =>
+    event.target instanceof Element ? event.target.closest<HTMLElement>(".studio__preset") : null;
+  const onDropperPointer = (event: PointerEvent) => {
+    if (!dropper || event.button !== 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const inside =
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom;
+    if (!inside) {
+      const preset = presetTarget(event);
+      if (preset) blockPresetClick = true;
+      setDropper(false);
+      if (preset) {
+        event.preventDefault();
+        event.stopPropagation();
+        preset.blur();
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    closeLayerMenu();
+    if (editing) closeEditor(true);
+    sampleDropper(cardPoint(event));
+  };
+  const onDropperClick = (event: MouseEvent) => {
+    const preset = presetTarget(event);
+    if (!preset) {
+      blockPresetClick = false;
+      return;
+    }
+    if (!dropper && !blockPresetClick) return;
+    blockPresetClick = false;
+    setDropper(false);
+    event.preventDefault();
+    event.stopPropagation();
+    preset.blur();
+  };
   document.addEventListener("keydown", studioKeys);
-  stopStudioKeys = () => document.removeEventListener("keydown", studioKeys);
+  document.addEventListener("pointerdown", onDropperPointer, true);
+  document.addEventListener("click", onDropperClick, true);
+  stopStudioKeys = () => {
+    document.removeEventListener("keydown", studioKeys);
+    document.removeEventListener("pointerdown", onDropperPointer, true);
+    document.removeEventListener("click", onDropperClick, true);
+  };
 
   splitter.addEventListener("pointerdown", (event) => {
     if (studio.getBoundingClientRect().width < 768) return;

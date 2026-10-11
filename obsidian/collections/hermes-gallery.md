@@ -1,7 +1,7 @@
 ---
 slug: hermes-gallery
 title: "Hermes 비주얼 스터디"
-description: "image-pick-hermes의 정지 스터디 30건."
+description: "image-pick-hermes의 정지 스터디 35건."
 captures:
   - capsule-pattern
   - directional-flow
@@ -33,6 +33,11 @@ captures:
   - electric-blue-pinch-fold
   - textile-vertical-bar-grid
   - warm-horizon-brush-field
+  - torn-burgundy-olive-collage
+  - rounded-overprint-color-blocks
+  - ivory-blind-emboss-relief
+  - torn-cobalt-black-paper-edge
+  - diagonal-textile-stripe-bands
 ---
 
 # Hermes 비주얼 스터디

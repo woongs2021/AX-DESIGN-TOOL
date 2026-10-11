@@ -161,7 +161,6 @@ for (const item of vault.captures) {
   let thumbPath: string | null = null;
   if (probed.kind === "still") {
     const thumbName = `${basename(originalName, extname(originalName))}.thumb.webp`;
-    // iridescent-chrome-field ships without its final CRC/IEND; pixel data is complete.
     const thumb = await sharp(assetAbs, { failOn: "none" })
       .resize({ width: THUMB_WIDTH, withoutEnlargement: true })
       .webp({ quality: THUMB_QUALITY })

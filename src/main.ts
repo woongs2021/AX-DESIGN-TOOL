@@ -311,7 +311,8 @@ function bindSettingsMenu(app: HTMLElement): void {
       if (studioState) {
         const captures = loadState.status === "ready" ? loadState.index.captures : [];
         const theme = knownTheme(DEFAULT_THEME_SLUG, captures) ?? studioState.themeSlug;
-        studioState = createStudioState(theme, defaultStudioColor());
+        studioState = readBaseline(DEFAULT_PRESET_ID) ?? createStudioState(theme, defaultStudioColor());
+        if (!knownTheme(studioState.themeSlug, captures)) studioState.themeSlug = theme;
       }
       if (route.name === "studio" && route.card) {
         route = { name: "studio", theme: null, card: null };

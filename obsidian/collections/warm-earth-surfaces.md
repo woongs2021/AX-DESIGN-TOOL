@@ -13,6 +13,8 @@ captures:
   - warm-amber-folded-surface
   - cropped-circular-segments
   - warm-horizon-brush-field
+  - torn-burgundy-olive-collage
+  - ivory-blind-emboss-relief
 ---
 
 # 웜 어스 면
