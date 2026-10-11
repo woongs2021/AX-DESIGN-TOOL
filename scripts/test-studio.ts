@@ -58,6 +58,7 @@ for (const preset of STUDIO_PRESETS) {
   assert.equal(builtin.presetId, preset.id);
   assert.deepEqual([builtin.cardWidth, builtin.cardHeight], [preset.width, preset.height]);
   assert.ok(existsSync(`obsidian/captures/${builtin.themeSlug}/capture.png`), `theme ${builtin.themeSlug}`);
+  assert.ok(existsSync(`src/styles/presets/${preset.id}.webp`), `preset thumb ${preset.id}`);
 }
 
 assert.equal(clampRadius(28), 28);

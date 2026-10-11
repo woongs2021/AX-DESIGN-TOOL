@@ -4,21 +4,21 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 1 Online Marketing Studio 구현**. 네비는 **Graphic Library / Online Marketing Studio / History**. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 1 Online Studio 구현**. 네비는 **Graphic Library / Online Studio / History**. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
 | Phase | 목표 | 상태 | 문서 |
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
-| 1 Online Marketing Studio | 35개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
+| 1 Online Studio | 35개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
 
-## Phase 1 — Online Marketing Studio 계획 요약
+## Phase 1 — Online Studio 계획 요약
 
 **목표**: 지금 아카이브된 이미지를 기반으로 온라인 마케팅 브랜드 에셋을 제작하는 툴을 만든다. 산출물은 인스타그램, 페이스북, 유튜브 커버, 쇼츠 등 여러 규격으로 만들 수 있다.
 
 **IA 변경**
-- Intake, Design System, Stats 탭을 없애고 **Online Marketing Studio** 한 탭(`#/studio`)으로 정리한다. 네비는 Graphic Library / Online Marketing Studio / History가 된다.
+- Intake, Design System, Stats 탭을 없애고 **Online Studio** 한 탭(`#/studio`)으로 정리한다. 네비는 Graphic Library / Online Studio / History가 된다.
 - 예전 `#/intake`, `#/design-system`, `#/stats` 주소는 `#/studio`로 리다이렉트한다.
 - `npm run ingest`, `npm run design-system` CLI는 탭과 별개로 유지한다.
 - 상세 뷰에 `이 테마로 만들기` 링크를 두어 해당 작업물을 테마로 선택한 채 스튜디오로 들어간다.
@@ -26,7 +26,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 **화면 구성**
 - 좌측은 **컨트롤 패널**, 우측은 **프리뷰**. 768px 이상(태블릿·데스크톱)에서는 가운데 바를 드래그해 두 영역의 너비를 조절한다. 767px 이하 모바일은 프리뷰 위, 컨트롤 아래로 쌓고, 헤더는 로고·모드 버튼 한 줄과 메뉴 한 줄로 줄인다. 헤더 아래에는 모바일·타블렛·데스크탑 뷰 아이콘이 있다. 화면 폭에 따라 하나, 둘, 셋이 보이고, 누르면 컨트롤 패널과 프리뷰가 그 화면으로 함께 바뀐다. 아이콘에는 원형 테두리가 없고, 모바일·타블렛 프레임 좌우에도 선이 없다. 프레임 스크롤바는 스크롤할 때만 콘텐츠 위에 겹친다. 프리뷰 폭이 좁으면 하단 바가 크기 정보, 편집·줌 버튼, 다운로드 버튼 순으로 줄바꿈된다. 프리뷰는 `−` / `+`로 확대·축소하고, `Fit`을 누르면 사방 10px 여백을 두고 100%로 맞춘다. 현재 카드의 실제 픽셀 크기 PNG로 다운로드한다. 첫 방문의 화면 모드는 다크다.
 - 컨트롤 패널은 **디자인 영역**과 **코드 영역** 두 탭으로 나눈다.
-- **Graphic Library**(예전 Archive)는 스튜디오에 쓸 그래픽을 모아 둔 화면이다. 제목 아래 설명 문장과 `Target … · N · N pinned` 줄을 두고, 검색창·필터 없이 All/Pin 탭으로만 나눈다.
+- **Graphic Library**(예전 Archive)는 스튜디오에 쓸 그래픽을 모아 둔 화면이다. 제목 아래 설명 문장과 `Target … · N · N pinned` 줄을 두고, 검색창·필터 없이 All/Pin 탭으로만 나눈다. 카드 테두리는 공통 선보다 연하다.
 - 프리뷰에는 이전 동작·원래대로 버튼이 있고, 드래그하는 동안만 잡은 요소에 테두리가 보인다. 단축키는 이전 동작 Cmd/Ctrl+Z, 원래대로 Cmd+Shift+Z · Ctrl+Y다(글자 입력칸 안에서는 브라우저 기본 동작).
 - 프리뷰에서 타이틀·본문·이미지를 클릭하면 선택되고, Shift+클릭으로 여러 개를 선택하거나 하나만 뺀다. 선택된 객체를 끌면 함께 움직이고, 한 개 이상 선택하면 프리뷰 위에 정렬 바(왼쪽·수평 가운데·오른쪽·위쪽·수직 가운데·아래쪽은 카드 배경에 맞추고, 세 개 이상이면 가로·세로 균등 정렬)가 뜬다. Option(맥)·Alt(윈도우)+드래그는 선택을 복제해 끈다. 방향키는 0.5px, Shift+방향키는 10px씩 옮긴다. 프리뷰 확대·축소는 Cmd/Ctrl와 +/− 또는 Cmd(맥)·Ctrl(윈도우)+휠이다. 카드 요소는 레이어로 쌓이며(기본: 이미지 맨 아래, 그 위 본문·타이틀), 오른쪽 클릭 또는 롱프레스 메뉴로 복사·붙여넣기·맨 위로/맨 밑으로 보내기·크롭하기(이미지)·삭제를 한다. Cmd/Ctrl+C·V로도 복사·붙여넣기하고, Delete(맥 ⌫)로 지운다. I는 스포이드로, 선택한 텍스트가 있으면 그 글자 색을 모두 바꾸고, 선택된 텍스트가 없으면 카드 배경색을 찍는다. 타이틀·본문은 굵기(Light·Regular·Medium·SemiBold·Bold), 볼드·이탤릭·밑줄과 왼쪽·가운데·오른쪽 정렬을 패널 버튼으로 바꾼다. 분할 바는 옅은 색이고, 조절바의 빈 트랙은 라이트·다크 모드 모두에서 보이게 칠한다.
 
@@ -39,12 +39,12 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | 폰트 크기 | 타이틀·본문 각각 range 바 + 수치. 최소 5px, 최대는 카드 너비 − 20px. 텍스트를 두 개 이상 선택하면 `폰트 크기 함께`가 나타나고, 가장 큰 글자를 기준으로 선택된 글자가 같은 비율로 커지거나 줄어든다 |
 | 폰트 | 타이틀·본문 각각 선택. Roboto, Pretendard, Montserrat. `fonts/`에 폰트 파일을 넣고 다시 빌드하면 목록에 추가 |
 | 초기화 | 현재 프리셋의 기준 레이아웃으로 되돌린다. 기준은 `초기화로 세팅`으로 브라우저에 저장하고, 저장한 것이 없으면 `src/shared/studio-defaults.json`의 8개 프리셋 내장 기준을 쓴다. 설정 메뉴의 리셋은 저장한 기준만 지우고 내장 기준으로 돌아간다. 패널 너비는 유지 |
-| 아카이브 테마 | 35개 아카이브 작업물 썸네일 중 하나를 선택한 이미지 레이어(없으면 맨 아래 이미지)에 적용. 프리뷰로 끌어다 놓으면 새 이미지 레이어로 삽입. 끝의 `+`로 이미지를 추가(이 브라우저에 저장, ×로 삭제) |
+| 아카이브 테마 | 35개 아카이브 작업물 썸네일 중 하나를 선택한 이미지 레이어(없으면 맨 아래 이미지)에 적용. 원본을 불러오는 동안 오른쪽 회색 프리뷰 가운데에 `이미지를 로딩중입니다...`가 14px로 보이고, 글자 투명도가 반복해서 변한다. 프리뷰로 끌어다 놓으면 새 이미지 레이어로 삽입. 끝의 `+`로 이미지를 추가(이 브라우저에 저장, ×로 삭제) |
 | 카드 이미지 | 너비 바 + 수치(100~4000px, 높이는 원본 비율). 이미지 radius는 0~120px, 처음 값 12px. 프리뷰에서 드래그해 위치 이동. 핀치하거나 클릭 후 상하좌우 핸들로 크기 조절 |
 | 카드 컬러 | 원형 컬러 피커 + hex 입력. 타이틀·본문 시작색은 대비에 맞춘 흑 또는 백 |
 | 카드 radius | range 바 + 수치 입력 동기화(0~120px, 기본 28px), CSS 변수로 적용 |
 
-**카드 크기 프리셋**(실제 비율 네모가 들어간 그리드, 크기 조절바 옆 −/+는 2px · Shift 10px): Instagram Feed 1080×1080(기본), Instagram Portrait 1080×1350, Instagram Story/Reels 1080×1920, Facebook Feed 1200×630, Facebook Cover 1640×624, YouTube Thumbnail 1280×720, YouTube Channel Cover 2560×1440, YouTube Shorts 1080×1920.
+**카드 크기 프리셋**(초기화 레이아웃을 실제 비율로 줄인 이미지가 들어간 그리드, 크기 조절바 옆 −/+는 2px · Shift 10px): Instagram Feed 1080×1080(기본), Instagram Portrait 1080×1350, Instagram Story/Reels 1080×1920, Facebook Feed 1200×630, Facebook Cover 1640×624, YouTube Thumbnail 1280×720, YouTube Channel Cover 2560×1440, YouTube Shorts 1080×1920.
 
 **코드 영역**: HTML + CSS 조각을 붙여 넣으면 sandbox iframe 안에서 프리뷰로 렌더한다. 스크립트는 실행하지 않는다. 디자인 영역 값은 CSS 변수와 `{{title}}`·`{{body}}`·`{{themeImage}}`·`{{image:<출처>}}` 치환자로 이어지고, `현재 디자인을 코드로 복사`로 디자인 상태를 코드로 내보낸다.
 
@@ -56,7 +56,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-10-11 | 그래픽 5점을 더해 테마 35개. 스튜디오 테마와 상세의 원본 다운로드는 3072 PNG로 낮추고, 라이브러리에 보이는 이미지는 저화질 썸네일을 유지한다. |
+| 2026-10-11 | 그래픽 5점을 더해 테마 35개. 스튜디오 테마와 상세의 원본 다운로드는 3072 PNG로 낮추고, 라이브러리에 보이는 이미지는 저화질 썸네일을 유지한다. 8개 카드 크기의 초기화 레이아웃을 앱에 넣고, 프리셋 칸에는 그 화면을 실제 비율로 줄인 미리보기를 둔다. 글자를 두 개 이상 고르면 같은 비율로 크기를 조절한다. 네비 이름을 Online Studio로 바꾸고, 라이브러리 카드 테두리를 연하게 했다. 테마 원본을 불러오는 동안 프리뷰에 로딩 문구를 보여 준다. |
 | 2026-10-05 | Graphic Library와 스튜디오 테마 이미지를 4096 정사각 PNG로 교체하고, 새 그래픽 10점을 더해 30개가 되었다. 스튜디오에 초기화로 세팅·설정 메뉴의 리셋·그래픽 라이브러리 저장(Saved 탭)을 넣었다. |
 
 | 2026-09-28 | 프리뷰에서 이미지 핀치·크기 핸들과 텍스트 바로 수정. 모바일·타블렛·데스크탑 뷰 전환, 스크롤할 때만 보이는 프레임 스크롤바. 디바이더와 디바이스 바를 같은 색으로 맞추고 아이콘 테두리·프레임 좌우 선을 없앴다. History 본문 글자 크기를 날짜와 같게 14px로 맞췄다. 그래픽 4점을 추가해 테마 20개. Shift 다중 선택·함께 드래그, 이전 동작·원래대로 키보드 단축키. |
@@ -78,7 +78,7 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 |---|---|
 | [docs/decisions.md](docs/decisions.md) | 결정표 `D-01`~`D-17`의 단일 원천. |
 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) | 예전 Phase 0~8을 통합한 아카이브 기반 요약. |
-| [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) | Online Marketing Studio 계획서. |
+| [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) | Online Studio 계획서. |
 | [docs/llm-wiki-model.md](docs/llm-wiki-model.md) | LLM Wiki 계층과 operation 규칙. |
 | [docs/authoring-guide.md](docs/authoring-guide.md) | 캡처 1건 작성 기준. |
 | [docs/deploy.md](docs/deploy.md) | 수동 배포 절차. |
