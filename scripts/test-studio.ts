@@ -34,6 +34,7 @@ import {
   sanitizeStudioCode,
   scaleFontSizes,
   scaleImageAround,
+  isTextLayer,
   setStudioTheme,
   substituteStudioCode,
   wrapText,
@@ -41,6 +42,7 @@ import {
   type StudioState,
 } from "../src/shared/studio.ts";
 import { DEFAULT_PRESET_ID, presetById, STUDIO_PRESETS } from "../src/shared/studio-presets.ts";
+import { lineContains, nodeBounds, parseGradient, parseVectorLayer, penContains, radiusHandlePoints, restartPenAt, resizeShape, scaleShapeBox, shadowOffset, shapeBlend, shapeContains, shapeNodes, shapeStroke, starInner, starPoints, transformNodes, vectorSvg } from "../src/shared/studio-shapes.ts";
 
 assert.equal(STUDIO_PRESETS.length, 8);
 assert.equal(new Set(STUDIO_PRESETS.map((preset) => preset.id)).size, 8);
@@ -336,5 +338,211 @@ assert.equal(isLegacyStudioHash("#/intake"), true);
 assert.equal(isLegacyStudioHash("#/studio"), false);
 assert.equal(hrefFor({ name: "studio", theme: "warm-earth-oval", card: null }), "#/studio?theme=warm-earth-oval");
 assert.equal(hrefFor({ name: "studio", theme: "warm-earth-oval", card: "saved-abc" }), "#/studio?card=saved-abc");
+
+const square = { x: 10, y: 20, width: 100, height: 40 };
+const stretched = resizeShape(square, "e", 30, 0, false);
+assert.equal(stretched.width, 130);
+assert.equal(stretched.height, 40);
+assert.equal(stretched.x, 10);
+const uniform = resizeShape(square, "e", 20, 0, true);
+assert.equal(uniform.width, uniform.height);
+assert.equal(uniform.y, 20 + 20 - uniform.height / 2);
+const corner = resizeShape(square, "se", 10, 50, false);
+assert.equal(corner.width, 110);
+assert.equal(corner.height, 90);
+const squared = resizeShape({ x: 0, y: 0, width: 80, height: 80 }, "se", -20, -10, true);
+assert.equal(squared.width, squared.height);
+assert.ok(squared.width >= 8);
+const scaled = scaleShapeBox({ x: 0, y: 0, width: 100, height: 50 }, 200);
+assert.equal(scaled.width, 200);
+assert.equal(scaled.height, 100);
+assert.equal(scaled.x, -50);
+assert.equal(scaled.y, -25);
+
+const shapeState = normalizeStudioState({
+  themeSlug: "x",
+  color: "#ffffff",
+  layers: [
+    { id: "s", kind: "shape", shape: "ellipse", x: 4, y: 6, width: 40, height: 20, radius: 4, color: "#112233" },
+    { id: "l", kind: "line", x: 0, y: 10, x2: 40, y2: 10, stroke: 6, cap: "round", start: true, end: false, color: "#abcdef" },
+    {
+      id: "p",
+      kind: "pen",
+      closed: true,
+      fill: "#222222",
+      stroke: "#333333",
+      strokeWidth: 2,
+      points: [
+        { x: 0, y: 0, in: null, out: null },
+        { x: 20, y: 0, in: null, out: { x: 30, y: 10 } },
+        { x: 10, y: 20, in: null, out: null },
+      ],
+    },
+  ],
+});
+assert.ok(shapeState);
+assert.deepEqual(
+  shapeState.layers.filter((layer) => !isTextLayer(layer) && layer.kind !== "image").map((layer) => layer.kind),
+  ["shape", "line", "pen"],
+);
+assert.equal(isTextLayer(shapeState.layers.find((layer) => layer.kind === "shape")!), false);
+const drawn = designToCode(shapeState);
+assert.match(drawn, /<ellipse /);
+assert.match(drawn, /stroke-linecap="round"/);
+assert.match(drawn, /<path /);
+assert.equal(shapeContains({ id: "s", kind: "shape", shape: "ellipse", x: 0, y: 0, width: 40, height: 20, radius: 0, color: "#000000" }, 20, 10), true);
+assert.equal(shapeContains({ id: "s", kind: "shape", shape: "ellipse", x: 0, y: 0, width: 40, height: 20, radius: 0, color: "#000000" }, 0, 0), false);
+assert.equal(lineContains({ id: "l", kind: "line", x: 0, y: 10, x2: 40, y2: 10, stroke: 4, cap: "butt", start: false, end: false, color: "#000000" }, 20, 10), true);
+assert.equal(lineContains({ id: "l", kind: "line", x: 0, y: 10, x2: 40, y2: 10, stroke: 4, cap: "butt", start: false, end: false, color: "#000000" }, 20, 40), false);
+assert.equal(
+  penContains(
+    {
+      id: "p",
+      kind: "pen",
+      closed: true,
+      fill: "#111111",
+      stroke: "",
+      strokeWidth: 0,
+      points: [
+        { x: 0, y: 0, in: null, out: null },
+        { x: 30, y: 0, in: null, out: null },
+        { x: 0, y: 30, in: null, out: null },
+      ],
+    },
+    5,
+    5,
+  ),
+  true,
+);
+assert.equal(parseVectorLayer({ kind: "bogus" }, "#000000"), null);
+const keptShape = shapeState.layers.find((layer) => layer.kind === "shape");
+assert.equal(keptShape?.kind === "shape" ? keptShape.shadow?.size : -1, 0);
+assert.equal(keptShape?.kind === "shape" ? keptShape.shadow?.opacity : -1, 55);
+assert.equal(keptShape?.kind === "shape" ? keptShape.stroke?.width : -1, 0);
+assert.equal(keptShape?.kind === "shape" ? keptShape.blend : "", "normal");
+assert.equal(keptShape?.kind === "shape" ? keptShape.gradient : "missing", null);
+const shaded = normalizeStudioState({
+  themeSlug: "x",
+  color: "#ffffff",
+  layers: [
+    {
+      id: "shade",
+      kind: "shape",
+      shape: "rect",
+      x: 0,
+      y: 0,
+      width: 80,
+      height: 40,
+      radius: 0,
+      color: "#112233",
+      shadow: { size: 4, blur: 8, distance: 10 },
+      blend: "multiply",
+      blurFrom: 0,
+      blurTo: 12,
+      gradient: { angle: 0, from: "#000000", to: "#ffffff" },
+    },
+    {
+      id: "fade",
+      kind: "title",
+      text: "Hi",
+      x: 0,
+      y: 0,
+      size: 20,
+      fontId: "pretendard",
+      color: "#111111",
+      gradient: { angle: 90, from: "#000000", to: "#ffffff" },
+    },
+  ],
+});
+assert.ok(shaded);
+const shadeCode = designToCode(shaded);
+assert.match(shadeCode, /mix-blend-mode: multiply/);
+assert.match(shadeCode, /linearGradient/);
+assert.match(shadeCode, /background-clip: text/);
+const drop = shadowOffset(100);
+assert.equal(drop.x, drop.y);
+assert.ok(drop.x > 60 && drop.x < 80);
+const cornered = restartPenAt(
+  [
+    { x: 0, y: 0, in: null, out: { x: 8, y: 0 } },
+    { x: 20, y: 0, in: { x: 12, y: 4 }, out: { x: 28, y: -4 } },
+    { x: 40, y: 10, in: null, out: null },
+  ],
+  1,
+);
+assert.equal(cornered.length, 2);
+assert.equal(cornered[1]?.out, null);
+assert.deepEqual(cornered[1]?.in, { x: 12, y: 4 });
+assert.equal(parseGradient({ angle: 400, from: "#abcdef", to: "#112233" })?.angle, 40);
+assert.equal(
+  shapeBlend({ id: "s", kind: "shape", shape: "rect", x: 0, y: 0, width: 10, height: 10, radius: 0, color: "#000000" }),
+  "normal",
+);
+assert.equal(
+  shapeStroke({ id: "s", kind: "shape", shape: "rect", x: 0, y: 0, width: 10, height: 10, radius: 0, color: "#112233" }).width,
+  0,
+);
+const stroked = parseVectorLayer(
+  {
+    id: "edge",
+    kind: "shape",
+    shape: "rect",
+    x: 0,
+    y: 0,
+    width: 40,
+    height: 20,
+    radius: 0,
+    color: "#112233",
+    shadow: { size: 2, blur: 0, distance: 0, opacity: 40 },
+    stroke: { width: 6, opacity: 50, color: "#abcdef", gradient: { angle: 0, from: "#000000", to: "#ffffff" } },
+  },
+  "#000000",
+);
+assert.equal(stroked?.kind === "shape" ? stroked.shadow?.opacity : 0, 40);
+assert.equal(stroked?.kind === "shape" ? stroked.stroke?.width : 0, 6);
+assert.equal(stroked?.kind === "shape" ? stroked.stroke?.opacity : 0, 50);
+if (stroked) {
+  const markup = vectorSvg(stroked);
+  assert.match(markup, /stroke-width="6"/);
+  assert.match(markup, /stroke-opacity="0.5"/);
+  assert.match(markup, /flood-opacity="0.4"/);
+  assert.match(markup, /linearGradient/);
+}
+
+const sharpRect = {
+  id: "r",
+  kind: "shape" as const,
+  shape: "rect" as const,
+  x: 10,
+  y: 20,
+  width: 40,
+  height: 30,
+  radius: 0,
+  color: "#112233",
+};
+const radiusTips = radiusHandlePoints(sharpRect);
+const roundedTips = radiusHandlePoints({ ...sharpRect, radius: 12 });
+assert.equal(radiusTips.length, 4);
+assert.equal(roundedTips.length, 4);
+assert.ok(radiusTips[0] && radiusTips[0].x > sharpRect.x && radiusTips[0].y > sharpRect.y);
+assert.ok(roundedTips[0] && radiusTips[0] && roundedTips[0].x > radiusTips[0].x && roundedTips[0].y > radiusTips[0].y);
+assert.equal(radiusHandlePoints({ ...sharpRect, shape: "triangle" }).length, 3);
+assert.equal(radiusHandlePoints({ ...sharpRect, shape: "ellipse" }).length, 0);
+assert.equal(radiusHandlePoints({ ...sharpRect, shape: "star" }).length, 0);
+assert.equal(radiusHandlePoints({ ...sharpRect, nodes: shapeNodes(sharpRect) }).length, 0);
+assert.equal(shapeNodes(sharpRect).length, 4);
+assert.equal(shapeNodes({ ...sharpRect, radius: 8 }).length, 8);
+assert.equal(shapeNodes({ ...sharpRect, shape: "ellipse" }).length, 4);
+assert.ok(shapeNodes({ ...sharpRect, shape: "ellipse" })[0]?.out);
+const starBox = { x: 0, y: 0, width: 100, height: 100 };
+const innerTip = starPoints(starBox, 0.5)[1];
+const defaultTip = starPoints(starBox)[1];
+assert.ok(innerTip && defaultTip && Math.abs(innerTip.y - 50) > Math.abs(defaultTip.y - 50));
+assert.equal(starInner({ ...sharpRect, shape: "star", inner: 0.2 }), 0.2);
+const moved = transformNodes(shapeNodes(sharpRect), sharpRect, { x: 0, y: 0, width: 80, height: 60 });
+assert.equal(moved[0]?.x, 0);
+assert.equal(nodeBounds(shapeNodes(sharpRect)).width > 30, true);
+const starred = parseVectorLayer({ id: "star", kind: "shape", shape: "star", x: 0, y: 0, width: 80, height: 80, radius: 0, color: "#112233", inner: 0.5 }, "#000000");
+assert.equal(starred?.kind === "shape" ? starred.inner : 0, 0.5);
 
 console.log("OK: studio preset, size, font, radius, wrap, ink, code, and route checks");

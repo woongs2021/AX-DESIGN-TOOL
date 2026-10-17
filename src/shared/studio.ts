@@ -1,3 +1,4 @@
+import { shapeBlend, vectorSvg, type LineLayer, type LinearGradient, type PenLayer, type ShapeLayer, parseGradient, parseVectorLayer } from "./studio-shapes.ts";
 import { DEFAULT_PRESET_ID, presetById } from "./studio-presets.ts";
 
 export const RADIUS_MIN = 0;
@@ -46,6 +47,8 @@ export type TextLayer = {
   size: number;
   fontId: string;
   color: string;
+  /** Solid color is used when this is absent. */
+  gradient?: LinearGradient | null;
   /** One of TEXT_WEIGHTS. */
   weight: number;
   italic: boolean;
@@ -66,7 +69,7 @@ export type ImageLayer = {
   radius: number;
   crop: StudioCrop | null;
 };
-export type StudioLayer = TextLayer | ImageLayer;
+export type StudioLayer = TextLayer | ImageLayer | ShapeLayer | LineLayer | PenLayer;
 export type LayerKind = StudioLayer["kind"];
 
 export type StudioState = {
@@ -209,9 +212,8 @@ export function fontStack(fontId: string, extras: { id: string; stack: string }[
 
 function defaultLayer(kind: "image", src: string, cardWidth?: number, cardHeight?: number): ImageLayer;
 function defaultLayer(kind: TextKind, src: string, cardWidth?: number, cardHeight?: number): TextLayer;
-function defaultLayer(kind: LayerKind, src: string, cardWidth?: number, cardHeight?: number): StudioLayer;
 function defaultLayer(
-  kind: LayerKind,
+  kind: "image" | TextKind,
   src: string,
   cardWidth = presetById(DEFAULT_PRESET_ID).width,
   cardHeight = presetById(DEFAULT_PRESET_ID).height,
@@ -283,7 +285,7 @@ function textStyle(value: Record<string, unknown>, kind: TextKind): Pick<TextLay
 }
 
 export function isTextLayer(layer: StudioLayer): layer is TextLayer {
-  return layer.kind !== "image";
+  return layer.kind === "title" || layer.kind === "body";
 }
 
 export const UPLOAD_PREFIX = "upload:";
@@ -308,10 +310,12 @@ export function firstLayer(state: StudioState, kind: LayerKind): StudioLayer | u
 /** The first layer of a kind, added back with starting values if the state has none. */
 export function ensureLayer(state: StudioState, kind: "image"): ImageLayer;
 export function ensureLayer(state: StudioState, kind: TextKind): TextLayer;
-export function ensureLayer(state: StudioState, kind: LayerKind): StudioLayer {
+export function ensureLayer(state: StudioState, kind: "image" | TextKind): StudioLayer {
   const found = state.layers.find((layer) => layer.kind === kind);
   if (found) return found;
-  const layer = defaultLayer(kind, state.themeSlug, state.cardWidth, state.cardHeight);
+  const layer = kind === "image"
+    ? defaultLayer("image", state.themeSlug, state.cardWidth, state.cardHeight)
+    : defaultLayer(kind, state.themeSlug, state.cardWidth, state.cardHeight);
   layer.id = newLayerId();
   if (kind === "image") state.layers.unshift(layer);
   else state.layers.push(layer);
@@ -380,6 +384,8 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
   const value = raw as Record<string, unknown>;
   const num = (field: unknown) => (typeof field === "number" && Number.isFinite(field) ? field : null);
   const id = typeof value.id === "string" && value.id ? value.id : newLayerId();
+  const vector = parseVectorLayer({ ...value, id }, ink);
+  if (vector) return vector;
   const x = num(value.x) ?? 0;
   const y = num(value.y) ?? 0;
   if (value.kind === "image") {
@@ -409,6 +415,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
     size: num(value.size) ?? (value.kind === "title" ? DEFAULT_TITLE_SIZE : DEFAULT_BODY_SIZE),
     fontId: typeof value.fontId === "string" && value.fontId ? value.fontId : "pretendard",
     color: normalizeHex(String(value.color ?? "")) ?? ink,
+    gradient: parseGradient(value.gradient),
     ...textStyle(value, value.kind),
   };
 }
@@ -673,6 +680,14 @@ export function designToCode(
   const rules: string[] = [];
   state.layers.forEach((layer, index) => {
     const name = `layer-${index + 1}`;
+    if (layer.kind === "shape" || layer.kind === "line" || layer.kind === "pen") {
+      const blend = layer.kind === "shape" && shapeBlend(layer) !== "normal" ? ` mix-blend-mode: ${shapeBlend(layer)};` : "";
+      items.push(
+        `  <svg class="${name}" viewBox="0 0 ${state.cardWidth} ${state.cardHeight}" preserveAspectRatio="none">${vectorSvg(layer)}</svg>`,
+      );
+      rules.push(`  .studio-card .${name} { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible;${blend} }`);
+      return;
+    }
     const place = `left: ${px(layer.x)}; top: ${px(layer.y)};`;
     if (layer.kind === "image") {
       const src = layer.src === state.themeSlug ? "{{themeImage}}" : `{{image:${escapeHtml(layer.src)}}}`;
@@ -698,8 +713,12 @@ export function designToCode(
       layer.underline ? "text-decoration: underline;" : "",
       layer.align !== "left" ? `text-align: ${layer.align};` : "",
     ].filter(Boolean).join(" ");
+    const gradient = layer.gradient;
+    const paint = gradient
+      ? `color: transparent; background-image: linear-gradient(${(gradient.angle + 90) % 360}deg, ${gradient.from}, ${gradient.to}); -webkit-background-clip: text; background-clip: text;`
+      : `color: ${layer.color};`;
     rules.push(
-      `  .studio-card .${name} { ${place} font-size: ${px(layer.size)}; font-family: ${fontStack(layer.fontId, extras)}; color: ${layer.color}; ${style} }`,
+      `  .studio-card .${name} { ${place} font-size: ${px(layer.size)}; font-family: ${fontStack(layer.fontId, extras)}; ${paint} ${style} }`,
     );
   });
   return `<article class="studio-card">

@@ -33,6 +33,7 @@ import {
   IMAGE_RADIUS_DEFAULT,
   imageLayerHeight,
   IMAGE_MIN,
+  inkHex,
   isTextLayer,
   maxFontSize,
   moveCropBox,
@@ -44,6 +45,7 @@ import {
   RADIUS_MAX,
   RADIUS_MIN,
   resizeCropBox,
+  roundOffset,
   scaleCardSize,
   scaleFontSizes,
   scaleImageAround,
@@ -62,6 +64,58 @@ import {
   type TextLayer,
 } from "../shared/studio.ts";
 import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
+import {
+  BLEND_LABELS,
+  LAYER_BLUR_MAX,
+  LINE_WIDTH_DEFAULT,
+  LINE_WIDTH_MAX,
+  LINE_WIDTH_MIN,
+  PEN_CLOSE,
+  SHADOW_BLUR_MAX,
+  SHADOW_DISTANCE_MAX,
+  SHADOW_SIZE_MAX,
+  SHAPE_BLENDS,
+  SHAPE_MAX,
+  SHAPE_MIN,
+  clampShapeSize,
+  arrowLength,
+  arrowPolygon,
+  clampUnit,
+  emptyShadow,
+  emptyStroke,
+  lineBounds,
+  lineContains,
+  lineSegment,
+  penBounds,
+  nodeBounds,
+  penContains,
+  penPointIndex,
+  resizeShape,
+  restartPenAt,
+  scaleShapeBox,
+  shadowOffset,
+  shapeBlend,
+  shapeContains,
+  radiusHandlePoints,
+  shapeNodes,
+  shapeShadow,
+  shapeStroke,
+  starInner,
+  starPoints,
+  tracePen,
+  trianglePoints,
+  traceShape,
+  transformNodes,
+  type DrawPath,
+  type LineLayer,
+  type LinearGradient,
+  type PenAnchor,
+  type PenLayer,
+  type ShapeBlend,
+  type ShapeHandle,
+  type ShapeLayer,
+  type ShapeName,
+} from "../shared/studio-shapes.ts";
 import { confirmProceed, showToast } from "../feedback.ts";
 import thumbIgFeedSquare from "../styles/presets/ig-feed-square.webp";
 import thumbIgFeedPortrait from "../styles/presets/ig-feed-portrait.webp";
@@ -274,6 +328,51 @@ function documentInput(
   };
 }
 
+const effectBuffers: HTMLCanvasElement[] = [];
+const BLUR_STEPS = 8;
+
+function effectBuffer(index: number, width: number, height: number): HTMLCanvasElement {
+  const canvas = effectBuffers[index] ?? document.createElement("canvas");
+  effectBuffers[index] = canvas;
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = Math.max(1, width);
+    canvas.height = Math.max(1, height);
+  }
+  canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+function boxGradient(
+  ctx: CanvasRenderingContext2D,
+  gradient: LinearGradient,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): CanvasGradient {
+  const rad = (gradient.angle * Math.PI) / 180;
+  const dx = Math.cos(rad);
+  const dy = Math.sin(rad);
+  const half = (Math.abs(dx) * w + Math.abs(dy) * h) / 2;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const paint = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+  paint.addColorStop(0, gradient.from);
+  paint.addColorStop(1, gradient.to);
+  return paint;
+}
+
+function blurMask(index: number, steps: number): Array<[number, number]> {
+  const at = (step: number) => Math.min(1, Math.max(0, step / (steps - 1)));
+  if (index <= 0) return [[0, 1], [at(1), 0]];
+  if (index >= steps - 1) return [[at(steps - 2), 0], [1, 1]];
+  return [[at(index - 1), 0], [at(index), 1], [at(index + 1), 0]];
+}
+
+function compositeFor(blend: ShapeBlend): GlobalCompositeOperation {
+  return blend === "normal" ? "source-over" : blend;
+}
+
 function drawCard(
   canvas: HTMLCanvasElement,
   state: StudioState,
@@ -322,13 +421,15 @@ function drawCard(
 
   const paintText = (layer: TextLayer): void => {
     if (!layer.text.trim()) return;
-    ctx.fillStyle = layer.color;
     ctx.font = textFont(layer, layer.size, extras);
     const lines = wrapText(layer.text.trim(), maxText, (value) => ctx.measureText(value).width);
     const lineHeight = Math.round(layer.size * 1.25);
     const widths = lines.map((line) => ctx.measureText(line).width);
     const widest = Math.max(0, ...widths);
     const underline = Math.max(1, Math.round(layer.size / 16));
+    const blockWidth = Math.max(widest, layer.size);
+    const blockHeight = Math.max(lines.length, 1) * lineHeight;
+    ctx.fillStyle = layer.gradient ? boxGradient(ctx, layer.gradient, layer.x, layer.y, blockWidth, blockHeight) : layer.color;
     lines.forEach((line, index) => {
       if (layer.id === hiddenId) return;
       const lineWidth = widths[index] ?? 0;
@@ -342,13 +443,167 @@ function drawCard(
       kind: layer.kind,
       x: layer.x,
       y: layer.y,
-      w: Math.max(widest, layer.size),
-      h: Math.max(lines.length, 1) * lineHeight,
+      w: blockWidth,
+      h: blockHeight,
     });
+  };
+
+  const pathOf = (target: CanvasRenderingContext2D): DrawPath => ({
+    moveTo: (x, y) => target.moveTo(x, y),
+    lineTo: (x, y) => target.lineTo(x, y),
+    quadraticCurveTo: (cx, cy, x, y) => target.quadraticCurveTo(cx, cy, x, y),
+    bezierCurveTo: (c1x, c1y, c2x, c2y, x, y) => target.bezierCurveTo(c1x, c1y, c2x, c2y, x, y),
+    closePath: () => target.closePath(),
+    ellipse: (x, y, rx, ry) => target.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), 0, 0, Math.PI * 2),
+    rect: (x, y, w, h, radius) => target.roundRect(x, y, w, h, radius),
+  });
+  const paintShape = (layer: ShapeLayer): void => {
+    if (layer.id !== hiddenId) {
+      const shadow = shapeShadow(layer);
+      const stroke = shapeStroke(layer);
+      const blurFrom = clampUnit(layer.blurFrom ?? 0, LAYER_BLUR_MAX);
+      const blurTo = clampUnit(layer.blurTo ?? 0, LAYER_BLUR_MAX);
+      const fillShape = (target: CanvasRenderingContext2D) => {
+        target.beginPath();
+        traceShape(pathOf(target), layer);
+        target.fillStyle = layer.gradient ? boxGradient(target, layer.gradient, layer.x, layer.y, layer.width, layer.height) : layer.color;
+        target.fill();
+      };
+      const paintStroke = (target: CanvasRenderingContext2D) => {
+        if (stroke.width <= 0 || stroke.opacity <= 0) return;
+        target.save();
+        target.globalAlpha *= stroke.opacity / 100;
+        target.lineWidth = stroke.width;
+        target.lineJoin = "round";
+        target.lineCap = "round";
+        target.strokeStyle = stroke.gradient
+          ? boxGradient(target, stroke.gradient, layer.x, layer.y, layer.width, layer.height)
+          : stroke.color;
+        target.beginPath();
+        traceShape(pathOf(target), layer);
+        target.stroke();
+        target.restore();
+      };
+      if (shadow.opacity > 0 && (shadow.size > 0 || shadow.blur > 0 || shadow.distance > 0)) {
+        const offset = shadowOffset(shadow.distance);
+        const ink = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
+        const spread = shadow.size * 2 + stroke.width;
+        ctx.save();
+        ctx.shadowColor = ink;
+        ctx.shadowBlur = shadow.blur;
+        ctx.shadowOffsetX = offset.x;
+        ctx.shadowOffsetY = offset.y;
+        ctx.fillStyle = ink;
+        ctx.strokeStyle = ink;
+        ctx.lineJoin = "round";
+        ctx.lineWidth = spread;
+        ctx.beginPath();
+        traceShape(pathOf(ctx), layer);
+        if (spread > 0) ctx.stroke();
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = compositeFor(shapeBlend(layer));
+      if (blurFrom === 0 && blurTo === 0) {
+        fillShape(ctx);
+      } else {
+        const pad = Math.ceil(Math.max(blurFrom, blurTo) * 2) + 4;
+        const left = Math.max(0, Math.floor(layer.x - pad));
+        const top = Math.max(0, Math.floor(layer.y - pad));
+        const right = Math.min(width, Math.ceil(layer.x + layer.width + pad));
+        const bottom = Math.min(height, Math.ceil(layer.y + layer.height + pad));
+        const bw = Math.max(1, right - left);
+        const bh = Math.max(1, bottom - top);
+        const sharp = effectBuffer(0, bw, bh);
+        const sharpCtx = sharp.getContext("2d");
+        if (!sharpCtx) fillShape(ctx);
+        else {
+          sharpCtx.save();
+          sharpCtx.translate(-left, -top);
+          fillShape(sharpCtx);
+          sharpCtx.restore();
+          ctx.drawImage(sharp, left, top);
+          const localX = layer.x - left;
+          for (let index = 0; index < BLUR_STEPS; index += 1) {
+            const t = index / (BLUR_STEPS - 1);
+            const radius = blurFrom + (blurTo - blurFrom) * t;
+            if (radius < 0.5) continue;
+            const blurred = effectBuffer(1, bw, bh);
+            const blurredCtx = blurred.getContext("2d");
+            if (!blurredCtx) continue;
+            blurredCtx.filter = `blur(${radius}px)`;
+            blurredCtx.drawImage(sharp, 0, 0);
+            blurredCtx.filter = "none";
+            blurredCtx.globalCompositeOperation = "destination-in";
+            const mask = blurredCtx.createLinearGradient(localX, 0, localX + layer.width, 0);
+            for (const [at, alpha] of blurMask(index, BLUR_STEPS)) mask.addColorStop(at, `rgba(0, 0, 0, ${alpha})`);
+            blurredCtx.fillStyle = mask;
+            blurredCtx.fillRect(0, 0, bw, bh);
+            blurredCtx.globalCompositeOperation = "source-over";
+            ctx.drawImage(blurred, left, top);
+          }
+        }
+      }
+      paintStroke(ctx);
+      ctx.restore();
+    }
+    hits.push({ id: layer.id, kind: "shape", x: layer.x, y: layer.y, w: layer.width, h: layer.height });
+  };
+  const paintLine = (layer: LineLayer): void => {
+    if (layer.id !== hiddenId) {
+      const segment = lineSegment(layer);
+      ctx.beginPath();
+      ctx.strokeStyle = layer.color;
+      ctx.fillStyle = layer.color;
+      ctx.lineWidth = layer.stroke;
+      ctx.lineCap = layer.cap;
+      ctx.moveTo(segment.x1, segment.y1);
+      ctx.lineTo(segment.x2, segment.y2);
+      ctx.stroke();
+      const length = arrowLength(layer);
+      const heads = [
+        layer.start ? arrowPolygon({ x: layer.x, y: layer.y }, { x: layer.x2, y: layer.y2 }, length) : null,
+        layer.end ? arrowPolygon({ x: layer.x2, y: layer.y2 }, { x: layer.x, y: layer.y }, length) : null,
+      ];
+      for (const points of heads) {
+        const tip = points?.[0];
+        if (!points || !tip) continue;
+        ctx.beginPath();
+        ctx.moveTo(tip.x, tip.y);
+        for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+    const box = lineBounds(layer);
+    hits.push({ id: layer.id, kind: "line", x: box.x, y: box.y, w: box.w, h: box.h });
+  };
+  const paintPen = (layer: PenLayer): void => {
+    if (layer.id !== hiddenId && layer.points.length > 0) {
+      ctx.beginPath();
+      tracePen(pathOf(ctx), layer.points, layer.closed);
+      if (layer.fill) {
+        ctx.fillStyle = layer.fill;
+        ctx.fill();
+      }
+      if (layer.stroke && layer.strokeWidth > 0) {
+        ctx.strokeStyle = layer.stroke;
+        ctx.lineWidth = layer.strokeWidth;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+    }
+    const box = penBounds(layer);
+    hits.push({ id: layer.id, kind: "pen", x: box.x, y: box.y, w: box.w, h: box.h });
   };
 
   for (const layer of state.layers) {
     if (layer.kind === "image") paintImage(layer);
+    else if (layer.kind === "shape") paintShape(layer);
+    else if (layer.kind === "line") paintLine(layer);
+    else if (layer.kind === "pen") paintPen(layer);
     else paintText(layer);
   }
   ctx.restore();
@@ -431,6 +686,17 @@ const PRESET_THUMBS: Record<string, string> = {
 };
 const STEP = 2;
 const STEP_SHIFT = 10;
+const DRAW_TOOLS = [
+  { id: "select", label: "선택", path: "M6 4.5v12.2l2.7-2.7 3.4 5.3 1.7-1.1-3.4-5.2H17z" },
+  { id: "ellipse", label: "원", path: "M19 12a7 7 0 1 1-14 0 7 7 0 1 1 14 0" },
+  { id: "rect", label: "사각형", path: "M6 6h12v12H6z" },
+  { id: "triangle", label: "삼각형", path: "M12 5 19 19H5z" },
+  { id: "star", label: "별", path: "M12 4.5 14.2 9.6 19.7 10.1 15.5 13.8 16.7 19.2 12 16.4 7.3 19.2 8.5 13.8 4.3 10.1 9.8 9.6z" },
+  { id: "line", label: "선", path: "M5 12h14" },
+  { id: "pen", label: "펜", path: "M15.5 4.5 19.5 8.5 8 20H4v-4z" },
+] as const;
+const drawIcon = (path: string) =>
+  `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>`;
 
 function stepButtons(name: string): string {
   return `<span class="studio__steps">
@@ -548,6 +814,36 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
     `;
   }
 
+  const blankInk = rgbToHex(0, 0, 0);
+  const gradientControls = (prefix: string, label: string) => `
+            <button type="button" class="studio__style-btn studio__style-btn--wide" id="${prefix}-gradient-toggle" aria-pressed="false">그라데이션</button>
+          </div>
+          <div id="${prefix}-gradient" hidden>
+            <div class="studio__field">
+              <label for="${prefix}-end">${label} 끝 색</label>
+              <div class="studio__color">
+                <input id="${prefix}-end" class="studio__color-picker studio__color-picker--text" type="color" value="${blankInk}" aria-label="${label} 그라데이션 끝 색" />
+                <input id="${prefix}-end-hex" class="studio__control" type="text" value="${blankInk}" spellcheck="false" aria-label="${label} 그라데이션 끝 색 hex" />
+              </div>
+            </div>
+            <div class="studio__field">
+              <label for="${prefix}-angle">${label} 각도</label>
+              <div class="studio__radius">
+                <input id="${prefix}-angle" type="range" min="0" max="360" step="1" value="0" />
+                ${stepButtons(`${label} 각도`)}
+                <input id="${prefix}-angle-number" class="studio__control studio__control--number" type="number" min="0" max="360" step="1" value="0" aria-label="${label} 각도 수치" />
+              </div>
+            </div>
+          </div>`;
+  const shadowRow = (id: string, label: string, max: number) => `
+            <div class="studio__field">
+              <label for="${id}">${label}</label>
+              <div class="studio__radius">
+                <input id="${id}" type="range" min="0" max="${max}" step="1" value="0" />
+                ${stepButtons(label)}
+                <input id="${id}-number" class="studio__control studio__control--number" type="number" min="0" max="${max}" step="1" value="0" aria-label="${label} 수치" />
+              </div>
+            </div>`;
   const title = ensureLayer(state, "title");
   const body = ensureLayer(state, "body");
   const image = ensureLayer(state, "image");
@@ -609,6 +905,130 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <div class="studio__presets" role="radiogroup" aria-labelledby="studio-preset-label">${presets}</div>
           </div>
           <div class="studio__field">
+            <span id="studio-draw-label">도형</span>
+            <div class="studio__draw" role="group" aria-labelledby="studio-draw-label">
+              ${DRAW_TOOLS.map(
+                (tool) =>
+                  `<button type="button" class="studio__draw-btn" data-draw="${tool.id}" aria-label="${tool.label}" title="${tool.label}"${tool.id === "select" ? ' aria-pressed="true"' : tool.id === "pen" ? ' aria-pressed="false"' : ""}>${drawIcon(tool.path)}</button>`,
+              ).join("")}
+            </div>
+            <p class="studio__hint">원, 사각형, 삼각형, 별과 선, 펜으로 카드에 형태를 그리는 도구입니다.</p>
+          </div>
+          <div class="studio__field" id="studio-shape-size-field" hidden>
+            <label for="studio-shape-size">도형 크기</label>
+            <div class="studio__radius">
+              <input id="studio-shape-size" type="range" min="${SHAPE_MIN}" max="${SHAPE_MAX}" step="1" value="${SHAPE_MIN}" />
+              ${stepButtons("도형 크기")}
+              <input id="studio-shape-size-number" class="studio__control studio__control--number" type="number" min="${SHAPE_MIN}" max="${SHAPE_MAX}" step="1" value="${SHAPE_MIN}" aria-label="도형 크기 수치" />
+            </div>
+          </div>
+          <div class="studio__field" id="studio-shape-radius-field" hidden>
+            <label for="studio-shape-radius">도형 radius</label>
+            <div class="studio__radius">
+              <input id="studio-shape-radius" type="range" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="0" />
+              ${stepButtons("도형 radius")}
+              <input id="studio-shape-radius-number" class="studio__control studio__control--number" type="number" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="0" aria-label="도형 radius 수치" />
+            </div>
+          </div>
+          <div class="studio__field" id="studio-shape-color-field" hidden>
+            <label for="studio-shape-color">도형 색</label>
+            <div class="studio__color">
+              <input id="studio-shape-color" class="studio__color-picker studio__color-picker--text" type="color" value="${blankInk}" aria-label="도형 색 피커" />
+              <input id="studio-shape-hex" class="studio__control" type="text" value="${blankInk}" spellcheck="false" aria-label="도형 색 hex" />
+              ${gradientControls("studio-shape", "도형")}
+          </div>
+          <div id="studio-shape-stroke" hidden>
+            ${shadowRow("studio-stroke-width", "선 두께", LINE_WIDTH_MAX)}
+            ${shadowRow("studio-stroke-opacity", "선 투명도", 100)}
+            <div class="studio__field">
+              <label for="studio-stroke-color">선 색</label>
+              <div class="studio__color">
+                <input id="studio-stroke-color" class="studio__color-picker studio__color-picker--text" type="color" value="${blankInk}" aria-label="선 색 피커" />
+                <input id="studio-stroke-hex" class="studio__control" type="text" value="${blankInk}" spellcheck="false" aria-label="선 색 hex" />
+                ${gradientControls("studio-stroke", "선")}
+            </div>
+          </div>
+          <div id="studio-shape-effects" hidden>
+            ${shadowRow("studio-shadow-size", "그림자 크기", SHADOW_SIZE_MAX)}
+            ${shadowRow("studio-shadow-blur", "그림자 블러", SHADOW_BLUR_MAX)}
+            ${shadowRow("studio-shadow-distance", "그림자 거리", SHADOW_DISTANCE_MAX)}
+            ${shadowRow("studio-shadow-opacity", "그림자 투명도", 100)}
+            <div class="studio__field">
+              <label for="studio-shape-blend">블렌딩</label>
+              <select id="studio-shape-blend" class="studio__control">${SHAPE_BLENDS.map((blend) => `<option value="${blend}">${BLEND_LABELS[blend]}</option>`).join("")}</select>
+            </div>
+            <div class="studio__field">
+              <span id="studio-layer-blur-label">레이어 블러</span>
+              <div class="studio__dual" role="group" aria-labelledby="studio-layer-blur-label">
+                <div class="studio__dual-ends">
+                  <label>왼쪽 <input id="studio-blur-from-number" class="studio__control studio__control--number" type="number" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="왼쪽 블러 수치" /></label>
+                  <label>오른쪽 <input id="studio-blur-to-number" class="studio__control studio__control--number" type="number" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="오른쪽 블러 수치" /></label>
+                </div>
+                <div class="studio__dual-range">
+                  <div class="studio__dual-track"></div>
+                  <input id="studio-blur-from" type="range" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="왼쪽 블러" />
+                  <input id="studio-blur-to" type="range" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="오른쪽 블러" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="studio-line-fields" hidden>
+            <div class="studio__field">
+              <label for="studio-line-width">선 두께</label>
+              <div class="studio__radius">
+                <input id="studio-line-width" type="range" min="${LINE_WIDTH_MIN}" max="${LINE_WIDTH_MAX}" step="1" value="${LINE_WIDTH_DEFAULT}" />
+                ${stepButtons("선 두께")}
+                <input id="studio-line-width-number" class="studio__control studio__control--number" type="number" min="${LINE_WIDTH_MIN}" max="${LINE_WIDTH_MAX}" step="1" value="${LINE_WIDTH_DEFAULT}" aria-label="선 두께 수치" />
+              </div>
+            </div>
+            <div class="studio__field">
+              <span id="studio-line-cap-label">선 끝</span>
+              <div class="studio__text-style" role="group" aria-labelledby="studio-line-cap-label">
+                <button type="button" class="studio__style-btn studio__style-btn--wide" data-line-cap="butt" aria-pressed="true">딱딱</button>
+                <button type="button" class="studio__style-btn studio__style-btn--wide" data-line-cap="round" aria-pressed="false">뭉뚝</button>
+              </div>
+            </div>
+            <div class="studio__field">
+              <span id="studio-line-arrow-label">화살표</span>
+              <div class="studio__text-style" role="group" aria-labelledby="studio-line-arrow-label">
+                <button type="button" class="studio__style-btn studio__style-btn--wide" data-line-arrow="start" aria-pressed="false">왼쪽</button>
+                <button type="button" class="studio__style-btn studio__style-btn--wide" data-line-arrow="end" aria-pressed="false">오른쪽</button>
+              </div>
+            </div>
+            <div class="studio__field">
+              <label for="studio-line-color">선 색</label>
+              <div class="studio__color">
+                <input id="studio-line-color" class="studio__color-picker studio__color-picker--text" type="color" value="${blankInk}" aria-label="선 색 피커" />
+                <input id="studio-line-hex" class="studio__control" type="text" value="${blankInk}" spellcheck="false" aria-label="선 색 hex" />
+              </div>
+            </div>
+          </div>
+          <div id="studio-pen-fields" hidden>
+            <div class="studio__field">
+              <label for="studio-pen-width">펜 선 두께</label>
+              <div class="studio__radius">
+                <input id="studio-pen-width" type="range" min="0" max="${LINE_WIDTH_MAX}" step="1" value="4" />
+                ${stepButtons("펜 선 두께")}
+                <input id="studio-pen-width-number" class="studio__control studio__control--number" type="number" min="0" max="${LINE_WIDTH_MAX}" step="1" value="4" aria-label="펜 선 두께 수치" />
+              </div>
+            </div>
+            <div class="studio__field">
+              <label for="studio-pen-stroke">펜 선 색</label>
+              <div class="studio__color">
+                <input id="studio-pen-stroke" class="studio__color-picker studio__color-picker--text" type="color" value="${blankInk}" aria-label="펜 선 색 피커" />
+                <input id="studio-pen-stroke-hex" class="studio__control" type="text" value="${blankInk}" spellcheck="false" aria-label="펜 선 색 hex" />
+              </div>
+            </div>
+            <div class="studio__field">
+              <label for="studio-pen-fill">펜 채우기</label>
+              <div class="studio__color">
+                <input id="studio-pen-fill-toggle" type="checkbox" aria-label="펜 채우기 사용" />
+                <input id="studio-pen-fill" class="studio__color-picker studio__color-picker--text" type="color" value="${blankInk}" aria-label="펜 채우기 색 피커" />
+                <input id="studio-pen-fill-hex" class="studio__control" type="text" value="${blankInk}" spellcheck="false" aria-label="펜 채우기 색 hex" />
+              </div>
+            </div>
+          </div>
+          <div class="studio__field">
             <label for="studio-size">너비·높이 함께</label>
             <div class="studio__radius">
               <input id="studio-size" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" />
@@ -649,7 +1069,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <div class="studio__color">
               <input id="studio-title-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(title.color)}" aria-label="타이틀 컬러 피커" />
               <input id="studio-title-hex" class="studio__control" type="text" value="${escapeHtml(title.color)}" spellcheck="false" aria-label="타이틀 컬러 hex" />
-            </div>
+              ${gradientControls("studio-title", "타이틀")}
           </div>
           <div class="studio__field">
             <label for="studio-title-size">타이틀 폰트 크기</label>
@@ -677,7 +1097,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
             <div class="studio__color">
               <input id="studio-body-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(body.color)}" aria-label="본문 컬러 피커" />
               <input id="studio-body-hex" class="studio__control" type="text" value="${escapeHtml(body.color)}" spellcheck="false" aria-label="본문 컬러 hex" />
-            </div>
+              ${gradientControls("studio-body", "본문")}
           </div>
           <div class="studio__field">
             <label for="studio-body-size">본문 폰트 크기</label>
@@ -773,6 +1193,13 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
                 <span class="studio__handle" data-handle="right" hidden></span>
                 <span class="studio__handle" data-handle="bottom" hidden></span>
                 <span class="studio__handle" data-handle="left" hidden></span>
+                <span class="studio__handle" data-handle="nw" hidden></span>
+                <span class="studio__handle" data-handle="ne" hidden></span>
+                <span class="studio__handle" data-handle="se" hidden></span>
+                <span class="studio__handle" data-handle="sw" hidden></span>
+                <span class="studio__handle" data-line-end="start" hidden></span>
+                <span class="studio__handle" data-line-end="end" hidden></span>
+                <div class="studio__pen-handles" id="studio-pen-handles"></div>
                 <div class="studio__select-frame studio__crop-frame" id="studio-crop-frame" hidden></div>
                 ${["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((edge) => `<span class="studio__handle studio__handle--crop" data-crop="${edge}" hidden></span>`).join("")}
                 <textarea class="studio__editor" id="studio-editor" rows="1" spellcheck="false" aria-label="텍스트 편집" hidden></textarea>
@@ -846,6 +1273,53 @@ export function bindStudio(
   const imageNumber = root.querySelector<HTMLInputElement>("#studio-image-width-number");
   const imageRadiusRange = root.querySelector<HTMLInputElement>("#studio-image-radius");
   const imageRadiusNumber = root.querySelector<HTMLInputElement>("#studio-image-radius-number");
+  const shapeSizeField = root.querySelector<HTMLElement>("#studio-shape-size-field");
+  const shapeSizeRange = root.querySelector<HTMLInputElement>("#studio-shape-size");
+  const shapeSizeNumber = root.querySelector<HTMLInputElement>("#studio-shape-size-number");
+  const shapeRadiusField = root.querySelector<HTMLElement>("#studio-shape-radius-field");
+  const shapeRadiusRange = root.querySelector<HTMLInputElement>("#studio-shape-radius");
+  const shapeRadiusNumber = root.querySelector<HTMLInputElement>("#studio-shape-radius-number");
+  const shapeColorField = root.querySelector<HTMLElement>("#studio-shape-color-field");
+  const shapeColorInput = root.querySelector<HTMLInputElement>("#studio-shape-color");
+  const shapeHexInput = root.querySelector<HTMLInputElement>("#studio-shape-hex");
+  const shapeEffects = root.querySelector<HTMLElement>("#studio-shape-effects");
+  const shapeStrokeFields = root.querySelector<HTMLElement>("#studio-shape-stroke");
+  const shadowSizeRange = root.querySelector<HTMLInputElement>("#studio-shadow-size");
+  const shadowSizeNumber = root.querySelector<HTMLInputElement>("#studio-shadow-size-number");
+  const shadowBlurRange = root.querySelector<HTMLInputElement>("#studio-shadow-blur");
+  const shadowBlurNumber = root.querySelector<HTMLInputElement>("#studio-shadow-blur-number");
+  const shadowDistanceRange = root.querySelector<HTMLInputElement>("#studio-shadow-distance");
+  const shadowDistanceNumber = root.querySelector<HTMLInputElement>("#studio-shadow-distance-number");
+  const shadowOpacityRange = root.querySelector<HTMLInputElement>("#studio-shadow-opacity");
+  const shadowOpacityNumber = root.querySelector<HTMLInputElement>("#studio-shadow-opacity-number");
+  const strokeWidthRange = root.querySelector<HTMLInputElement>("#studio-stroke-width");
+  const strokeWidthNumber = root.querySelector<HTMLInputElement>("#studio-stroke-width-number");
+  const strokeOpacityRange = root.querySelector<HTMLInputElement>("#studio-stroke-opacity");
+  const strokeOpacityNumber = root.querySelector<HTMLInputElement>("#studio-stroke-opacity-number");
+  const strokeColorInput = root.querySelector<HTMLInputElement>("#studio-stroke-color");
+  const strokeHexInput = root.querySelector<HTMLInputElement>("#studio-stroke-hex");
+  const shapeBlendSelect = root.querySelector<HTMLSelectElement>("#studio-shape-blend");
+  const blurFromRange = root.querySelector<HTMLInputElement>("#studio-blur-from");
+  const blurFromNumber = root.querySelector<HTMLInputElement>("#studio-blur-from-number");
+  const blurToRange = root.querySelector<HTMLInputElement>("#studio-blur-to");
+  const blurToNumber = root.querySelector<HTMLInputElement>("#studio-blur-to-number");
+  const lineFields = root.querySelector<HTMLElement>("#studio-line-fields");
+  const lineWidthRange = root.querySelector<HTMLInputElement>("#studio-line-width");
+  const lineWidthNumber = root.querySelector<HTMLInputElement>("#studio-line-width-number");
+  const lineColorInput = root.querySelector<HTMLInputElement>("#studio-line-color");
+  const lineHexInput = root.querySelector<HTMLInputElement>("#studio-line-hex");
+  const penFields = root.querySelector<HTMLElement>("#studio-pen-fields");
+  const penWidthRange = root.querySelector<HTMLInputElement>("#studio-pen-width");
+  const penWidthNumber = root.querySelector<HTMLInputElement>("#studio-pen-width-number");
+  const penStrokeInput = root.querySelector<HTMLInputElement>("#studio-pen-stroke");
+  const penStrokeHexInput = root.querySelector<HTMLInputElement>("#studio-pen-stroke-hex");
+  const penFillToggle = root.querySelector<HTMLInputElement>("#studio-pen-fill-toggle");
+  const penFillInput = root.querySelector<HTMLInputElement>("#studio-pen-fill");
+  const penFillHexInput = root.querySelector<HTMLInputElement>("#studio-pen-fill-hex");
+  const penButton = root.querySelector<HTMLButtonElement>('[data-draw="pen"]');
+  const selectButton = root.querySelector<HTMLButtonElement>('[data-draw="select"]');
+  const lineEnds = [...root.querySelectorAll<HTMLElement>("[data-line-end]")];
+  const penHandleHost = root.querySelector<HTMLElement>("#studio-pen-handles");
   const colorInput = root.querySelector<HTMLInputElement>("#studio-color");
   const hexInput = root.querySelector<HTMLInputElement>("#studio-hex");
   const radiusRange = root.querySelector<HTMLInputElement>("#studio-radius");
@@ -905,6 +1379,52 @@ export function bindStudio(
     !imageNumber ||
     !imageRadiusRange ||
     !imageRadiusNumber ||
+    !shapeSizeField ||
+    !shapeSizeRange ||
+    !shapeSizeNumber ||
+    !shapeRadiusField ||
+    !shapeRadiusRange ||
+    !shapeRadiusNumber ||
+    !shapeColorField ||
+    !shapeColorInput ||
+    !shapeHexInput ||
+    !shapeEffects ||
+    !shapeStrokeFields ||
+    !shadowSizeRange ||
+    !shadowSizeNumber ||
+    !shadowBlurRange ||
+    !shadowBlurNumber ||
+    !shadowDistanceRange ||
+    !shadowDistanceNumber ||
+    !shadowOpacityRange ||
+    !shadowOpacityNumber ||
+    !strokeWidthRange ||
+    !strokeWidthNumber ||
+    !strokeOpacityRange ||
+    !strokeOpacityNumber ||
+    !strokeColorInput ||
+    !strokeHexInput ||
+    !shapeBlendSelect ||
+    !blurFromRange ||
+    !blurFromNumber ||
+    !blurToRange ||
+    !blurToNumber ||
+    !lineFields ||
+    !lineWidthRange ||
+    !lineWidthNumber ||
+    !lineColorInput ||
+    !lineHexInput ||
+    !penFields ||
+    !penWidthRange ||
+    !penWidthNumber ||
+    !penStrokeInput ||
+    !penStrokeHexInput ||
+    !penFillToggle ||
+    !penFillInput ||
+    !penFillHexInput ||
+    !penButton ||
+    !selectButton ||
+    !penHandleHost ||
     !colorInput ||
     !hexInput ||
     !radiusRange ||
@@ -935,6 +1455,9 @@ export function bindStudio(
 
   let dropper = false;
   let blockPresetClick = false;
+  let penMode = false;
+  let penEdit: { id: string; snapshot: PenAnchor[] | null; box: { x: number; y: number; width: number; height: number } | null; active: number | null } | null = null;
+  let penDraft: { points: PenAnchor[]; hover: { x: number; y: number } | null; pointerId: number | null; dragging: number | null; closing: boolean } | null = null;
   const setDropper = (on: boolean) => {
     dropper = on;
     if (on) studio.dataset.dropper = "true";
@@ -993,6 +1516,16 @@ export function bindStudio(
     }
     return ensureLayer(state, "image");
   };
+  const topSelected = <T extends StudioLayer>(kind: T["kind"]): T | null => {
+    for (let index = state.layers.length - 1; index >= 0; index -= 1) {
+      const layer = state.layers[index];
+      if (layer && layer.kind === kind && selected.has(layer.id)) return layer as T;
+    }
+    return null;
+  };
+  const panelShape = () => topSelected<ShapeLayer>("shape");
+  const panelLine = () => topSelected<LineLayer>("line");
+  const panelPen = () => topSelected<PenLayer>("pen");
   const imageLayers = () => state.layers.filter((layer): layer is ImageLayer => layer.kind === "image");
   const imageReady = (url: string) => {
     const image = imageCache.get(url);
@@ -1178,6 +1711,25 @@ export function bindStudio(
     writeControl(fontScaleRange, fontScaleNumber, fontScale);
     writeControl(imageRange, imageNumber, panelImage().width);
     writeControl(imageRadiusRange, imageRadiusNumber, panelImage().radius);
+    const shape = panelShape();
+    if (shape) {
+      const shadow = shapeShadow(shape);
+      writeControl(shapeSizeRange, shapeSizeNumber, Math.round(Math.max(shape.width, shape.height)));
+      writeControl(shapeRadiusRange, shapeRadiusNumber, shape.radius);
+      const stroke = shapeStroke(shape);
+      writeControl(shadowSizeRange, shadowSizeNumber, shadow.size);
+      writeControl(shadowBlurRange, shadowBlurNumber, shadow.blur);
+      writeControl(shadowDistanceRange, shadowDistanceNumber, shadow.distance);
+      writeControl(shadowOpacityRange, shadowOpacityNumber, shadow.opacity);
+      writeControl(strokeWidthRange, strokeWidthNumber, stroke.width);
+      writeControl(strokeOpacityRange, strokeOpacityNumber, stroke.opacity);
+      writeControl(blurFromRange, blurFromNumber, clampUnit(shape.blurFrom ?? 0, LAYER_BLUR_MAX));
+      writeControl(blurToRange, blurToNumber, clampUnit(shape.blurTo ?? 0, LAYER_BLUR_MAX));
+    }
+    const line = panelLine();
+    if (line) writeControl(lineWidthRange, lineWidthNumber, line.stroke);
+    const pen = panelPen();
+    if (pen) writeControl(penWidthRange, penWidthNumber, pen.strokeWidth);
     imageRadiusRange.setAttribute("aria-valuenow", String(panelImage().radius));
   };
 
@@ -1207,7 +1759,13 @@ export function bindStudio(
   };
 
   const showPanel = (panel: StudioState["panel"]) => {
-    if (panel !== "design") setDropper(false);
+    if (panel !== "design") {
+      setDropper(false);
+      if (penEdit) commitPenEdit();
+      penMode = false;
+      penDraft = null;
+      delete canvas.dataset.pen;
+    }
     state.panel = panel;
     const design = panel === "design";
     root.querySelector("#studio-panel-design")?.toggleAttribute("hidden", !design);
@@ -1219,6 +1777,32 @@ export function bindStudio(
     if (designTab) designTab.tabIndex = design ? 0 : -1;
     if (codeTab) codeTab.tabIndex = design ? -1 : 0;
     void redraw();
+  };
+
+  const syncGradient = (prefix: string, color: string, gradient: LinearGradient | null) => {
+    const toggle = root.querySelector<HTMLButtonElement>(`#${prefix}-gradient-toggle`);
+    const panel = root.querySelector<HTMLElement>(`#${prefix}-gradient`);
+    const endColor = root.querySelector<HTMLInputElement>(`#${prefix}-end`);
+    const endHex = root.querySelector<HTMLInputElement>(`#${prefix}-end-hex`);
+    const angleRange = root.querySelector<HTMLInputElement>(`#${prefix}-angle`);
+    const angleNumber = root.querySelector<HTMLInputElement>(`#${prefix}-angle-number`);
+    if (!toggle || !panel || !endColor || !endHex || !angleRange || !angleNumber) return;
+    toggle.setAttribute("aria-pressed", gradient ? "true" : "false");
+    panel.hidden = !gradient;
+    if (!gradient) return;
+    if (document.activeElement !== endHex) {
+      endColor.value = gradient.to;
+      endHex.value = gradient.to;
+    }
+    writeControl(angleRange, angleNumber, gradient.angle);
+    if (document.activeElement !== root.querySelector(`#${prefix}-hex`)) {
+      const picker = root.querySelector<HTMLInputElement>(`#${prefix}-color`);
+      const hex = root.querySelector<HTMLInputElement>(`#${prefix}-hex`);
+      if (picker && hex && prefix !== "studio-shape") {
+        picker.value = color;
+        hex.value = color;
+      }
+    }
   };
 
   const syncForm = () => {
@@ -1253,6 +1837,57 @@ export function bindStudio(
       const style = button.dataset.textStyle as TextToggle | undefined;
       const on = style ? styleOn(layer, style) : layer.align === button.dataset.textAlign;
       button.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+    const shape = panelShape();
+    const line = panelLine();
+    const pen = panelPen();
+    shapeSizeField.hidden = !shape;
+    shapeRadiusField.hidden = !shape || shape.shape === "ellipse" || Boolean(shape.nodes && shape.nodes.length >= 2);
+    shapeColorField.hidden = !shape;
+    shapeStrokeFields.hidden = !shape;
+    shapeEffects.hidden = !shape;
+    lineFields.hidden = !line;
+    penFields.hidden = !pen;
+    penButton.setAttribute("aria-pressed", penMode ? "true" : "false");
+    selectButton.setAttribute("aria-pressed", penMode ? "false" : "true");
+    if (shape && document.activeElement !== shapeHexInput) {
+      shapeColorInput.value = shape.color;
+      shapeHexInput.value = shape.color;
+      shapeBlendSelect.value = shapeBlend(shape);
+    }
+    syncGradient("studio-title", title.color, title.gradient ?? null);
+    syncGradient("studio-body", body.color, body.gradient ?? null);
+    syncGradient("studio-shape", shape?.color ?? rgbToHex(0, 0, 0), shape?.gradient ?? null);
+    const stroke = shape ? shapeStroke(shape) : null;
+    if (stroke && document.activeElement !== strokeHexInput) {
+      strokeColorInput.value = stroke.color;
+      strokeHexInput.value = stroke.color;
+    }
+    syncGradient("studio-stroke", stroke?.color ?? rgbToHex(0, 0, 0), stroke?.gradient ?? null);
+    if (line && document.activeElement !== lineHexInput) {
+      lineColorInput.value = line.color;
+      lineHexInput.value = line.color;
+      for (const button of root.querySelectorAll<HTMLButtonElement>("[data-line-cap]")) {
+        button.setAttribute("aria-pressed", button.dataset.lineCap === line.cap ? "true" : "false");
+      }
+      for (const button of root.querySelectorAll<HTMLButtonElement>("[data-line-arrow]")) {
+        const on = button.dataset.lineArrow === "start" ? line.start : line.end;
+        button.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    }
+    if (pen) {
+      const stroke = pen.stroke || rgbToHex(0, 0, 0);
+      if (document.activeElement !== penStrokeHexInput) {
+        penStrokeInput.value = stroke;
+        penStrokeHexInput.value = stroke;
+      }
+      penFillToggle.checked = Boolean(pen.fill);
+      penFillInput.disabled = !pen.fill;
+      penFillHexInput.disabled = !pen.fill;
+      if (pen.fill && document.activeElement !== penFillHexInput) {
+        penFillInput.value = pen.fill;
+        penFillHexInput.value = pen.fill;
+      }
     }
     if (document.activeElement !== codeInput) codeInput.value = state.code;
     markTheme(panelImage().src);
@@ -1442,6 +2077,73 @@ export function bindStudio(
   bindPair(imageRadiusRange, imageRadiusNumber, (value) => {
     panelImage().radius = clampRadius(value);
   }, () => panelImage().radius);
+  bindPair(shapeSizeRange, shapeSizeNumber, (value) => {
+    const layer = panelShape();
+    if (!layer) return;
+    const from = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+    const nodes = layer.nodes ? structuredClone(layer.nodes) : null;
+    Object.assign(layer, scaleShapeBox(layer, value));
+    if (nodes) layer.nodes = transformNodes(nodes, from, layer);
+  }, () => {
+    const layer = panelShape();
+    return layer ? Math.round(Math.max(layer.width, layer.height)) : SHAPE_MIN;
+  });
+  bindPair(shapeRadiusRange, shapeRadiusNumber, (value) => {
+    const layer = panelShape();
+    if (layer) layer.radius = clampRadius(value);
+  }, () => panelShape()?.radius ?? 0);
+  const withShadow = (layer: ShapeLayer, patch: Partial<ReturnType<typeof shapeShadow>>) => {
+    layer.shadow = { ...shapeShadow(layer), ...patch };
+  };
+  bindPair(shadowSizeRange, shadowSizeNumber, (value) => {
+    const layer = panelShape();
+    if (layer) withShadow(layer, { size: clampUnit(value, SHADOW_SIZE_MAX) });
+  }, () => (panelShape() ? shapeShadow(panelShape()!).size : 0));
+  bindPair(shadowBlurRange, shadowBlurNumber, (value) => {
+    const layer = panelShape();
+    if (layer) withShadow(layer, { blur: clampUnit(value, SHADOW_BLUR_MAX) });
+  }, () => (panelShape() ? shapeShadow(panelShape()!).blur : 0));
+  bindPair(shadowDistanceRange, shadowDistanceNumber, (value) => {
+    const layer = panelShape();
+    if (layer) withShadow(layer, { distance: clampUnit(value, SHADOW_DISTANCE_MAX) });
+  }, () => (panelShape() ? shapeShadow(panelShape()!).distance : 0));
+  bindPair(shadowOpacityRange, shadowOpacityNumber, (value) => {
+    const layer = panelShape();
+    if (layer) withShadow(layer, { opacity: clampUnit(value, 100) });
+  }, () => (panelShape() ? shapeShadow(panelShape()!).opacity : 0));
+  const withStroke = (layer: ShapeLayer, patch: Partial<ReturnType<typeof shapeStroke>>) => {
+    layer.stroke = { ...shapeStroke(layer), ...patch };
+  };
+  bindPair(strokeWidthRange, strokeWidthNumber, (value) => {
+    const layer = panelShape();
+    if (layer) withStroke(layer, { width: clampUnit(value, LINE_WIDTH_MAX) });
+  }, () => (panelShape() ? shapeStroke(panelShape()!).width : 0));
+  bindPair(strokeOpacityRange, strokeOpacityNumber, (value) => {
+    const layer = panelShape();
+    if (layer) withStroke(layer, { opacity: clampUnit(value, 100) });
+  }, () => (panelShape() ? shapeStroke(panelShape()!).opacity : 100));
+  bindPair(blurFromRange, blurFromNumber, (value) => {
+    const layer = panelShape();
+    if (layer) layer.blurFrom = clampUnit(value, LAYER_BLUR_MAX);
+  }, () => clampUnit(panelShape()?.blurFrom ?? 0, LAYER_BLUR_MAX));
+  bindPair(blurToRange, blurToNumber, (value) => {
+    const layer = panelShape();
+    if (layer) layer.blurTo = clampUnit(value, LAYER_BLUR_MAX);
+  }, () => clampUnit(panelShape()?.blurTo ?? 0, LAYER_BLUR_MAX));
+  for (const range of [blurFromRange, blurToRange]) {
+    range.addEventListener("pointerdown", () => {
+      range.style.zIndex = "2";
+      (range === blurFromRange ? blurToRange : blurFromRange).style.zIndex = "1";
+    });
+  }
+  bindPair(lineWidthRange, lineWidthNumber, (value) => {
+    const layer = panelLine();
+    if (layer) layer.stroke = Math.min(LINE_WIDTH_MAX, Math.max(LINE_WIDTH_MIN, Math.round(value)));
+  }, () => panelLine()?.stroke ?? LINE_WIDTH_DEFAULT);
+  bindPair(penWidthRange, penWidthNumber, (value) => {
+    const layer = panelPen();
+    if (layer) layer.strokeWidth = Math.min(LINE_WIDTH_MAX, Math.max(0, Math.round(value)));
+  }, () => panelPen()?.strokeWidth ?? 0);
   const bindSelect = (select: HTMLSelectElement, apply: () => void) => {
     select.addEventListener("focus", () => beginGesture(select));
     select.addEventListener("change", () => {
@@ -1451,6 +2153,11 @@ export function bindStudio(
     });
     select.addEventListener("blur", () => finishGesture(select));
   };
+  bindSelect(shapeBlendSelect, () => {
+    const layer = panelShape();
+    const blend = SHAPE_BLENDS.find((item) => item === shapeBlendSelect.value);
+    if (layer && blend) layer.blend = blend;
+  });
   bindSelect(titleFontSelect, () => {
     panelText("title").fontId = titleFontSelect.value;
   });
@@ -1565,11 +2272,95 @@ export function bindStudio(
     state.color = hex;
   }, () => state.color);
   bindColor(titleColorInput, titleHexInput, (hex) => {
-    panelText("title").color = hex;
+    const layer = panelText("title");
+    layer.color = hex;
+    if (layer.gradient) layer.gradient = { ...layer.gradient, from: hex };
   }, () => panelText("title").color);
   bindColor(bodyColorInput, bodyHexInput, (hex) => {
-    panelText("body").color = hex;
+    const layer = panelText("body");
+    layer.color = hex;
+    if (layer.gradient) layer.gradient = { ...layer.gradient, from: hex };
   }, () => panelText("body").color);
+  bindColor(shapeColorInput, shapeHexInput, (hex) => {
+    const layer = panelShape();
+    if (!layer) return;
+    layer.color = hex;
+    if (layer.gradient) layer.gradient = { ...layer.gradient, from: hex };
+  }, () => panelShape()?.color ?? rgbToHex(0, 0, 0));
+  const bindGradient = (
+    prefix: string,
+    read: () => { color: string; gradient?: LinearGradient | null },
+    write: (color: string, gradient: LinearGradient | null) => void,
+  ) => {
+    const toggle = root.querySelector<HTMLButtonElement>(`#${prefix}-gradient-toggle`);
+    const endColor = root.querySelector<HTMLInputElement>(`#${prefix}-end`);
+    const endHex = root.querySelector<HTMLInputElement>(`#${prefix}-end-hex`);
+    const angleRange = root.querySelector<HTMLInputElement>(`#${prefix}-angle`);
+    const angleNumber = root.querySelector<HTMLInputElement>(`#${prefix}-angle-number`);
+    if (!toggle || !endColor || !endHex || !angleRange || !angleNumber) return;
+    toggle.addEventListener("click", () => {
+      const current = read();
+      beginGesture(toggle);
+      if (current.gradient) write(current.color, null);
+      else write(current.color, { angle: 0, from: current.color, to: inkHex(current.color) });
+      finishGesture(toggle);
+      void redraw();
+    });
+    bindColor(endColor, endHex, (hex) => {
+      const current = read();
+      if (!current.gradient) return;
+      write(current.color, { ...current.gradient, to: hex });
+    }, () => read().gradient?.to ?? rgbToHex(0, 0, 0));
+    bindPair(angleRange, angleNumber, (value) => {
+      const current = read();
+      if (!current.gradient) return;
+      const angle = ((Math.round(value) % 360) + 360) % 360;
+      write(current.color, { ...current.gradient, angle });
+    }, () => read().gradient?.angle ?? 0);
+  };
+  bindGradient("studio-title", () => panelText("title"), (color, gradient) => {
+    const layer = panelText("title");
+    layer.color = color;
+    layer.gradient = gradient;
+  });
+  bindGradient("studio-body", () => panelText("body"), (color, gradient) => {
+    const layer = panelText("body");
+    layer.color = color;
+    layer.gradient = gradient;
+  });
+  bindGradient("studio-shape", () => panelShape() ?? { color: rgbToHex(0, 0, 0), gradient: null }, (color, gradient) => {
+    const layer = panelShape();
+    if (!layer) return;
+    layer.color = color;
+    layer.gradient = gradient;
+  });
+  bindColor(strokeColorInput, strokeHexInput, (hex) => {
+    const layer = panelShape();
+    if (!layer) return;
+    const stroke = shapeStroke(layer);
+    layer.stroke = { ...stroke, color: hex, gradient: stroke.gradient ? { ...stroke.gradient, from: hex } : null };
+  }, () => (panelShape() ? shapeStroke(panelShape()!).color : rgbToHex(0, 0, 0)));
+  bindGradient("studio-stroke", () => {
+    const layer = panelShape();
+    const stroke = layer ? shapeStroke(layer) : null;
+    return { color: stroke?.color ?? rgbToHex(0, 0, 0), gradient: stroke?.gradient ?? null };
+  }, (color, gradient) => {
+    const layer = panelShape();
+    if (!layer) return;
+    layer.stroke = { ...shapeStroke(layer), color, gradient };
+  });
+  bindColor(lineColorInput, lineHexInput, (hex) => {
+    const layer = panelLine();
+    if (layer) layer.color = hex;
+  }, () => panelLine()?.color ?? rgbToHex(0, 0, 0));
+  bindColor(penStrokeInput, penStrokeHexInput, (hex) => {
+    const layer = panelPen();
+    if (layer) layer.stroke = hex;
+  }, () => panelPen()?.stroke || rgbToHex(0, 0, 0));
+  bindColor(penFillInput, penFillHexInput, (hex) => {
+    const layer = panelPen();
+    if (layer && penFillToggle.checked) layer.fill = hex;
+  }, () => panelPen()?.fill || rgbToHex(0, 0, 0));
   const applyRadius = (raw: string) => {
     state.radius = clampRadius(Number(raw));
     syncRadiusControls();
@@ -1764,6 +2555,19 @@ export function bindStudio(
     for (let index = hits.length - 1; index >= 0; index -= 1) {
       const box = hits[index];
       if (!box) continue;
+      const layer = layerById(box.id);
+      if (layer?.kind === "shape") {
+        if (shapeContains(layer, x, y, pad)) return box;
+        continue;
+      }
+      if (layer?.kind === "line") {
+        if (lineContains(layer, x, y, pad)) return box;
+        continue;
+      }
+      if (layer?.kind === "pen") {
+        if (penContains(layer, x, y, pad)) return box;
+        continue;
+      }
       if (x >= box.x - pad && y >= box.y - pad && x <= box.x + box.w + pad && y <= box.y + box.h + pad) {
         return box;
       }
@@ -1811,7 +2615,7 @@ export function bindStudio(
   type ImageBox = { x: number; y: number; width: number };
   type Point = { x: number; y: number };
   /** copy: the first move duplicates the selection and drags the copies (Option/Alt drag). */
-  let drag: { id: string; origin: Point; start: Map<string, Point>; pointerId: number; copy: boolean } | null = null;
+  let drag: { id: string; origin: Point; start: Map<string, DragOrigin>; pointerId: number; copy: boolean } | null = null;
   let tapStart: { x: number; y: number; moved: boolean; shift: boolean } | null = null;
   let lastTap: { id: string; time: number; x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
@@ -1821,42 +2625,104 @@ export function bindStudio(
   let panelKey = "";
 
   const imageBox = (layer: ImageLayer): ImageBox => ({ x: layer.x, y: layer.y, width: layer.width });
-  const clampLayerPosition = (layer: StudioLayer, x: number, y: number): Point =>
-    layer.kind === "image"
-      ? {
-          x: clampImageOffset(x, state.cardWidth, layer.width),
-          y: clampImageOffset(y, state.cardHeight, layerHeight(layer)),
-        }
-      : {
-          x: clampTextOffset(x, state.cardWidth, layer.size),
-          y: clampTextOffset(y, state.cardHeight, layer.size),
-        };
+  type DragOrigin = { x: number; y: number; x2?: number; y2?: number; points?: PenAnchor[] };
+  const clampLayerPosition = (layer: StudioLayer, x: number, y: number): Point => {
+    if (layer.kind === "image") {
+      return {
+        x: clampImageOffset(x, state.cardWidth, layer.width),
+        y: clampImageOffset(y, state.cardHeight, layerHeight(layer)),
+      };
+    }
+    if (layer.kind === "shape") {
+      return {
+        x: clampImageOffset(x, state.cardWidth, layer.width),
+        y: clampImageOffset(y, state.cardHeight, layer.height),
+      };
+    }
+    if (layer.kind === "title" || layer.kind === "body") {
+      return {
+        x: clampTextOffset(x, state.cardWidth, layer.size),
+        y: clampTextOffset(y, state.cardHeight, layer.size),
+      };
+    }
+    return { x, y };
+  };
+  const originOf = (layer: StudioLayer): DragOrigin => {
+    if (layer.kind === "line") return { x: layer.x, y: layer.y, x2: layer.x2, y2: layer.y2 };
+    if (layer.kind === "pen") return { x: 0, y: 0, points: structuredClone(layer.points) };
+    if (layer.kind === "shape" && layer.nodes && layer.nodes.length >= 2) {
+      return { x: layer.x, y: layer.y, points: structuredClone(layer.nodes) };
+    }
+    return { x: layer.x, y: layer.y };
+  };
+  const allowedDelta = (layer: StudioLayer, origin: DragOrigin, dx: number, dy: number): Point => {
+    if (layer.kind === "line") {
+      const box = lineBounds({ ...layer, x: origin.x, y: origin.y, x2: origin.x2 ?? origin.x, y2: origin.y2 ?? origin.y });
+      return {
+        x: clampImageOffset(box.x + dx, state.cardWidth, box.w) - box.x,
+        y: clampImageOffset(box.y + dy, state.cardHeight, box.h) - box.y,
+      };
+    }
+    if ((layer.kind === "pen" || layer.kind === "shape") && origin.points) {
+      const box = nodeBounds(origin.points);
+      return {
+        x: clampImageOffset(box.x + dx, state.cardWidth, box.width) - box.x,
+        y: clampImageOffset(box.y + dy, state.cardHeight, box.height) - box.y,
+      };
+    }
+    const clamped = clampLayerPosition(layer, origin.x + dx, origin.y + dy);
+    return { x: clamped.x - origin.x, y: clamped.y - origin.y };
+  };
+  const placeFrom = (layer: StudioLayer, origin: DragOrigin, dx: number, dy: number) => {
+    if (layer.kind === "line") {
+      layer.x = roundOffset(origin.x + dx);
+      layer.y = roundOffset(origin.y + dy);
+      layer.x2 = roundOffset((origin.x2 ?? layer.x2) + dx);
+      layer.y2 = roundOffset((origin.y2 ?? layer.y2) + dy);
+      return;
+    }
+    if (layer.kind === "pen" || (layer.kind === "shape" && origin.points)) {
+      const points = origin.points ?? (layer.kind === "pen" ? layer.points : layer.nodes ?? []);
+      const moved = points.map((point) => ({
+        x: roundOffset(point.x + dx),
+        y: roundOffset(point.y + dy),
+        in: point.in ? { x: roundOffset(point.in.x + dx), y: roundOffset(point.in.y + dy) } : null,
+        out: point.out ? { x: roundOffset(point.out.x + dx), y: roundOffset(point.out.y + dy) } : null,
+      }));
+      if (layer.kind === "pen") layer.points = moved;
+      else {
+        layer.nodes = moved;
+        layer.x = roundOffset(origin.x + dx);
+        layer.y = roundOffset(origin.y + dy);
+      }
+      return;
+    }
+    const next = clampLayerPosition(layer, origin.x + dx, origin.y + dy);
+    layer.x = next.x;
+    layer.y = next.y;
+  };
   const positionsOf = (ids: Iterable<string>) => {
-    const start = new Map<string, Point>();
+    const start = new Map<string, DragOrigin>();
     for (const id of ids) {
       const layer = layerById(id);
-      if (layer) start.set(id, { x: layer.x, y: layer.y });
+      if (layer) start.set(id, originOf(layer));
     }
     return start;
   };
-  const moveGroup = (start: Map<string, Point>, dx: number, dy: number) => {
+  const moveGroup = (start: Map<string, DragOrigin>, dx: number, dy: number) => {
     // Shrink the shared delta to the most constrained item so the group keeps its spacing at card edges.
     const nearer = (a: number, b: number) => (Math.abs(b) < Math.abs(a) ? b : a);
-    const moving: { layer: StudioLayer; from: Point }[] = [];
+    const moving: { layer: StudioLayer; from: DragOrigin }[] = [];
     for (const [id, from] of start) {
       const layer = layerById(id);
       if (layer) moving.push({ layer, from });
     }
     for (const { layer, from } of moving) {
-      const clamped = clampLayerPosition(layer, from.x + dx, from.y + dy);
-      dx = nearer(dx, clamped.x - from.x);
-      dy = nearer(dy, clamped.y - from.y);
+      const allowed = allowedDelta(layer, from, dx, dy);
+      dx = nearer(dx, allowed.x);
+      dy = nearer(dy, allowed.y);
     }
-    for (const { layer, from } of moving) {
-      const next = clampLayerPosition(layer, from.x + dx, from.y + dy);
-      layer.x = next.x;
-      layer.y = next.y;
-    }
+    for (const { layer, from } of moving) placeFrom(layer, from, dx, dy);
   };
   const applyImage = (layer: ImageLayer, next: ImageBox) => {
     layer.width = next.width;
@@ -1874,11 +2740,182 @@ export function bindStudio(
     }
     return panelImage();
   };
+  const editAnchors = (): PenAnchor[] | null => {
+    if (penMode || !penEdit) return null;
+    const layer = layerById(penEdit.id);
+    if (layer?.kind === "pen") return layer.points;
+    if (layer?.kind === "shape" && layer.nodes && layer.nodes.length >= 2) return layer.nodes;
+    return null;
+  };
+  const fitShapeNodes = (layer: ShapeLayer) => {
+    if (!layer.nodes || layer.nodes.length < 2) return;
+    const box = nodeBounds(layer.nodes);
+    layer.x = roundOffset(box.x);
+    layer.y = roundOffset(box.y);
+    layer.width = Math.max(1, box.width);
+    layer.height = Math.max(1, box.height);
+  };
+  const paintPenChrome = () => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx || state.code.trim()) return;
+    const draw: DrawPath = {
+      moveTo: (x, y) => ctx.moveTo(x, y),
+      lineTo: (x, y) => ctx.lineTo(x, y),
+      quadraticCurveTo: (cx, cy, x, y) => ctx.quadraticCurveTo(cx, cy, x, y),
+      bezierCurveTo: (c1x, c1y, c2x, c2y, x, y) => ctx.bezierCurveTo(c1x, c1y, c2x, c2y, x, y),
+      closePath: () => ctx.closePath(),
+    };
+    ctx.save();
+    if (penDraft && penDraft.points.length > 0) {
+      const first = penDraft.points[0];
+      const closingDrag = penDraft.closing;
+      const nearFirst = Boolean(
+        first &&
+          penDraft.points.length >= 2 &&
+          !closingDrag &&
+          penDraft.dragging === null &&
+          penDraft.hover &&
+          Math.hypot(penDraft.hover.x - first.x, penDraft.hover.y - first.y) <= PEN_CLOSE,
+      );
+      const closing = closingDrag || nearFirst;
+      if (closing) canvas.dataset.penClose = "true";
+      else delete canvas.dataset.penClose;
+      const aim = closing && first ? first : penDraft.hover;
+      ctx.beginPath();
+      tracePen(draw, penDraft.points, false);
+      const last = penDraft.points[penDraft.points.length - 1];
+      if (last && aim && penDraft.dragging === null) {
+        const c1 = last.out ?? last;
+        const c2 = closing && first?.in ? first.in : aim;
+        ctx.moveTo(last.x, last.y);
+        if (last.out || (closing && first?.in)) ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, aim.x, aim.y);
+        else ctx.lineTo(aim.x, aim.y);
+      }
+      ctx.strokeStyle = inkHex(state.color);
+      ctx.lineWidth = Math.max(2, state.cardWidth / 400);
+      ctx.lineCap = "round";
+      ctx.stroke();
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "rgb(64, 101, 248)";
+      ctx.fillStyle = inkHex(state.color);
+      for (const point of penDraft.points) {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, Math.max(4, state.cardWidth / 180), 0, Math.PI * 2);
+        ctx.fill();
+        for (const handle of [point.in, point.out]) {
+          if (!handle) continue;
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(handle.x, handle.y);
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+          ctx.lineWidth = 3;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(handle.x, handle.y);
+          ctx.strokeStyle = accent;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.fillStyle = accent;
+          ctx.arc(handle.x, handle.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      if (closing && first) {
+        ctx.beginPath();
+        ctx.arc(first.x, first.y, Math.max(12, state.cardWidth / 70), 0, Math.PI * 2);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    } else delete canvas.dataset.penClose;
+    const selectedPoints = editAnchors();
+    if (selectedPoints) {
+      ctx.strokeStyle = inkHex(state.color);
+      ctx.lineWidth = Math.max(1, state.cardWidth / 600);
+      for (const point of selectedPoints) {
+        for (const handle of [point.in, point.out]) {
+          if (!handle) continue;
+          ctx.beginPath();
+          ctx.moveTo(point.x, point.y);
+          ctx.lineTo(handle.x, handle.y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  };
+  const dragPenHandle = (event: PointerEvent, index: number, part: "anchor" | "in" | "out") => {
+    const points = editAnchors();
+    const basePoint = points?.[index];
+    const edit = penEdit;
+    if (!points || !basePoint || !edit) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) {
+      try {
+        target.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+    }
+    const base = structuredClone(basePoint);
+    const origin = cardPoint(event);
+    let moved = false;
+    const moving = part === "anchor" && edit.active === index;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      const point = cardPoint(ev);
+      if (Math.hypot(point.x - origin.x, point.y - origin.y) >= 4) moved = true;
+      const next = structuredClone(base);
+      if (part === "anchor" && moving) {
+        const dx = point.x - origin.x;
+        const dy = point.y - origin.y;
+        next.x = roundOffset(base.x + dx);
+        next.y = roundOffset(base.y + dy);
+        next.in = base.in ? { x: roundOffset(base.in.x + dx), y: roundOffset(base.in.y + dy) } : null;
+        next.out = base.out ? { x: roundOffset(base.out.x + dx), y: roundOffset(base.out.y + dy) } : null;
+      } else if (part === "anchor") {
+        if (Math.hypot(point.x - base.x, point.y - base.y) >= 4) {
+          next.out = { x: roundOffset(point.x), y: roundOffset(point.y) };
+          if (!ev.altKey) next.in = { x: roundOffset(base.x * 2 - point.x), y: roundOffset(base.y * 2 - point.y) };
+        }
+      } else {
+        next[part] = { x: roundOffset(point.x), y: roundOffset(point.y) };
+        const other = part === "in" ? "out" : "in";
+        if (!ev.altKey && base[other]) next[other] = { x: roundOffset(base.x * 2 - point.x), y: roundOffset(base.y * 2 - point.y) };
+      }
+      points[index] = next;
+      const shape = layerById(edit.id);
+      if (shape?.kind === "shape") fitShapeNodes(shape);
+      paint();
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId || !(target instanceof HTMLElement)) return;
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", end);
+      target.removeEventListener("pointercancel", end);
+      if (part === "anchor" && !moved && penEdit?.id === edit.id) penEdit.active = index;
+      paint();
+    };
+    if (target instanceof HTMLElement) {
+      target.addEventListener("pointermove", move);
+      target.addEventListener("pointerup", end);
+      target.addEventListener("pointercancel", end);
+    }
+  };
   paint = () => {
+    if (penEdit) {
+      const edited = layerById(penEdit.id);
+      const alive = edited?.kind === "pen" || (edited?.kind === "shape" && (edited.nodes?.length ?? 0) >= 2);
+      if (!alive) penEdit = null;
+    }
     for (const id of [...selected]) if (!layerById(id)) selected.delete(id);
     hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id);
     paintCropGhost();
     paintDragStroke();
+    paintPenChrome();
     syncOverlay();
     const key = [...selected].join(" ");
     if (key !== panelKey) {
@@ -1908,7 +2945,17 @@ export function bindStudio(
     editor.style.font = textFont(layer, base, extraFonts());
     editor.style.textDecoration = layer.underline ? "underline" : "none";
     editor.style.lineHeight = `${(Math.round(layer.size * 1.25) * viewScale) / shrink}px`;
-    editor.style.color = layer.color;
+    if (layer.gradient) {
+      editor.style.color = "transparent";
+      editor.style.backgroundImage = `linear-gradient(${(layer.gradient.angle + 90) % 360}deg, ${layer.gradient.from}, ${layer.gradient.to})`;
+      editor.style.backgroundClip = "text";
+      editor.style.setProperty("-webkit-background-clip", "text");
+    } else {
+      editor.style.color = layer.color;
+      editor.style.backgroundImage = "";
+      editor.style.backgroundClip = "";
+      editor.style.setProperty("-webkit-background-clip", "");
+    }
     editor.style.width = `${(Math.max(1, state.cardWidth - FONT_SIDE_MARGIN * 2) * viewScale) / shrink}px`;
     editor.style.transform = `scale(${shrink})`;
     editor.style.height = "auto";
@@ -1931,10 +2978,203 @@ export function bindStudio(
       placeAt(handle, x, y);
     }
   };
-  const singleImage = (): ImageLayer | null => {
+  const singleOf = <T extends StudioLayer>(kind: T["kind"]): T | null => {
     const [onlyId] = selected.size === 1 ? [...selected] : [];
     const layer = onlyId ? layerById(onlyId) : undefined;
-    return layer?.kind === "image" ? layer : null;
+    return layer?.kind === kind ? (layer as T) : null;
+  };
+  const singleImage = (): ImageLayer | null => singleOf<ImageLayer>("image");
+  const singleShape = (): ShapeLayer | null => singleOf<ShapeLayer>("shape");
+  const singleLine = (): LineLayer | null => singleOf<LineLayer>("line");
+  const shapeHandleName = (edge: string): ShapeHandle | null => {
+    if (edge === "top") return "n";
+    if (edge === "right") return "e";
+    if (edge === "bottom") return "s";
+    if (edge === "left") return "w";
+    if (edge === "nw" || edge === "ne" || edge === "se" || edge === "sw") return edge;
+    return null;
+  };
+  let penHandleKey = "";
+  const dragStarHandle = (event: PointerEvent, index: number) => {
+    const layer = singleShape();
+    if (!layer || layer.shape !== "star") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) {
+      try {
+        target.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+    }
+    beginGesture(penHandleHost);
+    const start = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+    const center = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
+    const outer = index % 2 === 0;
+    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      const point = cardPoint(ev);
+      const dist = Math.hypot(point.x - center.x, point.y - center.y);
+      const outerDist = Math.hypot(Math.cos(angle) * (start.width / 2), Math.sin(angle) * (start.height / 2));
+      if (outer) {
+        const factor = dist / Math.max(1, outerDist);
+        const width = clampShapeSize(start.width * factor);
+        const height = clampShapeSize(start.height * factor);
+        layer.width = width;
+        layer.height = height;
+        layer.x = roundOffset(center.x - width / 2);
+        layer.y = roundOffset(center.y - height / 2);
+      } else {
+        layer.inner = Math.min(0.92, Math.max(0.08, dist / Math.max(1, outerDist)));
+      }
+      paint();
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId || !(target instanceof HTMLElement)) return;
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", end);
+      target.removeEventListener("pointercancel", end);
+      finishGesture(penHandleHost);
+      void redraw();
+    };
+    if (target instanceof HTMLElement) {
+      target.addEventListener("pointermove", move);
+      target.addEventListener("pointerup", end);
+      target.addEventListener("pointercancel", end);
+    }
+  };
+  const dragRadiusHandle = (event: PointerEvent, index: number) => {
+    const layer = singleShape();
+    if (!layer || (layer.shape !== "rect" && layer.shape !== "triangle")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) {
+      try {
+        target.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+    }
+    beginGesture(penHandleHost);
+    const corners =
+      layer.shape === "rect"
+        ? [
+            { x: layer.x, y: layer.y },
+            { x: layer.x + layer.width, y: layer.y },
+            { x: layer.x + layer.width, y: layer.y + layer.height },
+            { x: layer.x, y: layer.y + layer.height },
+          ]
+        : trianglePoints(layer);
+    const corner = corners[index];
+    const origin = cardPoint(event);
+    const startRadius = layer.radius;
+    const startDist = corner ? Math.hypot(origin.x - corner.x, origin.y - corner.y) : 0;
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId || !corner) return;
+      const point = cardPoint(ev);
+      const dist = Math.hypot(point.x - corner.x, point.y - corner.y);
+      const limit = Math.min(RADIUS_MAX, layer.width / 2, layer.height / 2);
+      layer.radius = Math.round(Math.min(limit, Math.max(0, startRadius + dist - startDist)));
+      paint();
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId || !(target instanceof HTMLElement)) return;
+      target.removeEventListener("pointermove", move);
+      target.removeEventListener("pointerup", end);
+      target.removeEventListener("pointercancel", end);
+      finishGesture(penHandleHost);
+      void redraw();
+    };
+    if (target instanceof HTMLElement) {
+      target.addEventListener("pointermove", move);
+      target.addEventListener("pointerup", end);
+      target.addEventListener("pointercancel", end);
+    }
+  };
+  const syncPenHandles = (points: PenAnchor[] | null, id: string) => {
+    const key = points ? `${id}:${points.length}` : "";
+    if (key !== penHandleKey) {
+      penHandleKey = key;
+      penHandleHost.replaceChildren();
+      if (points) {
+        points.forEach((_point, index) => {
+          for (const part of ["anchor", "in", "out"] as const) {
+            const handle = document.createElement("span");
+            handle.className = part === "anchor" ? "studio__handle" : "studio__handle studio__handle--curve";
+            handle.title = part === "anchor" ? "점" : "휘어짐";
+            handle.setAttribute("aria-label", part === "anchor" ? "점" : "휘어짐");
+            handle.dataset.penPart = part;
+            handle.dataset.penIndex = String(index);
+            handle.addEventListener("pointerdown", (event) => dragPenHandle(event, index, part));
+            penHandleHost.append(handle);
+          }
+        });
+      }
+    }
+    if (!points) return;
+    for (const handle of penHandleHost.querySelectorAll<HTMLElement>("[data-pen-part]")) {
+      const index = Number(handle.dataset.penIndex);
+      const point = points[index];
+      const part = handle.dataset.penPart;
+      const at = !point ? null : part === "in" ? point.in : part === "out" ? point.out : point;
+      handle.hidden = !at;
+      handle.classList.toggle("studio__handle--active", part === "anchor" && penEdit?.active === index);
+      if (!at) continue;
+      placeAt(handle, at.x, at.y);
+    }
+  };
+  const syncStarHandles = (layer: ShapeLayer | null) => {
+    const key = layer ? `star:${layer.id}` : "";
+    if (key !== penHandleKey) {
+      penHandleKey = key;
+      penHandleHost.replaceChildren();
+      if (layer) {
+        starPoints(layer, starInner(layer)).forEach((_point, index) => {
+          const handle = document.createElement("span");
+          const radiusTip = index % 2 === 1;
+          handle.className = radiusTip ? "studio__handle studio__handle--radius" : "studio__handle";
+          handle.title = radiusTip ? "radius" : "크기";
+          handle.setAttribute("aria-label", radiusTip ? "radius" : "크기");
+          handle.dataset.starIndex = String(index);
+          handle.addEventListener("pointerdown", (event) => dragStarHandle(event, index));
+          penHandleHost.append(handle);
+        });
+      }
+    }
+    if (!layer) return;
+    const tips = starPoints(layer, starInner(layer));
+    for (const handle of penHandleHost.querySelectorAll<HTMLElement>("[data-star-index]")) {
+      const tip = tips[Number(handle.dataset.starIndex)];
+      if (!tip) continue;
+      placeAt(handle, tip.x, tip.y);
+    }
+  };
+  const syncRadiusHandles = (layer: ShapeLayer | null) => {
+    const points = layer ? radiusHandlePoints(layer) : [];
+    const key = points.length > 0 && layer ? `radius:${layer.id}` : "";
+    if (key !== penHandleKey) {
+      penHandleKey = key;
+      penHandleHost.replaceChildren();
+      points.forEach((_point, index) => {
+        const handle = document.createElement("span");
+        handle.className = "studio__handle studio__handle--radius";
+        handle.dataset.radiusIndex = String(index);
+        handle.title = "radius";
+        handle.setAttribute("aria-label", "radius");
+        handle.addEventListener("pointerdown", (event) => dragRadiusHandle(event, index));
+        penHandleHost.append(handle);
+      });
+    }
+    if (!layer || points.length === 0) return;
+    const live = radiusHandlePoints(layer);
+    for (const handle of penHandleHost.querySelectorAll<HTMLElement>("[data-radius-index]")) {
+      const tip = live[Number(handle.dataset.radiusIndex)];
+      if (!tip) continue;
+      placeAt(handle, tip.x, tip.y);
+    }
   };
   syncOverlay = () => {
     const visible = !editing && !cropping && !state.code.trim();
@@ -1971,29 +3211,86 @@ export function bindStudio(
       }
     }
     const image = singleImage();
-    const box = image ? hits.find((hit) => hit.id === image.id) : undefined;
-    const show = visible && Boolean(box);
-    for (const handle of handles) handle.hidden = !show;
-    if (show && box) {
-      const inset = 12 / Math.max(viewScale, 0.001);
-      const clampX = (value: number) => Math.min(state.cardWidth - inset, Math.max(inset, value));
-      const clampY = (value: number) => Math.min(state.cardHeight - inset, Math.max(inset, value));
+    const shape = singleShape();
+    const line = singleLine();
+    const sized = shape ?? image;
+    const box = sized ? hits.find((hit) => hit.id === sized.id) : undefined;
+    const inset = 12 / Math.max(viewScale, 0.001);
+    const clampX = (value: number) => Math.min(state.cardWidth - inset, Math.max(inset, value));
+    const clampY = (value: number) => Math.min(state.cardHeight - inset, Math.max(inset, value));
+    for (const handle of handles) {
+      const edge = handle.dataset.handle ?? "";
+      const corner = edge === "nw" || edge === "ne" || edge === "se" || edge === "sw";
+      const pointEdit = Boolean(editAnchors());
+      const starTips = Boolean(shape?.shape === "star" && !pointEdit);
+      const show = visible && Boolean(box) && !pointEdit && !starTips && (shape ? true : Boolean(image) && !corner);
+      handle.hidden = !show;
+      handle.title = "크기";
+      handle.setAttribute("aria-label", "크기");
+      if (!show || !box) continue;
       const cx = clampX(box.x + box.w / 2);
       const cy = clampY(box.y + box.h / 2);
-      for (const handle of handles) {
-        const edge = handle.dataset.handle;
-        if (edge === "top") placeAt(handle, cx, clampY(box.y));
-        else if (edge === "bottom") placeAt(handle, cx, clampY(box.y + box.h));
-        else if (edge === "left") placeAt(handle, clampX(box.x), cy);
-        else placeAt(handle, clampX(box.x + box.w), cy);
-      }
+      if (edge === "top") placeAt(handle, cx, clampY(box.y));
+      else if (edge === "bottom") placeAt(handle, cx, clampY(box.y + box.h));
+      else if (edge === "left") placeAt(handle, clampX(box.x), cy);
+      else if (edge === "right") placeAt(handle, clampX(box.x + box.w), cy);
+      else if (edge === "nw") placeAt(handle, clampX(box.x), clampY(box.y));
+      else if (edge === "ne") placeAt(handle, clampX(box.x + box.w), clampY(box.y));
+      else if (edge === "se") placeAt(handle, clampX(box.x + box.w), clampY(box.y + box.h));
+      else if (edge === "sw") placeAt(handle, clampX(box.x), clampY(box.y + box.h));
     }
+    for (const handle of lineEnds) {
+      const show = visible && Boolean(line);
+      handle.hidden = !show;
+      if (!show || !line) continue;
+      const start = handle.dataset.lineEnd === "start";
+      placeAt(handle, start ? line.x : line.x2, start ? line.y : line.y2);
+    }
+    if (!visible || penMode) syncPenHandles(null, "");
+    else if (editAnchors()) syncPenHandles(editAnchors(), penEdit?.id ?? "");
+    else if (shape?.shape === "star") syncStarHandles(shape);
+    else if (shape && (shape.shape === "rect" || shape.shape === "triangle")) syncRadiusHandles(shape);
+    else syncRadiusHandles(null);
     syncCropOverlay();
     placeEditor();
   };
 
   for (const handle of handles) {
     handle.addEventListener("pointerdown", (event) => {
+      const edge = handle.dataset.handle ?? "";
+      const shape = singleShape();
+      const shapeEdge = shape ? shapeHandleName(edge) : null;
+      if (shape && shapeEdge) {
+        event.preventDefault();
+        try {
+          handle.setPointerCapture(event.pointerId);
+        } catch {
+          /* the pointer can already be inactive */
+        }
+        beginGesture(handle);
+        const start = { x: shape.x, y: shape.y, width: shape.width, height: shape.height };
+        const startNodes = shape.nodes ? structuredClone(shape.nodes) : null;
+        const origin = cardPoint(event);
+        const move = (ev: PointerEvent) => {
+          if (ev.pointerId !== event.pointerId) return;
+          const point = cardPoint(ev);
+          Object.assign(shape, resizeShape(start, shapeEdge, point.x - origin.x, point.y - origin.y, ev.shiftKey));
+          if (startNodes) shape.nodes = transformNodes(startNodes, start, shape);
+          paint();
+        };
+        const end = (ev: PointerEvent) => {
+          if (ev.pointerId !== event.pointerId) return;
+          handle.removeEventListener("pointermove", move);
+          handle.removeEventListener("pointerup", end);
+          handle.removeEventListener("pointercancel", end);
+          finishGesture(handle);
+          void redraw();
+        };
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", end);
+        handle.addEventListener("pointercancel", end);
+        return;
+      }
       const layer = singleImage();
       const box = layer ? hits.find((hit) => hit.id === layer.id) : undefined;
       if (!layer || !box) return;
@@ -2004,7 +3301,6 @@ export function bindStudio(
         /* the pointer can already be inactive */
       }
       beginGesture(handle);
-      const edge = handle.dataset.handle;
       const start = imageBox(layer);
       const ratio = box.h / Math.max(1, box.w);
       const anchor =
@@ -2024,6 +3320,47 @@ export function bindStudio(
           : edge === "bottom" ? (box.h + dy) / ratio
           : (box.h - dy) / ratio;
         applyImage(layer, scaleImageAround(start, width, anchor.x, anchor.y));
+        paint();
+      };
+      const end = (ev: PointerEvent) => {
+        if (ev.pointerId !== event.pointerId) return;
+        handle.removeEventListener("pointermove", move);
+        handle.removeEventListener("pointerup", end);
+        handle.removeEventListener("pointercancel", end);
+        finishGesture(handle);
+        void redraw();
+      };
+      handle.addEventListener("pointermove", move);
+      handle.addEventListener("pointerup", end);
+      handle.addEventListener("pointercancel", end);
+    });
+  }
+
+  for (const handle of lineEnds) {
+    handle.addEventListener("pointerdown", (event) => {
+      const layer = singleLine();
+      if (!layer) return;
+      const start = handle.dataset.lineEnd === "start";
+      event.preventDefault();
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+      beginGesture(handle);
+      const move = (ev: PointerEvent) => {
+        if (ev.pointerId !== event.pointerId) return;
+        const point = cardPoint(ev);
+        const pad = 200;
+        const x = roundOffset(Math.min(state.cardWidth + pad, Math.max(-pad, point.x)));
+        const y = roundOffset(Math.min(state.cardHeight + pad, Math.max(-pad, point.y)));
+        if (start) {
+          layer.x = x;
+          layer.y = y;
+        } else {
+          layer.x2 = x;
+          layer.y2 = y;
+        }
         paint();
       };
       const end = (ev: PointerEvent) => {
@@ -2091,6 +3428,16 @@ export function bindStudio(
     if (repeat && layer && isTextLayer(layer)) {
       lastTap = null;
       openEditor(layer);
+      return;
+    }
+    if (repeat && layer?.kind === "pen" && !penMode && penEdit?.id !== layer.id) {
+      lastTap = null;
+      enterPenEdit(layer);
+      return;
+    }
+    if (repeat && layer?.kind === "shape" && layer.shape !== "star" && !penMode && penEdit?.id !== layer.id) {
+      lastTap = null;
+      enterShapeEdit(layer);
       return;
     }
     lastTap = { id, time: event.timeStamp, x: event.clientX, y: event.clientY };
@@ -2172,6 +3519,205 @@ export function bindStudio(
     finishGesture(owner);
     void redraw();
   };
+  const syncPenMode = () => {
+    penButton.setAttribute("aria-pressed", penMode ? "true" : "false");
+    selectButton.setAttribute("aria-pressed", penMode ? "false" : "true");
+    if (penMode) canvas.dataset.pen = "true";
+    else {
+      delete canvas.dataset.pen;
+      delete canvas.dataset.penClose;
+    }
+  };
+  const enterPenEdit = (layer: PenLayer) => {
+    penEdit = { id: layer.id, snapshot: structuredClone(layer.points), box: null, active: null };
+    selected.clear();
+    selected.add(layer.id);
+    paint();
+  };
+  const enterShapeEdit = (layer: ShapeLayer) => {
+    if (layer.shape === "star" || penMode || penEdit?.id === layer.id) return;
+    const box = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+    const snapshot = layer.nodes ? structuredClone(layer.nodes) : null;
+    if (!layer.nodes) layer.nodes = shapeNodes(layer);
+    penEdit = { id: layer.id, snapshot, box, active: null };
+    selected.clear();
+    selected.add(layer.id);
+    paint();
+  };
+  const commitPenEdit = () => {
+    if (!penEdit) return;
+    const edit = penEdit;
+    penEdit = null;
+    const layer = layerById(edit.id);
+    if (layer?.kind === "pen" && edit.snapshot) {
+      const next = structuredClone(layer.points);
+      layer.points = edit.snapshot;
+      commitLayers(() => {
+        layer.points = next;
+      });
+      return;
+    }
+    if (layer?.kind === "shape") {
+      const nextNodes = layer.nodes ? structuredClone(layer.nodes) : null;
+      const nextBox = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+      layer.nodes = edit.snapshot ? structuredClone(edit.snapshot) : null;
+      if (edit.box) Object.assign(layer, edit.box);
+      commitLayers(() => {
+        layer.nodes = nextNodes;
+        Object.assign(layer, nextBox);
+      });
+      return;
+    }
+    paint();
+  };
+  const cancelPenEdit = () => {
+    if (!penEdit) return;
+    const layer = layerById(penEdit.id);
+    if (layer?.kind === "pen" && penEdit.snapshot) layer.points = structuredClone(penEdit.snapshot);
+    if (layer?.kind === "shape") {
+      layer.nodes = penEdit.snapshot ? structuredClone(penEdit.snapshot) : null;
+      if (penEdit.box) Object.assign(layer, penEdit.box);
+    }
+    penEdit = null;
+    paint();
+  };
+  const commitPen = (closed: boolean) => {
+    const draft = penDraft;
+    penDraft = null;
+    if (!draft || draft.points.length < 2) {
+      paint();
+      return;
+    }
+    const ink = inkHex(state.color);
+    commitLayers(() => {
+      const layer: PenLayer = {
+        id: newLayerId(),
+        kind: "pen",
+        points: draft.points,
+        closed,
+        fill: closed ? ink : "",
+        stroke: ink,
+        strokeWidth: 4,
+      };
+      state.layers.push(layer);
+      selected.clear();
+      selected.add(layer.id);
+    });
+  };
+  const finishPenWork = () => {
+    if (penDraft) commitPen(false);
+    if (penEdit) commitPenEdit();
+    penMode = false;
+    syncPenMode();
+  };
+  const addShape = (shape: ShapeName) => {
+    finishPenWork();
+    const size = Math.max(SHAPE_MIN, Math.min(240, state.cardWidth - 80, state.cardHeight - 80));
+    commitLayers(() => {
+      const layer: ShapeLayer = {
+        id: newLayerId(),
+        kind: "shape",
+        shape,
+        x: roundOffset((state.cardWidth - size) / 2),
+        y: roundOffset((state.cardHeight - size) / 2),
+        width: size,
+        height: size,
+        radius: shape === "ellipse" ? 0 : 16,
+        color: inkHex(state.color),
+        shadow: emptyShadow(),
+        stroke: emptyStroke(inkHex(state.color)),
+        blend: "normal",
+        blurFrom: 0,
+        blurTo: 0,
+        gradient: null,
+      };
+      state.layers.push(layer);
+      selected.clear();
+      selected.add(layer.id);
+    });
+  };
+  const addLine = () => {
+    finishPenWork();
+    const half = Math.min(160, state.cardWidth / 4);
+    commitLayers(() => {
+      const layer: LineLayer = {
+        id: newLayerId(),
+        kind: "line",
+        x: roundOffset(state.cardWidth / 2 - half),
+        y: roundOffset(state.cardHeight / 2),
+        x2: roundOffset(state.cardWidth / 2 + half),
+        y2: roundOffset(state.cardHeight / 2),
+        stroke: LINE_WIDTH_DEFAULT,
+        cap: "butt",
+        start: false,
+        end: false,
+        color: inkHex(state.color),
+      };
+      state.layers.push(layer);
+      selected.clear();
+      selected.add(layer.id);
+    });
+  };
+  for (const button of root.querySelectorAll<HTMLButtonElement>("[data-draw]")) {
+    // A click would focus the button, and Esc then paints the focus ring. Keep mouse use unfocused.
+    button.addEventListener("mousedown", (event) => {
+      if (event.button === 0) event.preventDefault();
+    });
+    button.addEventListener("click", () => {
+      const tool = button.dataset.draw;
+      if (tool === "select") {
+        finishPenWork();
+        paint();
+        return;
+      }
+      if (tool === "pen") {
+        if (penMode) {
+          if (penDraft) commitPen(false);
+          penMode = false;
+          syncPenMode();
+          paint();
+          return;
+        }
+        if (penEdit) commitPenEdit();
+        penMode = true;
+        setDropper(false);
+        syncPenMode();
+        return;
+      }
+      if (tool === "line") addLine();
+      else if (tool === "ellipse" || tool === "rect" || tool === "triangle" || tool === "star") addShape(tool);
+    });
+  }
+  for (const button of root.querySelectorAll<HTMLButtonElement>("[data-line-cap]")) {
+    button.addEventListener("click", () => {
+      const layer = panelLine();
+      const cap = button.dataset.lineCap === "round" ? "round" : "butt";
+      if (!layer || layer.cap === cap) return;
+      beginGesture(button);
+      layer.cap = cap;
+      finishGesture(button);
+      void redraw();
+    });
+  }
+  for (const button of root.querySelectorAll<HTMLButtonElement>("[data-line-arrow]")) {
+    button.addEventListener("click", () => {
+      const layer = panelLine();
+      if (!layer) return;
+      beginGesture(button);
+      if (button.dataset.lineArrow === "start") layer.start = !layer.start;
+      else layer.end = !layer.end;
+      finishGesture(button);
+      void redraw();
+    });
+  }
+  penFillToggle.addEventListener("change", () => {
+    const layer = panelPen();
+    if (!layer) return;
+    beginGesture(penFillToggle);
+    layer.fill = penFillToggle.checked ? normalizeHex(penFillInput.value) ?? inkHex(state.color) : "";
+    finishGesture(penFillToggle);
+    void redraw();
+  });
   const copyLayers = () => {
     const picked = selectedLayers();
     if (picked.length > 0) layerClipboard = structuredClone(picked);
@@ -2180,14 +3726,18 @@ export function bindStudio(
     if (layerClipboard.length === 0) return;
     commitLayers(() => {
       const copies = structuredClone(layerClipboard);
-      const dx = at ? at.x - Math.min(...copies.map((layer) => layer.x)) : PASTE_OFFSET;
-      const dy = at ? at.y - Math.min(...copies.map((layer) => layer.y)) : PASTE_OFFSET;
+      const leftOf = (layer: StudioLayer) =>
+        layer.kind === "line" ? Math.min(layer.x, layer.x2) : layer.kind === "pen" ? Math.min(...layer.points.map((point) => point.x)) : layer.x;
+      const topOf = (layer: StudioLayer) =>
+        layer.kind === "line" ? Math.min(layer.y, layer.y2) : layer.kind === "pen" ? Math.min(...layer.points.map((point) => point.y)) : layer.y;
+      const dx = at ? at.x - Math.min(...copies.map(leftOf)) : PASTE_OFFSET;
+      const dy = at ? at.y - Math.min(...copies.map(topOf)) : PASTE_OFFSET;
       selected.clear();
       for (const layer of copies) {
         layer.id = newLayerId();
-        const next = clampLayerPosition(layer, layer.x + dx, layer.y + dy);
-        layer.x = next.x;
-        layer.y = next.y;
+        const from = originOf(layer);
+        const allowed = allowedDelta(layer, from, dx, dy);
+        placeFrom(layer, from, allowed.x, allowed.y);
         selected.add(layer.id);
       }
       state.layers.push(...copies);
@@ -2210,7 +3760,9 @@ export function bindStudio(
         const layer = layerById(box.id);
         const offset = offsets[index];
         if (!layer || !offset) return;
-        Object.assign(layer, clampLayerPosition(layer, layer.x + offset.dx, layer.y + offset.dy));
+        const from = originOf(layer);
+        const allowed = allowedDelta(layer, from, offset.dx, offset.dy);
+        placeFrom(layer, from, allowed.x, allowed.y);
       });
     });
   };
@@ -2415,6 +3967,29 @@ export function bindStudio(
     if ((pixel[3] ?? 0) === 0) return;
     const hex = rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
     const texts = selectedLayers().filter(isTextLayer);
+    const vectors = selectedLayers().filter((layer) => layer.kind === "shape" || layer.kind === "line" || layer.kind === "pen");
+    if (texts.length === 0 && vectors.length > 0) {
+      recordChange(() => {
+        let changed = false;
+        for (const layer of vectors) {
+          if (layer.kind === "pen") {
+            const next = layer.stroke ? "stroke" : "fill";
+            if (layer[next] === hex) continue;
+            layer[next] = hex;
+          } else if (layer.color === hex && !(layer.kind === "shape" && layer.gradient)) continue;
+          else {
+            layer.color = hex;
+            if (layer.kind === "shape" && layer.gradient) layer.gradient = { ...layer.gradient, from: hex };
+          }
+          changed = true;
+        }
+        return changed;
+      });
+      syncForm();
+      setDropper(false);
+      void redraw();
+      return;
+    }
     recordChange(() => {
       if (texts.length === 0) {
         if (state.color === hex) return false;
@@ -2423,8 +3998,9 @@ export function bindStudio(
       }
       let changed = false;
       for (const layer of texts) {
-        if (layer.color === hex) continue;
+        if (layer.color === hex && !layer.gradient) continue;
         layer.color = hex;
+        if (layer.gradient) layer.gradient = { ...layer.gradient, from: hex };
         changed = true;
       }
       return changed;
@@ -2450,6 +4026,49 @@ export function bindStudio(
       else endCrop(true);
       return;
     }
+    if (penMode && event.button === 0) {
+      event.preventDefault();
+      const point = cardPoint(event);
+      if (event.altKey && penDraft) {
+        const index = penPointIndex(penDraft.points, point.x, point.y, PEN_CLOSE);
+        if (index >= 0) {
+          penDraft.points = restartPenAt(penDraft.points, index);
+          penDraft.dragging = null;
+          penDraft.hover = point;
+          paint();
+          return;
+        }
+      }
+      const first = penDraft?.points[0];
+      if (!event.altKey && penDraft && first && penDraft.points.length >= 2 && Math.hypot(point.x - first.x, point.y - first.y) <= PEN_CLOSE) {
+        penDraft.closing = true;
+        penDraft.dragging = null;
+        penDraft.pointerId = event.pointerId;
+        penDraft.hover = point;
+        try {
+          canvas.setPointerCapture(event.pointerId);
+        } catch {
+          /* the pointer can already be inactive */
+        }
+        paint();
+        return;
+      }
+      if (!penDraft) {
+        selected.clear();
+        penDraft = { points: [], hover: point, pointerId: event.pointerId, dragging: null, closing: false };
+      }
+      penDraft.points.push({ x: roundOffset(point.x), y: roundOffset(point.y), in: null, out: null });
+      penDraft.dragging = penDraft.points.length - 1;
+      penDraft.pointerId = event.pointerId;
+      penDraft.hover = point;
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch {
+        /* the pointer can already be inactive */
+      }
+      paint();
+      return;
+    }
     if (event.pointerType === "touch") {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       try {
@@ -2466,6 +4085,11 @@ export function bindStudio(
     }
     const point = cardPoint(event);
     const hit = hitAt(point.x, point.y);
+    if (penEdit && hit?.id === penEdit.id) {
+      paint();
+      return;
+    }
+    if (penEdit) commitPenEdit();
     if (!mouse) {
       selected.clear();
       if (hit) selected.add(hit.id);
@@ -2531,6 +4155,26 @@ export function bindStudio(
     if (tapStart && Math.hypot(event.clientX - tapStart.x, event.clientY - tapStart.y) > 6) tapStart.moved = true;
     const point = cardPoint(event);
     lastPointer = point;
+    if (penMode && penDraft) {
+      penDraft.hover = point;
+      if (penDraft.closing && penDraft.pointerId === event.pointerId) {
+        const first = penDraft.points[0];
+        if (first && Math.hypot(point.x - first.x, point.y - first.y) >= 4) {
+          first.in = { x: roundOffset(point.x), y: roundOffset(point.y) };
+          first.out = { x: roundOffset(first.x * 2 - point.x), y: roundOffset(first.y * 2 - point.y) };
+        }
+        paint();
+        return;
+      }
+      const index = penDraft.dragging;
+      const anchor = index === null ? undefined : penDraft.points[index];
+      if (anchor && penDraft.pointerId === event.pointerId && Math.hypot(point.x - anchor.x, point.y - anchor.y) >= 4) {
+        anchor.out = { x: roundOffset(point.x), y: roundOffset(point.y) };
+        anchor.in = { x: roundOffset(anchor.x * 2 - point.x), y: roundOffset(anchor.y * 2 - point.y) };
+      }
+      paint();
+      return;
+    }
     if (!drag || drag.pointerId !== event.pointerId) {
       canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
       return;
@@ -2554,6 +4198,18 @@ export function bindStudio(
         finishGesture(canvas);
         void redraw();
       }
+      return;
+    }
+    if (penDraft && penDraft.pointerId === event.pointerId) {
+      const closing = penDraft.closing && event.type === "pointerup";
+      penDraft.dragging = null;
+      penDraft.pointerId = null;
+      penDraft.closing = false;
+      if (closing) {
+        commitPen(true);
+        return;
+      }
+      paint();
       return;
     }
     if (!drag || drag.pointerId !== event.pointerId) return;
@@ -2777,6 +4433,34 @@ export function bindStudio(
       target instanceof HTMLElement &&
       (target.isContentEditable ||
         target.matches("textarea, input:not([type=range], [type=color], [type=radio], [type=checkbox], [type=button], [type=file])"));
+    if (event.key === "Escape" && !mod && !event.altKey && !typing) {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused.closest(".studio__draw")) focused.blur();
+    }
+    if (penEdit && !mod && !event.altKey && !typing && (event.key === "Enter" || event.key === "Escape")) {
+      event.preventDefault();
+      if (event.key === "Enter") commitPenEdit();
+      else cancelPenEdit();
+      return;
+    }
+    if (penMode && !mod && !event.altKey && !typing && (event.key === "Enter" || event.key === "Escape")) {
+      event.preventDefault();
+      if (event.key === "Enter") commitPen(false);
+      else {
+        penDraft = null;
+        penMode = false;
+        syncPenMode();
+        paint();
+      }
+      return;
+    }
+    if (penDraft && !mod && !typing && (event.key === "Delete" || event.key === "Backspace")) {
+      event.preventDefault();
+      penDraft.points.pop();
+      if (penDraft.points.length === 0) penDraft = null;
+      paint();
+      return;
+    }
     if (dropper && event.key === "Escape" && !mod && !event.altKey) {
       event.preventDefault();
       setDropper(false);
