@@ -41,33 +41,6 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 - ingest, 빌드, 배포는 사람이 명령으로 실행한다. 브라우저는 LLM 키를 갖지 않는다.
 - UI 색상 hex는 `src/shared/tokens.css`에만 둔다.
 
-## Phase 0 — Archive Foundation
-
-**목표**: 디자인 이미지를 Obsidian vault에 아카이빙하고, 빌드된 JSON만 읽는 정적 웹에서 탐색하는 기반을 만든다. 예전 Phase 0~8을 이 단계로 묶었다. Phase 1 Online Studio는 이 기반 위에서 아카이브 이미지를 소재로 쓴다. 세부 내용은 [Phase 0 문서](docs/phase-0-foundation.md)에 있다.
-
-**개발 순서**
-
-| 단계 | 내용 | 상태 |
-|---|---|---|
-| 0-1 | 토큰 단일 원천, 대비 검증, focus-visible, coarse pointer 터치 타깃, LF 정규화 | 완료 |
-| 0-2 | Markdown 스키마, vault 구조, 통제 어휘, visibility, LLM Wiki index/log | 완료 |
-| 0-3 | 결정적 JSON, 자산 프로브, 태그 정규화, 중복 감지, internal/public 이중 번들, 빌드 리포트 | 완료 |
-| 0-4 | 앱 셸, 해시 라우터, Archive 그리드, 검색·필터, 다크 모드, 키보드 접근 | 완료 |
-| 0-5 | 상세 뷰. Collections·Wiki·Export 화면과 Related captures는 제품 UI에서 제거 | 완료 |
-| 0-6 | 대비·키보드·터치 감사, public 누출 점검, Pages 용량, 수동 배포 | 완료 |
-| 0-7 | 로컬 `npm run ingest`로 vault 저장과 LLM 분석 초안. Intake 탭은 Phase 1에서 제거 | CLI |
-| 0-8 | `npm run design-system`으로 `design-system.md`·`tokens.json` 초안. Design System 탭은 Phase 1에서 제거 | CLI |
-| 0-9 | 디자인 시스템 기반 마케팅 이미지 생성 | Phase 1로 대체 |
-
-**핵심 계약**
-
-- `obsidian/` Markdown이 진실이다. 웹은 `dist/<target>/data/index.json`과 복사된 자산만 읽는다.
-- vault는 `obsidian/captures/<slug>/`, `obsidian/collections/`, `obsidian/wiki/`로 나뉜다.
-- 치수·바이트·포맷·해시처럼 파일에서 계산되는 값은 Markdown에 쓰지 않고 빌드가 만든다.
-- `internal`은 전체, `public`은 `visibility: public`만 포함한다. public은 internal 데이터를 빼놓고 만든다.
-- ingest, 빌드, 배포는 사람이 명령으로 실행한다. 브라우저는 LLM 키를 갖지 않는다.
-- UI 색상 hex는 `src/shared/tokens.css`에만 둔다.
-
 ## Phase 1 — Online Studio 계획 요약
 
 **목표**: 지금 아카이브된 이미지를 기반으로 온라인 마케팅 브랜드 에셋을 제작하는 툴을 만든다. 산출물은 인스타그램, 페이스북, 유튜브 커버, 쇼츠 등 여러 규격으로 만들 수 있다. 도형·선·펜과 그 점 편집까지 같은 카드 안에서 만든다.
