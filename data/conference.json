@@ -3,11 +3,11 @@
     {
       "id": "banner-l",
       "image": {
-        "bytes": 51778630,
+        "bytes": 53030,
         "dpi": 100,
-        "height": 3543,
-        "path": "assets/conference/backgrounds/banner-l.png",
-        "width": 21260
+        "height": 640,
+        "path": "assets/conference/backgrounds/banner-l.jpg",
+        "width": 3840
       },
       "thumbPath": "assets/conference/backgrounds/banner-l.thumb.webp",
       "video": null
@@ -15,73 +15,73 @@
     {
       "id": "banner-x",
       "image": {
-        "bytes": 27463924,
+        "bytes": 165367,
         "dpi": 150,
-        "height": 10630,
-        "path": "assets/conference/backgrounds/banner-x.png",
-        "width": 3543
+        "height": 3840,
+        "path": "assets/conference/backgrounds/banner-x.jpg",
+        "width": 1280
       },
       "thumbPath": "assets/conference/backgrounds/banner-x.thumb.webp",
       "video": {
-        "bytes": 14466535,
+        "bytes": 4923729,
         "durationSec": 5.041667,
-        "height": 6468,
+        "height": 1916,
         "path": "assets/conference/backgrounds/banner-x.mp4",
-        "width": 2160
+        "width": 640
       }
     },
     {
       "id": "instagram",
       "image": {
-        "bytes": 4320270,
+        "bytes": 451839,
         "dpi": 72,
         "height": 2160,
-        "path": "assets/conference/backgrounds/instagram.png",
+        "path": "assets/conference/backgrounds/instagram.jpg",
         "width": 2160
       },
       "thumbPath": "assets/conference/backgrounds/instagram.thumb.webp",
       "video": {
-        "bytes": 91361899,
+        "bytes": 9766284,
         "durationSec": 5.041667,
-        "height": 2160,
+        "height": 1920,
         "path": "assets/conference/backgrounds/instagram.mp4",
-        "width": 2160
+        "width": 1920
       }
     },
     {
       "id": "poster",
       "image": {
-        "bytes": 16135397,
+        "bytes": 1231641,
         "dpi": 300,
         "height": 3840,
-        "path": "assets/conference/backgrounds/poster.png",
+        "path": "assets/conference/backgrounds/poster.jpg",
         "width": 2880
       },
       "thumbPath": "assets/conference/backgrounds/poster.thumb.webp",
       "video": {
-        "bytes": 14117680,
+        "bytes": 9862245,
         "durationSec": 5.041667,
-        "height": 2880,
+        "height": 1920,
         "path": "assets/conference/backgrounds/poster.mp4",
-        "width": 2160
+        "width": 1440
       }
     },
     {
       "id": "slide",
       "image": {
-        "bytes": 6435776,
+        "bytes": 452903,
         "dpi": 72,
         "height": 2160,
-        "path": "assets/conference/backgrounds/slide.png",
+        "path": "assets/conference/backgrounds/slide.jpg",
         "width": 3840
       },
       "thumbPath": "assets/conference/backgrounds/slide.thumb.webp",
       "video": {
-        "bytes": 52599243,
+        "bytes": 6182089,
         "durationSec": 5.041667,
-        "height": 2160,
+        "height": 1080,
         "path": "assets/conference/backgrounds/slide.mp4",
-        "width": 3840
+        "width": 1920
       }
     }
   ],
