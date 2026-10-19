@@ -49,11 +49,14 @@ const reportPath = join("reports", `${target}-build-report.json`);
 const report = existsSync(reportPath)
   ? (JSON.parse(readFileSync(reportPath, "utf8")) as {
       assetBytesCopied: number;
+      bundleBytes?: number;
       oversizeFiles: { path: string; bytes: number }[];
       capturesIncluded: number;
       capturesTotal: number;
     })
   : null;
+
+const bundleBytes = report?.bundleBytes ?? report?.assetBytesCopied ?? 0;
 
 if (report && report.oversizeFiles.length > 0) {
   console.error("FAIL: oversize files above Git 100MB limit:");
@@ -63,9 +66,9 @@ if (report && report.oversizeFiles.length > 0) {
   process.exit(1);
 }
 
-if (report && report.assetBytesCopied > GITHUB_PAGES_MAX_BYTES) {
+if (report && bundleBytes > GITHUB_PAGES_MAX_BYTES) {
   console.error(
-    `FAIL: asset bytes ${report.assetBytesCopied} exceed GitHub Pages ${GITHUB_PAGES_MAX_BYTES}`,
+    `FAIL: bundle bytes ${bundleBytes} exceed GitHub Pages ${GITHUB_PAGES_MAX_BYTES}`,
   );
   process.exit(1);
 }
@@ -78,9 +81,10 @@ const inventory = {
   collectionsInBundle: index.collections.length,
   wikiPagesInBundle: index.wiki.pages.length,
   assetBytesCopied: report?.assetBytesCopied ?? null,
+  bundleBytes: report ? bundleBytes : null,
   githubPagesMaxBytes: GITHUB_PAGES_MAX_BYTES,
   githubPagesRemainingBytes: report
-    ? GITHUB_PAGES_MAX_BYTES - report.assetBytesCopied
+    ? GITHUB_PAGES_MAX_BYTES - bundleBytes
     : null,
   gitMaxFileBytes: GIT_MAX_FILE_BYTES,
   oversizeFiles: report?.oversizeFiles ?? [],
@@ -96,8 +100,9 @@ console.log(`\nOK: site ready in dist/app for target=${target}`);
 console.log(`captures: ${index.captures.length}`);
 if (report) {
   console.log(`asset bytes: ${report.assetBytesCopied}`);
+  console.log(`bundle bytes: ${bundleBytes}`);
   console.log(
-    `GitHub Pages remaining: ${GITHUB_PAGES_MAX_BYTES - report.assetBytesCopied}`,
+    `GitHub Pages remaining: ${GITHUB_PAGES_MAX_BYTES - bundleBytes}`,
   );
 }
 console.log("Deploy manually — see docs/deploy.md. No CI/watcher deploy is configured.");

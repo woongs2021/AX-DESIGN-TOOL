@@ -2,6 +2,10 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-10-20] update | Conference를 공개 사이트에 추가
+
+GitHub Pages 네비에 Conference를 넣었다. Instagram, Poster, Slide, X배너, L배너와 연사 사진, 로고를 공개 번들에도 싣는다. 100MB를 넘는 Slide 원본 동영상은 빠지고 줄인 사본을 쓴다.
+
 ## [2026-10-20] update | Conference 원본 공개 허락
 
 연사 사진과 대학·단체 로고를 저장소에 넣어도 된다고 정했다. Slide 원본 동영상은 100MB를 넘겨 제외하고, 줄인 사본을 둔다. 공개 사이트 번들에는 웹용으로 줄인 사본을 만들기 전까지 Conference를 넣지 않는다.

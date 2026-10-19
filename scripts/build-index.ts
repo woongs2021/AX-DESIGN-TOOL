@@ -319,8 +319,15 @@ const index = {
 const indexPath = join(dataDir, "index.json");
 writeFileSync(indexPath, stableStringify(index));
 
-// Conference stays internal until the speakers and logo owners allow publishing.
-const conference = target === "internal" ? await buildConference(outRoot) : null;
+// Both bundles publish Conference. Files over the Git 100MB limit are skipped.
+const conference = await buildConference(outRoot);
+const bundleBytes = copiedAssetBytes + (conference?.bytesCopied ?? 0);
+if (target === "public" && bundleBytes > GITHUB_PAGES_MAX_BYTES) {
+  failures.push({
+    path: "phase 2-resources",
+    reason: `public bundle ${bundleBytes} bytes exceeds GitHub Pages ${GITHUB_PAGES_MAX_BYTES}`,
+  });
+}
 
 const report = {
   target,
@@ -355,7 +362,8 @@ const report = {
   assetsSkippedNotCopied: skippedAssetCount,
   assetBytesSkippedNotCopied: skippedAssetBytes,
   githubPagesMaxBytes: GITHUB_PAGES_MAX_BYTES,
-  githubPagesRemainingBytes: GITHUB_PAGES_MAX_BYTES - copiedAssetBytes,
+  bundleBytes,
+  githubPagesRemainingBytes: GITHUB_PAGES_MAX_BYTES - bundleBytes,
   gitMaxFileBytes: GIT_MAX_FILE_BYTES,
   ...(conference ? { conference } : {}),
 };
@@ -381,6 +389,7 @@ for (const g of duplicateGroups) {
   console.log(`  ${g.hash.slice(0, 12)}… → ${g.slugs.join(", ")}`);
 }
 console.log(`asset bytes copied: ${copiedAssetBytes}`);
+console.log(`bundle bytes: ${bundleBytes}`);
 console.log(
   `GitHub Pages remaining: ${report.githubPagesRemainingBytes} / ${GITHUB_PAGES_MAX_BYTES}`,
 );

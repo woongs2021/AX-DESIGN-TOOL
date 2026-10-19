@@ -46,6 +46,10 @@ for (const target of ["internal", "public"] as const) {
     console.error(`FAIL: ${target} has oversize files`);
     process.exit(1);
   }
+  if (report.githubPagesRemainingBytes < 0) {
+    console.error(`FAIL: ${target} exceeds the GitHub Pages byte limit`);
+    process.exit(1);
+  }
 }
 
 console.log(`

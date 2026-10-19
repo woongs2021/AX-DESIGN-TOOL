@@ -4,21 +4,21 @@
 
 참조 결정: `D-01`, `D-03`, `D-09`, `D-11`, `D-12`, `D-15` / 기반: [Phase 0 Archive Foundation](phase-0-foundation.md), [Phase 1 Online Studio](phase-1-online-marketing-studio.md)
 
-> 상태: **구현**. 2026-10-17에 2-1부터 2-12를 로컬 호스트에 넣었다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 원본을 저장소에 커밋했다. public 번들은 웹용 사본 전까지 제외한다(`D-09`). 정한 사항은 맨 아래 [결정 기록](#결정-기록)에 있다.
+> 상태: **구현**. 2026-10-17에 2-1부터 2-12를 로컬 호스트에 넣었다. 2026-10-20에 연사 사진과 로고 공개를 허락하고, 100MB 이하 원본을 internal·public 번들과 GitHub Pages에 넣었다(`D-09`). 정한 사항은 맨 아래 [결정 기록](#결정-기록)에 있다.
 
 ## 범위
 
 - 입력: 저장소 루트 `phase 2-resources/`의 세 폴더. 브라우저는 이 폴더를 직접 읽지 않고, 빌드가 만든 JSON과 복사한 자산만 읽는다. (`D-01`)
 - 출력: 행사물 크기의 PNG, 배너의 인쇄 해상도 PNG, 동영상 배경일 때 글자·도형이 올라간 동영상 파일.
 - 서버·LLM 호출 없음. 합성과 내보내기는 브라우저 안에서 일어난다. (`D-11`)
-- 공개 범위: **internal 빌드(로컬 호스트)에서만** 연다. public 번들과 GitHub Pages에는 Conference 탭과 리소스를 넣지 않는다. (`D-03`)
+- 공개 범위: internal과 public 번들 모두에서 연다. GitHub Pages에도 Conference 탭과 100MB 이하 리소스가 있다. 100MB를 넘는 Slide 원본 동영상만 빠진다. (`D-09`)
 - Online Studio의 기능은 그대로 쓴다. Phase 1의 1-2부터 1-14까지(레이어, 선택, 정렬, 글자 스타일, 스포이드, 크롭, 도형·선·펜, 표면 효과, 점 편집)가 Conference에도 똑같이 있다.
 
 ## Online Studio와 다른 점
 
 | 항목 | Online Studio | Conference |
 |---|---|---|
-| 주소 | `#/studio` | `#/conference` (internal 빌드만) |
+| 주소 | `#/studio` | `#/conference` |
 | 카드 크기 프리셋 | SNS 8개 규격 | 행사물 5개 규격(Instagram, Poster, Slide, X배너, L배너) |
 | 배경 | 아카이브 테마 35개 중 하나를 이미지 레이어로 | 프리셋마다 정해진 메인 배경. 이미지와 동영상을 바꿔 쓸 수 있다 |
 | 이미지 목록 | 아카이브 테마 + 추가한 이미지 | Speecher, SVG 두 묶음 + 추가한 이미지 |
@@ -95,7 +95,7 @@ Online Studio의 패널 순서를 그대로 쓰고, `아카이브 테마` 자리
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| 2-1 | 네비에 Conference를 추가하고 `#/conference`로 들어온다(internal만) | 구현 |
+| 2-1 | 네비에 Conference를 추가하고 `#/conference`로 들어온다 | 구현 |
 | 2-2 | 스튜디오 화면을 설정값으로 받아 두 탭이 같은 코드를 쓰게 나눈다 | 구현 |
 | 2-3 | 리소스 빌드: 원본을 로컬 호스트에서 쓴다. 웹용 사본은 공개 허락 뒤에 만든다 | 구현 |
 | 2-4 | 카드 크기 프리셋 5개와 썸네일 | 구현 |
@@ -105,14 +105,14 @@ Online Studio의 패널 순서를 그대로 쓰고, `아카이브 테마` 자리
 | 2-8 | 동영상 내보내기 | 구현 |
 | 2-9 | Speecher와 SVG 넣기, 로고 색 바꾸기 | 구현 |
 | 2-10 | Conference 전용 초기화 기준과 내장 기준 | 구현 |
-| 2-11 | 저장소 용량과 public 번들 제외 점검 | 구현 |
+| 2-11 | 저장소 용량과 Pages 1GB 점검 | 구현 |
 | 2-12 | 테스트와 문서 | 구현 |
 
 ### 2-1 정보 구조
 
-계획: internal 빌드의 네비를 Graphic Library / Online Studio / Conference / History로 바꾼다. `#/conference`가 Conference 진입점이다. Online Studio와 같은 디바이스 뷰 바와 좌우 분할 레이아웃을 쓴다. public 빌드에는 Conference 탭이 없고, `#/conference`로 들어오면 Online Studio로 보낸다. `D-09`에 Conference 페이지와 internal 전용 조건을 더한다.
+계획: 네비를 Graphic Library / Online Studio / Conference / History로 바꾼다. `#/conference`가 Conference 진입점이다. Online Studio와 같은 디바이스 뷰 바와 좌우 분할 레이아웃을 쓴다. `conference.json`이 없으면 `#/conference`는 Online Studio로 보낸다.
 
-검증: 로컬 호스트에서 네비에 네 탭이 보이고, Conference를 누르면 Instagram 프리셋과 메인 배경이 깔린 카드가 열린다. `#/studio`는 지금과 똑같이 열린다. public 빌드에는 Conference 탭이 없다.
+검증: 로컬 호스트와 public 번들에서 네비에 네 탭이 보이고, Conference를 누르면 Instagram 프리셋과 메인 배경이 깔린 카드가 열린다. `#/studio`는 지금과 똑같이 열린다.
 
 ### 2-2 같은 편집기, 다른 설정
 
@@ -133,7 +133,7 @@ Online Studio의 패널 순서를 그대로 쓰고, `아카이브 테마` 자리
 - ffmpeg·ffprobe는 지금 이 컴퓨터에 없다. Slide 동영상을 줄이려면 지금 설치해야 한다. 줄이는 일은 사람이 명령으로 실행한다. (`D-11`)
 - ffprobe가 없으면 빌드는 동영상 크기·길이를 비워 두고 리포트에 경고를 남긴다. 원본 복사는 그대로 진행한다.
 - 폴더·파일 이름은 `instagram`, `poster`, `slide`, `banner-x`, `banner-l`, `speaker-001`, `logo-brunel-1`처럼 영문 slug로 바꾼다. 이름표는 한국어로 보여 준다.
-- 목록은 별도 `conference.json`으로 둔다. public 빌드는 이 파일을 만들지 않는다. 같은 입력이면 바이트 단위로 같은 결과가 나와야 한다.
+- 목록은 별도 `conference.json`으로 둔다. internal과 public 빌드가 같은 파일을 만든다. 같은 입력이면 바이트 단위로 같은 결과가 나와야 한다.
 검증: 빌드 리포트에 리소스 개수, 바이트, 실측 크기가 나온다. Poster·X배너 동영상은 실측 크기로 적힌다. 100MB를 넘는 리소스 파일이 있으면 리포트에 표시된다.
 
 ### 2-4 카드 크기 프리셋
@@ -217,10 +217,10 @@ Online Studio의 패널 순서를 그대로 쓰고, `아카이브 테마` 자리
 - 원본 리소스는 저장소에 커밋한다. 단, Git 단일 파일 한도(100MB)를 넘는 Slide 동영상(123MB)은 원본을 `.gitignore`에 적고, ffmpeg로 줄인 사본을 대신 커밋한다. (`D-15`)
 - Slide 사본은 3840 × 2160과 5.04초 길이를 지키고, 화질을 보며 100MB보다 넉넉히 작게(목표 60MB 안쪽) 줄인다.
 - 커밋하는 리소스는 원본 약 216MB에 Slide 사본을 더한 크기다. 리포 권장 크기 1GB 안에 드는지 커밋 전에 저장소 크기를 확인한다.
-- public 빌드는 Conference 화면, `conference.json`, 원본·웹용 리소스를 하나도 복사하지 않는다. Pages 용량(남은 약 530MB, 2026-10-17 public 빌드 기준)은 이 단계에서 바뀌지 않는다.
-- `npm run check:public-leak`가 public 번들에 Conference 자산 경로나 리소스 파일명이 있으면 실패하게 한다.
+- public 빌드도 같은 `conference.json`과 100MB 이하 원본을 복사한다. 아카이브 자산과 Conference를 합친 바이트가 Pages 1GB를 넘으면 빌드가 실패한다.
+- `npm run check:public-leak`는 internal 캡처가 public에 새지 않는지만 본다. Conference는 public에 있어도 통과한다.
 
-검증: `npm run build:site -- --target=public` 결과에 Conference 관련 파일이 없고, `npm run check:public-leak`가 통과한다. `git ls-files`에 Slide 원본 동영상은 없고 줄인 사본이 있으며, 100MB를 넘는 파일이 없다.
+검증: `npm run build:site -- --target=public` 결과에 `data/conference.json`과 `assets/conference/`가 있고, `npm run check:public-leak`가 통과한다. `git ls-files`에 Slide 원본 동영상은 없고 줄인 사본이 있으며, 100MB를 넘는 파일이 없다.
 
 ### 2-12 테스트와 문서
 
@@ -233,10 +233,8 @@ Online Studio의 패널 순서를 그대로 쓰고, `아카이브 테마` 자리
 ```mermaid
 flowchart LR
   resources["phase 2-resources"] --> build["리소스 빌드"]
-  build --> original["원본 (로컬 호스트)"]
-  build -.-> web["웹용 사본 (공개 허락 뒤, ffmpeg)"]
+  build --> original["100MB 이하 원본"]
   original --> json["conference.json"]
-  web -.-> json
   json --> presets["프리셋 5개"]
   json --> bg["메인 배경 이미지·동영상"]
   json --> assets["Speecher · SVG"]
@@ -253,7 +251,7 @@ flowchart LR
 
 ## 통과 기준
 
-- 로컬 호스트의 네비는 Graphic Library / Online Studio / Conference / History 네 탭이다. public 빌드에는 Conference가 없다.
+- 로컬 호스트와 GitHub Pages의 네비는 Graphic Library / Online Studio / Conference / History 네 탭이다.
 - Conference는 Instagram 2160 × 2160으로 열리고, Poster·Slide·X배너·L배너로 바꾸면 크기와 메인 배경이 함께 바뀐다.
 - 메인 배경을 이미지와 동영상으로 바꿀 수 있고, 위의 레이어는 그대로다.
 - 배너는 인쇄 크기·dpi의 PNG로, 동영상 배경은 레이어가 올라간 동영상 파일로 받는다.
@@ -266,7 +264,7 @@ flowchart LR
 
 | 항목 | 현재 계획 | 남은 결정 |
 |---|---|---|
-| 공개 허락 | 2026-10-20에 허락했다. 원본은 저장소에 있다. | public 번들에 넣으려면 웹용 사본과 Pages 용량 점검이 남는다. |
+| 공개 허락 | 2026-10-20에 허락하고 public 번들과 Pages에 넣었다. | 없음. 100MB를 넘는 Slide 원본만 계속 빠진다. |
 
 ## 결정 기록
 
@@ -280,7 +278,7 @@ flowchart LR
 | 동영상 내보내기 | PNG에 더해, 글자·도형이 올라간 동영상 파일을 받는다. |
 | 동영상 형식 | MP4만 받는다. MP4 녹화를 지원하지 않는 브라우저에서는 버튼을 끄고 안내한다. |
 | 동영상 출력 크기 | 편집 크기로 먼저 시도하고, 인코더가 지원하지 않으면 줄인 크기로 녹화한다. |
-| 공개 범위 | 2026-10-20에 저장소 공개를 허락했다. public 번들은 웹용 사본 전까지 internal 빌드에서만 연다. |
+| 공개 범위 | 2026-10-20에 internal과 public 번들, GitHub Pages에서 Conference를 연다. |
 | 원본 커밋 | 원본을 커밋하되 100MB를 넘는 Slide 동영상은 원본 대신 ffmpeg로 100MB 아래로 줄인 사본을 커밋한다. |
-| 원본과 웹용 사본 | 원본은 로컬 호스트에서 쓴다. 웹용 사본은 공개를 허락받은 뒤 ffmpeg로 동영상을 줄여 만든다. |
+| 원본과 웹용 사본 | 로컬 호스트와 Pages 모두 100MB 이하 원본을 쓴다. 합이 Pages 1GB를 넘으면 그때 웹용 사본으로 줄인다. |
 | 로고 색 | SVG 로고를 원래 색이나 고른 단색으로 바꿀 수 있게 한다. |

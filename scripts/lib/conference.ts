@@ -1,6 +1,6 @@
 /**
- * Conference resources for the internal build: phase 2-resources/ → dist/internal/assets/conference/ + data/conference.json.
- * The public build never calls this.
+ * Conference resources for both builds: phase 2-resources/ → <outRoot>/assets/conference/ + data/conference.json.
+ * Files over the Git 100MB limit are skipped. Slide uses its compressed copy.
  */
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";

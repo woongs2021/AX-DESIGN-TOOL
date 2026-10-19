@@ -1,6 +1,6 @@
 /**
- * Conference tab: size presets, the dist/internal/data/conference.json contract, and the built-in layouts.
- * Only the internal build writes conference.json; without it the tab is not shown.
+ * Conference tab: size presets, the conference.json contract, and the built-in layouts.
+ * Internal and public builds both write conference.json. Without that file the tab is not shown.
  */
 import {
   clampFontSize,
