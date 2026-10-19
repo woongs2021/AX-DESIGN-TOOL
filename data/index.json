@@ -1381,6 +1381,11 @@
       {
         "date": "2026-10-20",
         "operation": "update",
+        "title": "Conference를 공개 사이트에 추가"
+      },
+      {
+        "date": "2026-10-20",
+        "operation": "update",
         "title": "Conference 원본 공개 허락"
       },
       {

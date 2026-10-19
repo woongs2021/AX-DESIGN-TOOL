@@ -1,0 +1,243 @@
+{
+  "backgrounds": [
+    {
+      "id": "banner-l",
+      "image": {
+        "bytes": 51778630,
+        "dpi": 100,
+        "height": 3543,
+        "path": "assets/conference/backgrounds/banner-l.png",
+        "width": 21260
+      },
+      "thumbPath": "assets/conference/backgrounds/banner-l.thumb.webp",
+      "video": null
+    },
+    {
+      "id": "banner-x",
+      "image": {
+        "bytes": 27463924,
+        "dpi": 150,
+        "height": 10630,
+        "path": "assets/conference/backgrounds/banner-x.png",
+        "width": 3543
+      },
+      "thumbPath": "assets/conference/backgrounds/banner-x.thumb.webp",
+      "video": {
+        "bytes": 14466535,
+        "durationSec": 5.041667,
+        "height": 6468,
+        "path": "assets/conference/backgrounds/banner-x.mp4",
+        "width": 2160
+      }
+    },
+    {
+      "id": "instagram",
+      "image": {
+        "bytes": 4320270,
+        "dpi": 72,
+        "height": 2160,
+        "path": "assets/conference/backgrounds/instagram.png",
+        "width": 2160
+      },
+      "thumbPath": "assets/conference/backgrounds/instagram.thumb.webp",
+      "video": {
+        "bytes": 91361899,
+        "durationSec": 5.041667,
+        "height": 2160,
+        "path": "assets/conference/backgrounds/instagram.mp4",
+        "width": 2160
+      }
+    },
+    {
+      "id": "poster",
+      "image": {
+        "bytes": 16135397,
+        "dpi": 300,
+        "height": 3840,
+        "path": "assets/conference/backgrounds/poster.png",
+        "width": 2880
+      },
+      "thumbPath": "assets/conference/backgrounds/poster.thumb.webp",
+      "video": {
+        "bytes": 14117680,
+        "durationSec": 5.041667,
+        "height": 2880,
+        "path": "assets/conference/backgrounds/poster.mp4",
+        "width": 2160
+      }
+    },
+    {
+      "id": "slide",
+      "image": {
+        "bytes": 6435776,
+        "dpi": 72,
+        "height": 2160,
+        "path": "assets/conference/backgrounds/slide.png",
+        "width": 3840
+      },
+      "thumbPath": "assets/conference/backgrounds/slide.thumb.webp",
+      "video": {
+        "bytes": 52599243,
+        "durationSec": 5.041667,
+        "height": 2160,
+        "path": "assets/conference/backgrounds/slide.mp4",
+        "width": 3840
+      }
+    }
+  ],
+  "logos": [
+    {
+      "bytes": 14825,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-brunel-1",
+      "label": "브루넬로고1",
+      "path": "assets/conference/logos/logo-brunel-1.svg",
+      "thumbPath": "assets/conference/logos/logo-brunel-1.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 32629,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-brunel-2",
+      "label": "브루넬로고2",
+      "path": "assets/conference/logos/logo-brunel-2.svg",
+      "thumbPath": "assets/conference/logos/logo-brunel-2.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 8506,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-brunel-korean-society",
+      "label": "브루넬한인회로고",
+      "path": "assets/conference/logos/logo-brunel-korean-society.svg",
+      "thumbPath": "assets/conference/logos/logo-brunel-korean-society.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 17432,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-brunel-symbol",
+      "label": "브루넬심벌",
+      "path": "assets/conference/logos/logo-brunel-symbol.svg",
+      "thumbPath": "assets/conference/logos/logo-brunel-symbol.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 2170,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-disdot-1",
+      "label": "디스닷로고-01",
+      "path": "assets/conference/logos/logo-disdot-1.svg",
+      "thumbPath": "assets/conference/logos/logo-disdot-1.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 6514,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-hongik-1",
+      "label": "홍익대학교 로고-01",
+      "path": "assets/conference/logos/logo-hongik-1.svg",
+      "thumbPath": "assets/conference/logos/logo-hongik-1.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 8152,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-hongik-2",
+      "label": "홍익대학교 로고2",
+      "path": "assets/conference/logos/logo-hongik-2.svg",
+      "thumbPath": "assets/conference/logos/logo-hongik-2.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 13252,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-skku-1",
+      "label": "성균관대로고 1",
+      "path": "assets/conference/logos/logo-skku-1.svg",
+      "thumbPath": "assets/conference/logos/logo-skku-1.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 20853,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-skku-2",
+      "label": "성균관대로고 2",
+      "path": "assets/conference/logos/logo-skku-2.svg",
+      "thumbPath": "assets/conference/logos/logo-skku-2.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 9852,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-skku-3",
+      "label": "성균관대로고 3",
+      "path": "assets/conference/logos/logo-skku-3.svg",
+      "thumbPath": "assets/conference/logos/logo-skku-3.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 8593,
+      "format": "svg",
+      "height": 1080,
+      "id": "logo-skku-4",
+      "label": "성균관대로고 4",
+      "path": "assets/conference/logos/logo-skku-4.svg",
+      "thumbPath": "assets/conference/logos/logo-skku-4.svg",
+      "width": 1080
+    },
+    {
+      "bytes": 4578,
+      "format": "svg",
+      "height": 1080,
+      "id": "qr-code-1",
+      "label": "qr코드-01",
+      "path": "assets/conference/logos/qr-code-1.svg",
+      "thumbPath": "assets/conference/logos/qr-code-1.svg",
+      "width": 1080
+    }
+  ],
+  "speakers": [
+    {
+      "bytes": 3827984,
+      "format": "png",
+      "height": 3114,
+      "id": "speaker-001",
+      "label": "001",
+      "path": "assets/conference/speakers/speaker-001.png",
+      "thumbPath": "assets/conference/speakers/speaker-001.thumb.webp",
+      "width": 2379
+    },
+    {
+      "bytes": 4219111,
+      "format": "png",
+      "height": 3114,
+      "id": "speaker-002",
+      "label": "002",
+      "path": "assets/conference/speakers/speaker-002.png",
+      "thumbPath": "assets/conference/speakers/speaker-002.thumb.webp",
+      "width": 2568
+    },
+    {
+      "bytes": 4751426,
+      "format": "png",
+      "height": 3200,
+      "id": "speaker-003",
+      "label": "003",
+      "path": "assets/conference/speakers/speaker-003.png",
+      "thumbPath": "assets/conference/speakers/speaker-003.thumb.webp",
+      "width": 2684
+    }
+  ],
+  "version": 1
+}
