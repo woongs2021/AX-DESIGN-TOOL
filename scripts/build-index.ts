@@ -320,7 +320,7 @@ const indexPath = join(dataDir, "index.json");
 writeFileSync(indexPath, stableStringify(index));
 
 // Both bundles publish Conference. Files over the Git 100MB limit are skipped.
-const conference = await buildConference(outRoot);
+const conference = await buildConference(outRoot, target === "public" ? "web" : "original");
 const bundleBytes = copiedAssetBytes + (conference?.bytesCopied ?? 0);
 if (target === "public" && bundleBytes > GITHUB_PAGES_MAX_BYTES) {
   failures.push({

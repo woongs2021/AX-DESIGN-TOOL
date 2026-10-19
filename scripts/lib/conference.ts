@@ -1,12 +1,15 @@
 /**
- * Conference resources for both builds: phase 2-resources/ → <outRoot>/assets/conference/ + data/conference.json.
- * Files over the Git 100MB limit are skipped. Slide uses its compressed copy.
+ * Conference resources: phase 2-resources/ → <outRoot>/assets/conference/ + data/conference.json.
+ * The internal build copies originals under the Git 100MB limit. The public build writes
+ * edit-size JPEG stills and videos whose long edge is 1920, so GitHub Pages can publish them.
  */
+import { spawnSync } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import sharp from "sharp";
 import {
   backgroundIdFor,
+  CONFERENCE_PRESETS,
   logoSlug,
   speakerSlug,
   type ConferenceBackground,
@@ -21,6 +24,52 @@ export const CONFERENCE_SOURCE_DIR = "phase 2-resources";
 const THUMB_WIDTH = 480;
 const THUMB_QUALITY = 80;
 const SVG_EDGE = 1080;
+const WEB_JPEG_QUALITY = 80;
+const WEB_VIDEO_LONG_EDGE = 1920;
+
+function editBox(id: string): { width: number; height: number } {
+  const preset = CONFERENCE_PRESETS.find((item) => item.background === id);
+  return { width: preset?.width ?? WEB_VIDEO_LONG_EDGE, height: preset?.height ?? WEB_VIDEO_LONG_EDGE };
+}
+
+function evenSize(width: number, height: number, longEdge: number): { width: number; height: number } {
+  const scale = Math.min(1, longEdge / Math.max(width, height));
+  return {
+    width: Math.max(2, Math.round((width * scale) / 2) * 2),
+    height: Math.max(2, Math.round((height * scale) / 2) * 2),
+  };
+}
+
+function writeWebVideo(from: string, dest: string, box: { width: number; height: number }): void {
+  const size = evenSize(box.width, box.height, WEB_VIDEO_LONG_EDGE);
+  const result = spawnSync(
+    "ffmpeg",
+    [
+      "-y",
+      "-i",
+      from,
+      "-vf",
+      `scale=${size.width}:${size.height}:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2`,
+      "-c:v",
+      "libx264",
+      "-crf",
+      "28",
+      "-preset",
+      "veryfast",
+      "-an",
+      "-movflags",
+      "+faststart",
+      "-pix_fmt",
+      "yuv420p",
+      dest,
+    ],
+    { stdio: "pipe" },
+  );
+  if (result.status !== 0) {
+    const detail = result.stderr?.toString().trim().split("\n").at(-1) ?? "ffmpeg failed";
+    throw new Error(`${from}: ${detail}`);
+  }
+}
 
 export type ConferenceReport = {
   backgrounds: number;
@@ -53,7 +102,7 @@ function sizedSvg(text: string): { text: string; width: number; height: number }
   return { text: text.replace(/<svg\b/, `<svg width="${width}" height="${height}"`), width, height };
 }
 
-export async function buildConference(outRoot: string): Promise<ConferenceReport | null> {
+export async function buildConference(outRoot: string, mode: "original" | "web" = "original"): Promise<ConferenceReport | null> {
   const files = filesIn(CONFERENCE_SOURCE_DIR);
   if (files.length === 0) return null;
   const assetsRel = "assets/conference";
@@ -98,9 +147,20 @@ export async function buildConference(outRoot: string): Promise<ConferenceReport
       continue;
     }
     const meta = await sharp(path, { limitInputPixels: false }).metadata();
-    const name = `${id}${extname(path).toLowerCase()}`;
     const item = background(id);
-    item.image = { path: copy(path, "backgrounds", name), width: meta.width ?? null, height: meta.height ?? null, bytes, dpi: meta.density ?? null };
+    if (mode === "web") {
+      const box = editBox(id);
+      const name = `${id}.jpg`;
+      const info = await sharp(path, { failOn: "none", limitInputPixels: false })
+        .resize({ width: box.width, height: box.height, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: WEB_JPEG_QUALITY })
+        .toFile(join(assetsDir, "backgrounds", name));
+      report.bytesCopied += info.size;
+      item.image = { path: `${assetsRel}/backgrounds/${name}`, width: info.width, height: info.height, bytes: info.size, dpi: meta.density ?? null };
+    } else {
+      const name = `${id}${extname(path).toLowerCase()}`;
+      item.image = { path: copy(path, "backgrounds", name), width: meta.width ?? null, height: meta.height ?? null, bytes, dpi: meta.density ?? null };
+    }
     item.thumbPath = await thumb(path, "backgrounds", `${id}.thumb.webp`);
     report.backgrounds += 1;
   }
@@ -126,7 +186,20 @@ export async function buildConference(outRoot: string): Promise<ConferenceReport
     } catch {
       ffprobeMissing = true;
     }
-    item.video = { path: copy(path, "backgrounds", `${id}.mp4`), width: probed.width, height: probed.height, bytes, durationSec: probed.durationSec };
+    const videoName = `${id}.mp4`;
+    const videoPath = join(assetsDir, "backgrounds", videoName);
+    if (mode === "web") writeWebVideo(path, videoPath, editBox(id));
+    else copyFileSync(path, videoPath, constants.COPYFILE_FICLONE);
+    const videoBytes = statSync(videoPath).size;
+    report.bytesCopied += videoBytes;
+    if (mode === "web") {
+      try {
+        probed = probeWithFfprobe(videoPath);
+      } catch {
+        ffprobeMissing = true;
+      }
+    }
+    item.video = { path: `${assetsRel}/backgrounds/${videoName}`, width: probed.width, height: probed.height, bytes: videoBytes, durationSec: probed.durationSec };
     report.videos += 1;
   }
   if (ffprobeMissing) report.warnings.push("ffprobe가 없어 동영상 크기·길이를 비워 두었습니다.");

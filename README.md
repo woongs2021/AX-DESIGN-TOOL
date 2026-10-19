@@ -4,7 +4,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고, Conference를 로컬 호스트와 GitHub Pages에 넣었다. 100MB를 넘는 Slide 원본 동영상은 빠진다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 Conference를 GitHub Pages에도 열었다. 로컬은 원본, Pages는 편집용으로 줄인 사본이다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -12,7 +12,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
 | 1 Online Studio | 35개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
-| 2 Conference | 컨퍼런스 행사물(Instagram, Poster, Slide, X배너, L배너)을 같은 편집기로 만든다. 배경 이미지·동영상, 인쇄용 PNG, MP4, 연사·로고. 로컬 호스트와 GitHub Pages에 있다 | 구현됨 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) |
+| 2 Conference | 컨퍼런스 행사물(Instagram, Poster, Slide, X배너, L배너)을 같은 편집기로 만든다. 배경 이미지·동영상, 인쇄용 PNG, MP4, 연사·로고. 로컬은 원본, Pages는 편집용 사본 | 구현됨 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) |
 
 ## Phase 0 — Archive Foundation
 
@@ -123,7 +123,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-10-20 | GitHub Pages 네비에 Conference를 넣었다. 배경·연사·로고를 public 번들에 싣는다. 123MB Slide 원본 동영상은 제외하고 줄인 사본을 쓴다. |
+| 2026-10-20 | GitHub Pages 네비에 Conference를 넣었다. 배경은 편집 크기 JPEG, 동영상은 긴 변 1920 MP4로 줄여 올린다. 로컬 호스트는 원본을 쓴다. |
 | 2026-10-20 | 연사 사진과 대학·단체 로고 공개를 허락하고 Conference 원본 리소스를 저장소에 넣었다. Slide 원본 동영상(123MB)은 제외하고 줄인 사본을 넣는다. |
 | 2026-10-17 | 로컬 호스트에 Conference 탭을 더했다. Instagram·Poster·Slide·X배너·L배너, 배경 이미지와 동영상, 인쇄용 PNG, MP4, 연사와 로고. public 번들에는 넣지 않는다. 같은 날 카드 크기 아래에 원·사각형·삼각형·별·선·펜을 넣었다. 도형에 그림자, 블렌드, 좌우가 다른 블러, 그라데이션, 테두리를 더했다. 한 번 누르면 크기와 radius, 두 번 누르면 점의 위치와 휘어짐을 고친다. 크기는 동그라미, radius는 마름모, 휘어짐은 작은 파란색 점이다. |
 | 2026-10-11 | 그래픽 5점을 더해 테마 35개. 스튜디오 테마와 상세의 원본 다운로드는 3072 PNG로 낮추고, 라이브러리에 보이는 이미지는 저화질 썸네일을 유지한다. 8개 카드 크기의 초기화 레이아웃을 앱에 넣고, 프리셋 칸에는 그 화면을 실제 비율로 줄인 미리보기를 둔다. 글자를 두 개 이상 고르면 같은 비율로 크기를 조절한다. 네비 이름을 Online Studio로 바꾸고, 라이브러리 카드 테두리를 연하게 했다. 테마 원본을 불러오는 동안 프리뷰에 로딩 문구를 보여 준다. |
@@ -148,7 +148,7 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 | [docs/decisions.md](docs/decisions.md) | 결정표 `D-01`~`D-17`의 단일 원천. |
 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) | 예전 Phase 0~8을 통합한 아카이브 기반 요약. |
 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) | Online Studio 계획서. |
-| [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) | Conference 계획서. 로컬 호스트와 GitHub Pages에 있다. |
+| [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) | Conference 계획서. 로컬은 원본, Pages는 편집용 사본. |
 | [docs/llm-wiki-model.md](docs/llm-wiki-model.md) | LLM Wiki 계층과 operation 규칙. |
 | [docs/authoring-guide.md](docs/authoring-guide.md) | 캡처 1건 작성 기준. |
 | [docs/deploy.md](docs/deploy.md) | 수동 배포 절차. |
