@@ -30,10 +30,36 @@
 - **사람이 실행**: ingest, 빌드, 배포는 사람이 명령으로 실행한다. watcher·CI 자동 배포는 만들지 않는다. 브라우저는 LLM 키를 갖지 않는다. (`D-10`, `D-11`)
 - **토큰**: UI 색상 hex는 `src/shared/tokens.css`에만 둔다. Cool Blue 고정, light/dark 모드만 전환한다. (`D-12`, `D-14`)
 
-## 현재 제품 상태 (Phase 1 착수 전)
+## 디자인 시스템 v3
+
+전문은 [woongdesignv3.md](../woongdesignv3.md)다. 강의용 [woongdesignv2.md](../woongdesignv2.md)의 색·서체·컴포넌트 표를 그 문서 안에 함께 정리했다. 이 제품에서 고정한 원칙은 아래다.
+
+1. 도구 화면이므로 Cool Blue 한 세트만 쓴다. `data-theme="cool"`, `data-mode`는 light 또는 dark. Warm·Mint·Violet 전환 UI는 없다.
+2. 크롬과 작품을 나눈다. 네비·패널은 활자, 색면, 0.5px 선만 쓴다. 카드 안의 그림자·그라데이션·도형·펜은 사용자가 내보내는 작품이다.
+3. 바닥은 `#FCFCFF` / `#010102`, Primary는 `#4065F8`, 카드 기본 radius는 28px, 네비 높이는 80px다. 크롬 서체는 Pretendard 20px다.
+4. Samsung Sharp Sans는 v2 디스플레이 서체로 남아 있고, 라이선스 확인 전까지 이 제품 공개 번들에는 넣지 않는다.
+5. v2의 muted 60%·stroke 40%는 대비가 부족해 제품에서 0.82·0.72로 올렸다. hex는 `src/shared/tokens.css` 밖에 두지 않는다.
+
+## 개발 구조
+
+전문과 구조도는 [development-note.md](../development-note.md)에 있다. UI는 프레임워크 없는 TypeScript와 CSS이고, Vite 6이 묶는다. Node 스크립트가 Obsidian Markdown을 `dist/<target>/data/index.json`으로 굽는다. 브라우저는 그 JSON과 복사된 자산만 읽는다.
+
+```mermaid
+flowchart LR
+  hash["해시 라우터"] --> archive["Graphic Library"]
+  hash --> capture["상세"]
+  hash --> studio["스튜디오 한 벌"]
+  hash --> history["History"]
+  studio --> online["Online Studio"]
+  studio --> conference["Conference"]
+```
+
+Online Studio와 Conference는 `src/views/studio.ts` 하나를 `StudioConfig`로 나눈다. 인쇄용 PNG는 `src/shared/print-png.ts`가 `CompressionStream`으로 띠를 나눠 만든다. 동영상 내보내기는 브라우저 `MediaRecorder`다. Conference 공개 파일은 `scripts/lib/conference.ts`가 편집 크기 JPEG와 긴 변 1920 MP4로 줄인다. 로컬 호스트는 100MB 이하 원본을 쓴다.
+
+## 현재 제품 상태
 
 - 브랜드: 헤더 타이틀 **AX DESIGN STUDIO**.
-- 네비: Graphic Library / Online Studio / History. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+- 네비: Graphic Library / Online Studio / Conference / History. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다. `conference.json`이 없으면 `#/conference`도 `#/studio`로 보낸다.
 - Archive: All/Pin 탭 + 1:1 카드 그리드(이미지 cover 채움). 검색창과 필터 패널은 없다. 카드 kind 뱃지는 motion만 표시.
 - 상세 뷰: 왼쪽 Back 버튼, 이미지 contain + 남는 영역 light 흰색 / dark 검정(`--media-matte`), 분석 본문과 `Graphic asset` 설명.
 - 데이터: `image-pick-hermes` 그래픽 에셋 스터디 35건(모두 public). 사이트에 쓰는 PNG는 3072 정사각이고, 4K 원본은 `image-pic-high-resolution`에 둔다. 더미 캡처는 삭제했다.

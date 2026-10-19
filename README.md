@@ -123,6 +123,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-10-20 | 디자인 시스템 v3와 개발 노트를 정리했다. [woongdesignv3.md](woongdesignv3.md), [development-note.md](development-note.md). |
 | 2026-10-20 | GitHub Pages 네비에 Conference를 넣었다. 배경은 편집 크기 JPEG, 동영상은 긴 변 1920 MP4로 줄여 올린다. 로컬 호스트는 원본을 쓴다. |
 | 2026-10-20 | 연사 사진과 대학·단체 로고 공개를 허락하고 Conference 원본 리소스를 저장소에 넣었다. Slide 원본 동영상(123MB)은 제외하고 줄인 사본을 넣는다. |
 | 2026-10-17 | 로컬 호스트에 Conference 탭을 더했다. Instagram·Poster·Slide·X배너·L배너, 배경 이미지와 동영상, 인쇄용 PNG, MP4, 연사와 로고. public 번들에는 넣지 않는다. 같은 날 카드 크기 아래에 원·사각형·삼각형·별·선·펜을 넣었다. 도형에 그림자, 블렌드, 좌우가 다른 블러, 그라데이션, 테두리를 더했다. 한 번 누르면 크기와 radius, 두 번 누르면 점의 위치와 휘어짐을 고친다. 크기는 동그라미, radius는 마름모, 휘어짐은 작은 파란색 점이다. |
@@ -132,6 +133,33 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | 2026-09-27 | Online Marketing Studio 공개. 레이아웃·폰트·이미지 수동 조절, 타이틀·본문 폰트 분리, 초기화. Archive를 Graphic Library로 바꾸고 검색·필터 제거. 다크 모드 기본값, 기본 문구 `시즌`, 글자색 피커 테두리. 프리뷰 줌·Fit·이전 동작/원래대로·드래그 영역 표시. 너비·높이 함께 조절은 프레임과 이미지를 같이 바꾸고 폰트는 유지. 스크롤바·분할 바·조절바 시인성 정돈. 상세는 [Phase 1 문서의 업데이트 기록](docs/phase-1-online-marketing-studio.md#업데이트-기록). |
 
 History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 보여 준다. public 번들(GitHub Pages)에는 `update` 항목만 들어가고, 캡처 이름이 나올 수 있는 `ingest`·`query`·`lint` 항목은 internal에만 둔다. 같은 날 태블릿·모바일 레이아웃도 정리했다.
+
+## 디자인 시스템 v3
+
+강의용 시스템 v2를 제품 규칙으로 좁힌 문서가 [woongdesignv3.md](woongdesignv3.md)다. v2 원문도 그 파일 안에 정리해 두었고, [`woongdesignv2.md`](woongdesignv2.md)는 그대로 둔다. 다음에 비슷한 툴을 만들 때는 아래 순서를 먼저 정한다.
+
+1. 화면이 도구인지 대화인지 정한다. 이 제품은 도구이므로 Cool Blue 한 세트만 쓴다. Warm·Mint·Violet은 켜지 않는다.
+2. 앱 크롬과 카드 작품을 나눈다. 네비·패널에는 이모지, 그림자, 그라데이션이 없다. 카드 안의 그림자·그라데이션·도형은 사용자가 만드는 작품이다.
+3. UI 색 hex는 `src/shared/tokens.css` 하나다. 바닥은 `#FCFCFF` / `#010102`, 시그니처 액션은 `#4065F8`, 카드 기본 radius는 28px, 네비는 80px이다.
+4. 크롬 서체는 Pretendard다. Samsung Sharp Sans는 라이선스 확인 전까지 공개 번들에 넣지 않는다. 카드 글자는 Pretendard, Roboto, Montserrat 중에서 고른다.
+5. Markdown이 진실이고, 웹은 빌드된 JSON만 읽는다. 공개 번들은 내부 데이터를 빼놓고 만들며, 큰 원본은 로컬에 두고 공개 사이트에는 편집용 사본을 넣는다.
+6. 편집기는 하나다. Online Studio와 Conference는 프리셋·배경·내보내기 설정만 다르다.
+
+## 개발 구조
+
+언어와 특별한 코드의 전문은 [development-note.md](development-note.md)에 있다. UI는 React 없이 TypeScript와 CSS다. Vite 6이 화면을 묶고, Node 스크립트가 Markdown을 JSON으로 굽는다. 이미지 축소는 `sharp`, 공개용 동영상 축소는 `ffmpeg`다.
+
+```mermaid
+flowchart TB
+  vault["obsidian Markdown"] --> build["빌드 스크립트"]
+  resources["phase 2-resources"] --> build
+  build --> internal["dist/internal 원본"]
+  build --> public["dist/public 편집용 사본"]
+  ui["src 해시 라우터 · 스튜디오 한 벌"] --> internal
+  public --> pages["GitHub Pages"]
+```
+
+화면은 `#/` Graphic Library, `#/studio` Online Studio, `#/conference` Conference, `#/history` History다. 인쇄용 PNG는 `CompressionStream`으로 띠를 나눠 만들고, 동영상 내보내기는 브라우저 `MediaRecorder`다. 카드 합성은 서버 없이 브라우저 안에서만 한다.
 
 ## 핵심 원칙
 
@@ -145,6 +173,9 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 
 | 문서 | 역할 |
 |---|---|
+| [woongdesignv3.md](woongdesignv3.md) | 제품 디자인 시스템. v2 강의 시스템을 함께 정리했다. |
+| [woongdesignv2.md](woongdesignv2.md) | 강의·슬라이드용 제너럴 디자인 시스템 원문. |
+| [development-note.md](development-note.md) | 언어, 로직, 특별한 코드, 구조도. |
 | [docs/decisions.md](docs/decisions.md) | 결정표 `D-01`~`D-17`의 단일 원천. |
 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) | 예전 Phase 0~8을 통합한 아카이브 기반 요약. |
 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) | Online Studio 계획서. |
