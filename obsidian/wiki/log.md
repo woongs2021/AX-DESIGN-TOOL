@@ -2,6 +2,14 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-10-20] update | Conference 원본 공개 허락
+
+연사 사진과 대학·단체 로고를 저장소에 넣어도 된다고 정했다. Slide 원본 동영상은 100MB를 넘겨 제외하고, 줄인 사본을 둔다. 공개 사이트 번들에는 웹용으로 줄인 사본을 만들기 전까지 Conference를 넣지 않는다.
+
+## [2026-10-17] update | Conference 탭 추가
+
+로컬 호스트에 Conference 탭을 더했다. Instagram, Poster, Slide, X배너, L배너 크기로 행사물을 만들고, 같은 폴더의 이미지와 동영상을 배경으로 깐다. X배너와 L배너는 인쇄용 PNG를, 동영상이 있는 프리셋은 MP4를 내려받는다. Speecher와 SVG 로고를 넣고 로고는 원래 색이나 단색으로 바꾼다. public 번들에는 이 탭과 리소스를 넣지 않는다.
+
 ## [2026-10-17] update | 도형 도구 설명을 한 줄 정의로 변경
 
 도형 아래 문구를 사용법 대신 "원, 사각형, 삼각형, 별과 선, 펜으로 카드에 형태를 그리는 도구입니다."로 바꿨다.

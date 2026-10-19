@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import type { ConferenceIndex } from "../src/shared/conference.ts";
 import type { SiteIndex } from "../src/shared/index-types.ts";
 
 const PUBLIC_ROOT = "dist/public";
@@ -57,6 +58,29 @@ for (const file of textFiles) {
     if (text.includes(marker)) {
       failures += 1;
       console.error(`FAIL: ${file} contains internal marker "${marker}"`);
+    }
+  }
+}
+
+// Conference is internal-only: no JSON, no copied resources, no resource paths or ids in public text.
+for (const path of [`${PUBLIC_ROOT}/data/conference.json`, `${PUBLIC_ROOT}/assets/conference`]) {
+  if (existsSync(path)) {
+    failures += 1;
+    console.error(`FAIL: public bundle includes ${path}`);
+  }
+}
+const conferenceMarkers = new Set(["assets/conference/"]);
+const internalConference = "dist/internal/data/conference.json";
+if (existsSync(internalConference)) {
+  const conference = JSON.parse(readFileSync(internalConference, "utf8")) as ConferenceIndex;
+  for (const item of [...conference.speakers, ...conference.logos]) conferenceMarkers.add(item.id);
+}
+for (const file of textFiles) {
+  const text = readFileSync(file, "utf8");
+  for (const marker of conferenceMarkers) {
+    if (text.includes(marker)) {
+      failures += 1;
+      console.error(`FAIL: ${file} contains conference marker "${marker}"`);
     }
   }
 }

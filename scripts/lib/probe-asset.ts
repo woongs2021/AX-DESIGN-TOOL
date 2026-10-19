@@ -176,7 +176,7 @@ function which(bin: string): string | null {
   }
 }
 
-function probeWithFfprobe(
+export function probeWithFfprobe(
   filePath: string,
 ): Pick<ProbedAsset, "width" | "height" | "format" | "frameCount" | "durationSec"> {
   const ffprobe = which("ffprobe");

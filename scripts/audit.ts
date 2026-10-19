@@ -13,6 +13,7 @@ const steps: Array<{ command: string; args: string[] }> = [
   { command: "npm", args: ["run", "test:filter"] },
   { command: "npm", args: ["run", "test:phase4"] },
   { command: "npm", args: ["run", "test:studio"] },
+  { command: "npm", args: ["run", "test:conference"] },
   { command: "npm", args: ["run", "build:ui"] },
 ];
 

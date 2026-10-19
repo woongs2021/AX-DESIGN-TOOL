@@ -4,7 +4,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 1 Online Studio 구현**. 네비는 **Graphic Library / Online Studio / History**. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 2 Conference 구현**. 로컬 호스트 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 원본을 저장소에 넣었다. public 번들과 Pages에는 웹용 사본 전까지 Conference가 없다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -12,6 +12,34 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
 | 1 Online Studio | 35개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
+| 2 Conference | 컨퍼런스 행사물(Instagram, Poster, Slide, X배너, L배너)을 같은 편집기로 만든다. 배경 이미지·동영상, 인쇄용 PNG, MP4, 연사·로고. 원본은 저장소에 있고, public 번들은 웹용 사본 전 | 구현됨 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) |
+
+## Phase 0 — Archive Foundation
+
+**목표**: 디자인 이미지를 Obsidian vault에 아카이빙하고, 빌드된 JSON만 읽는 정적 웹에서 탐색하는 기반을 만든다. 예전 Phase 0~8을 이 단계로 묶었다. Phase 1 Online Studio는 이 기반 위에서 아카이브 이미지를 소재로 쓴다. 세부 내용은 [Phase 0 문서](docs/phase-0-foundation.md)에 있다.
+
+**개발 순서**
+
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| 0-1 | 토큰 단일 원천, 대비 검증, focus-visible, coarse pointer 터치 타깃, LF 정규화 | 완료 |
+| 0-2 | Markdown 스키마, vault 구조, 통제 어휘, visibility, LLM Wiki index/log | 완료 |
+| 0-3 | 결정적 JSON, 자산 프로브, 태그 정규화, 중복 감지, internal/public 이중 번들, 빌드 리포트 | 완료 |
+| 0-4 | 앱 셸, 해시 라우터, Archive 그리드, 검색·필터, 다크 모드, 키보드 접근 | 완료 |
+| 0-5 | 상세 뷰. Collections·Wiki·Export 화면과 Related captures는 제품 UI에서 제거 | 완료 |
+| 0-6 | 대비·키보드·터치 감사, public 누출 점검, Pages 용량, 수동 배포 | 완료 |
+| 0-7 | 로컬 `npm run ingest`로 vault 저장과 LLM 분석 초안. Intake 탭은 Phase 1에서 제거 | CLI |
+| 0-8 | `npm run design-system`으로 `design-system.md`·`tokens.json` 초안. Design System 탭은 Phase 1에서 제거 | CLI |
+| 0-9 | 디자인 시스템 기반 마케팅 이미지 생성 | Phase 1로 대체 |
+
+**핵심 계약**
+
+- `obsidian/` Markdown이 진실이다. 웹은 `dist/<target>/data/index.json`과 복사된 자산만 읽는다.
+- vault는 `obsidian/captures/<slug>/`, `obsidian/collections/`, `obsidian/wiki/`로 나뉜다.
+- 치수·바이트·포맷·해시처럼 파일에서 계산되는 값은 Markdown에 쓰지 않고 빌드가 만든다.
+- `internal`은 전체, `public`은 `visibility: public`만 포함한다. public은 internal 데이터를 빼놓고 만든다.
+- ingest, 빌드, 배포는 사람이 명령으로 실행한다. 브라우저는 LLM 키를 갖지 않는다.
+- UI 색상 hex는 `src/shared/tokens.css`에만 둔다.
 
 ## Phase 0 — Archive Foundation
 
@@ -122,7 +150,8 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-10-17 | 카드 크기 아래에 원·사각형·삼각형·별·선·펜을 넣었다. 도형에 그림자, 블렌드, 좌우가 다른 블러, 그라데이션, 테두리를 더했다. 한 번 누르면 크기와 radius, 두 번 누르면 점의 위치와 휘어짐을 고친다. 크기는 동그라미, radius는 마름모, 휘어짐은 작은 파란색 점이다. |
+| 2026-10-20 | 연사 사진과 대학·단체 로고 공개를 허락하고 Conference 원본 리소스를 저장소에 넣었다. Slide 원본 동영상(123MB)은 제외하고 줄인 사본을 넣는다. public 번들은 웹용 사본 전까지 Conference를 빼 둔다. |
+| 2026-10-17 | 로컬 호스트에 Conference 탭을 더했다. Instagram·Poster·Slide·X배너·L배너, 배경 이미지와 동영상, 인쇄용 PNG, MP4, 연사와 로고. public 번들에는 넣지 않는다. 같은 날 카드 크기 아래에 원·사각형·삼각형·별·선·펜을 넣었다. 도형에 그림자, 블렌드, 좌우가 다른 블러, 그라데이션, 테두리를 더했다. 한 번 누르면 크기와 radius, 두 번 누르면 점의 위치와 휘어짐을 고친다. 크기는 동그라미, radius는 마름모, 휘어짐은 작은 파란색 점이다. |
 | 2026-10-11 | 그래픽 5점을 더해 테마 35개. 스튜디오 테마와 상세의 원본 다운로드는 3072 PNG로 낮추고, 라이브러리에 보이는 이미지는 저화질 썸네일을 유지한다. 8개 카드 크기의 초기화 레이아웃을 앱에 넣고, 프리셋 칸에는 그 화면을 실제 비율로 줄인 미리보기를 둔다. 글자를 두 개 이상 고르면 같은 비율로 크기를 조절한다. 네비 이름을 Online Studio로 바꾸고, 라이브러리 카드 테두리를 연하게 했다. 테마 원본을 불러오는 동안 프리뷰에 로딩 문구를 보여 준다. |
 | 2026-10-05 | Graphic Library와 스튜디오 테마 이미지를 4096 정사각 PNG로 교체하고, 새 그래픽 10점을 더해 30개가 되었다. 스튜디오에 초기화로 세팅·설정 메뉴의 리셋·그래픽 라이브러리 저장(Saved 탭)을 넣었다. |
 | 2026-09-28 | 프리뷰에서 이미지 핀치·크기 핸들과 텍스트 바로 수정. 모바일·타블렛·데스크탑 뷰 전환, 스크롤할 때만 보이는 프레임 스크롤바. 디바이더와 디바이스 바를 같은 색으로 맞추고 아이콘 테두리·프레임 좌우 선을 없앴다. History 본문 글자 크기를 날짜와 같게 14px로 맞췄다. 그래픽 4점을 추가해 테마 20개. Shift 다중 선택·함께 드래그, 이전 동작·원래대로 키보드 단축키. |
@@ -145,6 +174,7 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 | [docs/decisions.md](docs/decisions.md) | 결정표 `D-01`~`D-17`의 단일 원천. |
 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) | 예전 Phase 0~8을 통합한 아카이브 기반 요약. |
 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) | Online Studio 계획서. |
+| [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) | Conference 계획서. 원본은 저장소에 있고, public 번들은 웹용 사본 전. |
 | [docs/llm-wiki-model.md](docs/llm-wiki-model.md) | LLM Wiki 계층과 operation 규칙. |
 | [docs/authoring-guide.md](docs/authoring-guide.md) | 캡처 1건 작성 기준. |
 | [docs/deploy.md](docs/deploy.md) | 수동 배포 절차. |

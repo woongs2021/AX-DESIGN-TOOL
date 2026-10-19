@@ -13,8 +13,21 @@ import {
   type StudioState,
 } from "./shared/studio.ts";
 import { DEFAULT_PRESET_ID } from "./shared/studio-presets.ts";
+import {
+  createConferenceState,
+  DEFAULT_CONFERENCE_PRESET_ID,
+  presetBackground,
+  type ConferenceIndex,
+} from "./shared/conference.ts";
 import { readPins, togglePin } from "./pins.ts";
-import { clearBaseline, readBaseline, writeBaseline } from "./studio-baseline.ts";
+import {
+  baselineStore,
+  clearBaseline,
+  CONFERENCE_BASELINE_KEY,
+  readBaseline,
+  writeBaseline,
+  type BaselineStore,
+} from "./studio-baseline.ts";
 import { addSavedCard, getSavedCards, loadSavedCards } from "./saved-cards.ts";
 import { loadUploads } from "./studio-uploads.ts";
 import { confirmProceed, showToast } from "./feedback.ts";
@@ -27,16 +40,24 @@ import {
 import { bindCaptureDetail, renderCaptureDetail } from "./views/capture.ts";
 import { renderHistory } from "./views/history.ts";
 import { renderNotFound } from "./views/placeholders.ts";
-import { bindStudio, renderStudio } from "./views/studio.ts";
+import {
+  bindStudio,
+  conferenceStudioConfig,
+  onlineStudioConfig,
+  renderStudio,
+  type StudioConfig,
+} from "./views/studio.ts";
 
 const MODE_KEY = "ax-design-studio-mode";
 const DATA_URL = "./data/index.json";
+/** Written only by the internal build. Missing means no Conference tab. */
+const CONFERENCE_URL = "./data/conference.json";
 
 type Mode = "light" | "dark";
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; index: SiteIndex };
+  | { status: "ready"; index: SiteIndex; conference: ConferenceIndex | null };
 
 let loadState: LoadState = { status: "loading" };
 let pinnedSlugs = readPins();
@@ -44,6 +65,9 @@ let archiveTab: ArchiveTab = "all";
 let studioState: StudioState | null = null;
 let appliedTheme: string | null = null;
 let appliedCard: string | null = null;
+let conferenceState: StudioState | null = null;
+let appliedConferenceCard: string | null = null;
+let conferenceBaselines: BaselineStore | null = null;
 let route: Route = parseHash();
 
 function readStoredMode(): Mode {
@@ -141,16 +165,41 @@ function ensureStudio(
   return studioState;
 }
 
+function conferenceStore(index: ConferenceIndex): BaselineStore {
+  conferenceBaselines ??= baselineStore(CONFERENCE_BASELINE_KEY, (presetId) => createConferenceState(presetId, index));
+  return conferenceBaselines;
+}
+
+function ensureConference(cardId: string | null, index: ConferenceIndex): StudioState {
+  if (cardId && cardId !== appliedConferenceCard) {
+    const saved = getSavedCards().find((card) => card.id === cardId);
+    const savedState = saved ? normalizeStudioState(structuredClone(saved.state)) : null;
+    if (savedState) {
+      conferenceState = savedState;
+      appliedConferenceCard = cardId;
+      return conferenceState;
+    }
+  }
+  if (!cardId) appliedConferenceCard = null;
+  conferenceState ??=
+    conferenceStore(index).read(DEFAULT_CONFERENCE_PRESET_ID) ?? createConferenceState(DEFAULT_CONFERENCE_PRESET_ID, index);
+  return conferenceState;
+}
+
 function shell(mainHtml: string): string {
   const mode = readStoredMode();
   const nextModeLabel = mode === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환";
-  const studio = route.name === "studio";
+  const studio = route.name === "studio" || route.name === "conference";
+  const conference = loadState.status === "ready" && loadState.conference
+    ? navLink("Conference", hrefFor({ name: "conference", card: null }), route.name === "conference")
+    : "";
   return `
     <header class="top-nav">
       <a class="wordmark" href="#/">AX Design Studio</a>
       <nav class="nav-menu" aria-label="Primary">
         ${navLink("Graphic Library", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
         ${navLink("Online Studio", hrefFor({ name: "studio", theme: null, card: null }), route.name === "studio")}
+        ${conference}
         ${navLink("History", hrefFor({ name: "history" }), route.name === "history")}
       </nav>
       <div class="nav-actions">
@@ -198,7 +247,11 @@ function renderMain(): string {
     case "capture":
       return renderCaptureDetail(index, route.slug, pinnedSlugs);
     case "studio":
-      return renderStudio(ensureStudio(route.theme, route.card, index.captures), index.captures);
+      return renderStudio(ensureStudio(route.theme, route.card, index.captures), onlineStudioConfig(index.captures));
+    case "conference":
+      return loadState.conference
+        ? renderStudio(ensureConference(route.card, loadState.conference), conferenceStudioConfig(loadState.conference))
+        : renderNotFound("/conference");
     case "history":
       return renderHistory(index);
     case "notfound":
@@ -211,6 +264,10 @@ function render(): void {
   if (!app) throw new Error("#app not found");
   applyMode(readStoredMode());
   pinnedSlugs = readPins();
+  if (route.name === "conference" && loadState.status === "ready" && !loadState.conference) {
+    route = { name: "studio", theme: null, card: route.card };
+    history.replaceState(null, "", hrefFor(route));
+  }
   app.innerHTML = shell(renderMain());
 
   app.querySelector("#index-retry")?.addEventListener("click", () => {
@@ -244,31 +301,49 @@ function render(): void {
     });
   }
 
-  if (route.name === "studio" && loadState.status === "ready" && studioState) {
-    bindStudio(app, studioState, loadState.index.captures, {
-      onReset: () => {
-        if (!studioState) return;
-        applyStudioBaseline(studioState, readBaseline(studioState.presetId), defaultStudioColor());
-        render();
-        document.querySelector<HTMLButtonElement>("#studio-reset")?.focus();
-      },
-      onSetBaseline: () => {
-        if (!studioState) return;
-        writeBaseline(structuredClone(studioState));
-      },
-      onLoadPreset: (presetId) => {
-        const baseline = readBaseline(presetId);
-        if (!studioState || !baseline) return false;
-        applyStudioBaseline(studioState, baseline, defaultStudioColor());
-        render();
-        return true;
-      },
-      onAddToLibrary: (thumbnail) => {
-        if (!studioState) return Promise.resolve(false);
-        return addSavedCard(studioState, thumbnail).then((card) => card !== null);
-      },
+  if (route.name === "studio" && studioState) {
+    bindEditor(app, studioState, onlineStudioConfig(loadState.index.captures), {
+      read: readBaseline,
+      write: writeBaseline,
+      clear: clearBaseline,
     });
   }
+  const conference = loadState.conference;
+  if (route.name === "conference" && conference && conferenceState) {
+    bindEditor(app, conferenceState, conferenceStudioConfig(conference), conferenceStore(conference), (state, previous) => {
+      state.background = presetBackground(conference, state.presetId, previous);
+    });
+  }
+}
+
+/** afterPreset: Conference keeps video mode when the next preset's background has a video. */
+function bindEditor(
+  app: HTMLElement,
+  state: StudioState,
+  config: StudioConfig,
+  baselines: BaselineStore,
+  afterPreset?: (state: StudioState, previous: StudioState["background"]) => void,
+): void {
+  bindStudio(app, state, config, {
+    onReset: () => {
+      applyStudioBaseline(state, baselines.read(state.presetId), defaultStudioColor());
+      render();
+      document.querySelector<HTMLButtonElement>("#studio-reset")?.focus();
+    },
+    onSetBaseline: () => {
+      baselines.write(structuredClone(state));
+    },
+    onLoadPreset: (presetId) => {
+      const baseline = baselines.read(presetId);
+      if (!baseline) return false;
+      const previous = state.background;
+      applyStudioBaseline(state, baseline, defaultStudioColor());
+      afterPreset?.(state, previous);
+      render();
+      return true;
+    },
+    onAddToLibrary: (thumbnail) => addSavedCard(state, thumbnail).then((card) => card !== null),
+  });
 }
 
 function bindSettingsMenu(app: HTMLElement): void {
@@ -307,7 +382,17 @@ function bindSettingsMenu(app: HTMLElement): void {
       const ok = await confirmProceed("세팅한 초기화 기준을 지우고 진행하시겠습니까?");
       if (!ok) return;
       clearBaseline();
+      conferenceBaselines?.clear();
       appliedCard = null;
+      appliedConferenceCard = null;
+      const conference = loadState.status === "ready" ? loadState.conference : null;
+      if (conferenceState && conference) {
+        conferenceState = conferenceStore(conference).read(DEFAULT_CONFERENCE_PRESET_ID);
+      }
+      if (route.name === "conference" && route.card) {
+        route = { name: "conference", card: null };
+        history.replaceState(null, "", hrefFor(route));
+      }
       if (studioState) {
         const captures = loadState.status === "ready" ? loadState.index.captures : [];
         const theme = knownTheme(DEFAULT_THEME_SLUG, captures) ?? studioState.themeSlug;
@@ -339,6 +424,20 @@ async function readIndex(): Promise<SiteIndex> {
   return index;
 }
 
+async function readConference(): Promise<ConferenceIndex | null> {
+  try {
+    const response = await fetch(`${CONFERENCE_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return null;
+    const text = await response.text();
+    // Vite answers a missing file with index.html.
+    if (text.trimStart().startsWith("<")) return null;
+    const conference = JSON.parse(text) as ConferenceIndex;
+    return conference?.version === 1 && Array.isArray(conference.backgrounds) ? conference : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadIndex(): Promise<void> {
   loadState = { status: "loading" };
   render();
@@ -346,8 +445,8 @@ async function loadIndex(): Promise<void> {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     try {
       const index = await readIndex();
-      await Promise.all([loadSavedCards(), loadUploads()]);
-      loadState = { status: "ready", index };
+      const [conference] = await Promise.all([readConference(), loadSavedCards(), loadUploads()]);
+      loadState = { status: "ready", index, conference };
       render();
       return;
     } catch (error) {
