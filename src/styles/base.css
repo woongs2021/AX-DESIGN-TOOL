@@ -51,6 +51,11 @@ code {
 :root {
   --line-width: 0.5px;
   --line-color: color-mix(in srgb, var(--stroke) 68%, transparent);
+  --code-bg: var(--tint);
+}
+
+html[data-mode="dark"] {
+  --code-bg: color-mix(in srgb, var(--fg) 10%, var(--studio-ink-dark));
 }
 
 :focus {
@@ -1684,6 +1689,7 @@ html[data-mode="light"] .studio__radius input[type="range"] {
 }
 
 .studio__theme {
+  position: relative;
   padding: 0;
   overflow: hidden;
   border: var(--line-width) solid var(--line-color);
@@ -1693,8 +1699,13 @@ html[data-mode="light"] .studio__radius input[type="range"] {
   aspect-ratio: 1;
 }
 
-.studio__theme[aria-checked="true"] {
+.studio__theme[aria-checked="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   box-shadow: inset 0 0 0 2px var(--primary);
+  pointer-events: none;
 }
 
 .studio__theme img {
@@ -1702,6 +1713,32 @@ html[data-mode="light"] .studio__radius input[type="range"] {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Same ground as the code block, so marks and cut-outs match that surface. */
+.studio__theme--speaker,
+.studio__theme--logo {
+  background: var(--code-bg);
+}
+
+html[data-mode="dark"] .studio__theme--speaker,
+html[data-mode="dark"] .studio__theme--logo {
+  background: color-mix(in srgb, var(--fg) 6%, var(--studio-ink-dark));
+}
+
+.studio__theme--speaker img,
+.studio__theme--logo img {
+  object-fit: contain;
+}
+
+.studio__theme--logo img {
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+/* Black-only marks disappear on the dark code ground. Flip those thumbnails so the artwork stays readable; the file colors are unchanged on the card. */
+html[data-mode="dark"] .studio__theme--logo.is-mono img {
+  filter: invert(1);
 }
 
 .studio__text-style {
@@ -1802,14 +1839,13 @@ html[data-mode="light"] .studio__radius input[type="range"] {
   margin: 0;
   padding: 12px;
   border-radius: 12px;
-  background: var(--tint);
+  background: var(--code-bg);
   color: var(--on-tint);
   font-size: 11px;
   white-space: pre-wrap;
 }
 
 html[data-mode="dark"] .studio__export {
-  background: color-mix(in srgb, var(--fg) 10%, var(--studio-ink-dark));
   color: var(--fg);
 }
 
@@ -1838,7 +1874,9 @@ html[data-mode="dark"] .studio__export {
   transform: translateX(-50%);
 }
 
-.studio__align[hidden] {
+.studio__align[hidden],
+.studio__bar-actions [hidden],
+.studio__note[hidden] {
   display: none;
 }
 
@@ -2193,6 +2231,30 @@ html[data-mode="dark"] .studio__export {
   margin: 0;
   color: var(--fg-muted);
   font-size: 14px;
+}
+
+.studio__bar-actions [hidden],
+.studio__note[hidden] {
+  display: none;
+}
+
+.studio__note {
+  margin: 0;
+  padding: 0 24px 16px;
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+/* While a print PNG or video is written, only the cancel button in the bar stays live. */
+.studio[data-recording="true"] .studio__controls-wrap,
+.studio[data-recording="true"] .studio__splitter,
+.studio[data-recording="true"] .studio__stage,
+.studio[data-recording="true"] .studio__align,
+.studio[data-recording="true"] .studio__history,
+.studio[data-recording="true"] .studio__zoom,
+.studio[data-recording="true"] #studio-download {
+  pointer-events: none;
+  opacity: 0.5;
 }
 
 @media (max-width: 767px) {

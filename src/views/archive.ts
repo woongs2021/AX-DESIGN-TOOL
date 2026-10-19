@@ -69,7 +69,7 @@ function renderSavedCard(card: SavedCard): string {
   const size = `${card.state.cardWidth} × ${card.state.cardHeight}`;
   return `
     <article class="capture-card">
-      <a class="capture-card__link" href="${hrefFor({ name: "studio", theme: null, card: card.id })}">
+      <a class="capture-card__link" href="${hrefFor(card.state.background ? { name: "conference", card: card.id } : { name: "studio", theme: null, card: card.id })}">
         <div class="capture-card__frame">
           <img class="capture-card__media" src="${escapeHtml(card.thumbnail)}" alt="" width="${card.state.cardWidth}" height="${card.state.cardHeight}" />
         </div>

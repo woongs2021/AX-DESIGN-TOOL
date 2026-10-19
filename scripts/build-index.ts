@@ -12,6 +12,7 @@ import {
 } from "../src/shared/limits.ts";
 import { extractCaptureSlugRefs } from "../src/shared/schema.ts";
 import { stableStringify } from "../src/shared/stable-json.ts";
+import { buildConference } from "./lib/conference.ts";
 import { extractPoster, probeAssetFile } from "./lib/probe-asset.ts";
 import { loadVault } from "./lib/vault.ts";
 
@@ -318,6 +319,9 @@ const index = {
 const indexPath = join(dataDir, "index.json");
 writeFileSync(indexPath, stableStringify(index));
 
+// Conference stays internal until the speakers and logo owners allow publishing.
+const conference = target === "internal" ? await buildConference(outRoot) : null;
+
 const report = {
   target,
   capturesTotal: vault.captures.length,
@@ -353,6 +357,7 @@ const report = {
   githubPagesMaxBytes: GITHUB_PAGES_MAX_BYTES,
   githubPagesRemainingBytes: GITHUB_PAGES_MAX_BYTES - copiedAssetBytes,
   gitMaxFileBytes: GIT_MAX_FILE_BYTES,
+  ...(conference ? { conference } : {}),
 };
 
 // Reports stay outside dist bundles so public deploy trees cannot leak internal paths.
@@ -387,6 +392,13 @@ if (skippedAssetCount > 0) {
 if (oversizeFiles.length > 0) {
   console.log("oversize files (>100MB):");
   for (const f of oversizeFiles) console.log(`  ${f.path} (${f.bytes})`);
+}
+if (conference) {
+  console.log(
+    `conference: ${conference.backgrounds} backgrounds, ${conference.videos} videos, ${conference.speakers} speakers, ${conference.logos} logos, ${conference.bytesCopied} bytes`,
+  );
+  for (const f of conference.skipped) console.log(`  skipped (>100MB): ${f.path} (${f.bytes})`);
+  for (const w of conference.warnings) console.log(`  warning: ${w}`);
 }
 for (const f of failures) {
   console.error(`FAIL ${f.path}: ${f.reason}`);

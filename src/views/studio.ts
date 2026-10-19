@@ -12,6 +12,7 @@ import {
   clampRadius,
   clampTextOffset,
   CONTROLS_MIN,
+  coverRect,
   cropFromBox,
   designToCode,
   ensureLayer,
@@ -63,7 +64,16 @@ import {
   type TextKind,
   type TextLayer,
 } from "../shared/studio.ts";
-import { presetById, STUDIO_PRESETS } from "../shared/studio-presets.ts";
+import { STUDIO_PRESETS, type StudioPreset } from "../shared/studio-presets.ts";
+import {
+  CONFERENCE_PRESETS,
+  conferenceSrc,
+  printSize,
+  videoExportSizes,
+  type ConferenceBackground,
+  type ConferenceIndex,
+} from "../shared/conference.ts";
+import { createPngEncoder, printStrips } from "../shared/print-png.ts";
 import {
   BLEND_LABELS,
   LAYER_BLUR_MAX,
@@ -141,6 +151,41 @@ let undoZoom: number[] = [];
 let redoZoom: number[] = [];
 let gesture: StudioState | null = null;
 let gestureZoom = 1;
+/** Commits a text edit that is still open when the editor is torn down to switch tabs. */
+let commitOpenGesture: (() => void) | null = null;
+/** Online Studio and Conference each keep their own undo history. */
+let historyOwner = "";
+const histories = new Map<string, { undo: StudioState[]; redo: StudioState[]; undoZoom: number[]; redoZoom: number[] }>();
+
+function useHistory(owner: string): void {
+  if (owner === historyOwner) return;
+  if (historyOwner) histories.set(historyOwner, { undo: undoStack, redo: redoStack, undoZoom, redoZoom });
+  const next = histories.get(owner) ?? { undo: [], redo: [], undoZoom: [], redoZoom: [] };
+  undoStack = next.undo;
+  redoStack = next.redo;
+  undoZoom = next.undoZoom;
+  redoZoom = next.redoZoom;
+  gesture = null;
+  historyOwner = owner;
+}
+
+const videoCache = new Map<string, HTMLVideoElement>();
+let videoPaused = false;
+let stopVideoLoop: (() => void) | null = null;
+
+/** One muted looping element per URL, kept across renders so the file loads once. */
+function backgroundVideo(url: string): HTMLVideoElement {
+  const cached = videoCache.get(url);
+  if (cached) return cached;
+  const video = document.createElement("video");
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.src = url;
+  videoCache.set(url, video);
+  return video;
+}
 
 type Device = "mobile" | "tablet" | "desktop";
 const DEVICES: { id: Device; label: string; icon: string }[] = [
@@ -373,24 +418,44 @@ function compositeFor(blend: ShapeBlend): GlobalCompositeOperation {
   return blend === "normal" ? "source-over" : blend;
 }
 
+type BackgroundPaint = { source: CanvasImageSource; width: number; height: number };
+const tintBuffer = document.createElement("canvas");
+
 function drawCard(
   canvas: HTMLCanvasElement,
   state: StudioState,
   imageOf: (layer: ImageLayer) => HTMLImageElement | null,
   hiddenId?: string,
+  background: BackgroundPaint | null = null,
 ): HitBox[] {
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
+  canvas.width = state.cardWidth;
+  canvas.height = state.cardHeight;
+  return paintCard(ctx, state, imageOf, hiddenId, background);
+}
+
+/** Paints in card coordinates. A transform on ctx scales the whole card (print PNG, video export). */
+function paintCard(
+  ctx: CanvasRenderingContext2D,
+  state: StudioState,
+  imageOf: (layer: ImageLayer) => HTMLImageElement | null,
+  hiddenId: string | undefined,
+  background: BackgroundPaint | null,
+): HitBox[] {
   const width = state.cardWidth;
   const height = state.cardHeight;
-  canvas.width = width;
-  canvas.height = height;
+  const unit = Math.abs(ctx.getTransform().a) || 1;
   ctx.clearRect(0, 0, width, height);
   ctx.save();
   roundedPath(ctx, width, height, state.radius);
   ctx.clip();
   ctx.fillStyle = state.color;
   ctx.fillRect(0, 0, width, height);
+  if (background && background.width > 0 && background.height > 0) {
+    const cover = coverRect(background.width, background.height, width, height);
+    ctx.drawImage(background.source, cover.x, cover.y, cover.w, cover.h);
+  }
 
   const hits: HitBox[] = [];
   const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
@@ -407,12 +472,22 @@ function drawCard(
       ctx.roundRect(layer.x, layer.y, layer.width, height, radius);
       ctx.clip();
       const crop = layer.crop;
-      if (crop) {
-        const sw = source.naturalWidth;
-        const sh = source.naturalHeight;
-        ctx.drawImage(source, crop.x * sw, crop.y * sh, crop.w * sw, crop.h * sh, layer.x, layer.y, layer.width, height);
+      const sw = source.naturalWidth;
+      const sh = source.naturalHeight;
+      const from = crop ? [crop.x * sw, crop.y * sh, crop.w * sw, crop.h * sh] as const : [0, 0, sw, sh] as const;
+      if (layer.tint) {
+        tintBuffer.width = Math.max(1, Math.ceil(layer.width * unit));
+        tintBuffer.height = Math.max(1, Math.ceil(height * unit));
+        const tint = tintBuffer.getContext("2d");
+        if (tint) {
+          tint.drawImage(source, ...from, 0, 0, tintBuffer.width, tintBuffer.height);
+          tint.globalCompositeOperation = "source-in";
+          tint.fillStyle = layer.tint;
+          tint.fillRect(0, 0, tintBuffer.width, tintBuffer.height);
+          ctx.drawImage(tintBuffer, layer.x, layer.y, layer.width, height);
+        }
       } else {
-        ctx.drawImage(source, layer.x, layer.y, layer.width, height);
+        ctx.drawImage(source, ...from, layer.x, layer.y, layer.width, height);
       }
       ctx.restore();
     }
@@ -489,10 +564,11 @@ function drawCard(
         const ink = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
         const spread = shadow.size * 2 + stroke.width;
         ctx.save();
+        // Shadows ignore the canvas transform, so a scaled card scales them by hand.
         ctx.shadowColor = ink;
-        ctx.shadowBlur = shadow.blur;
-        ctx.shadowOffsetX = offset.x;
-        ctx.shadowOffsetY = offset.y;
+        ctx.shadowBlur = shadow.blur * unit;
+        ctx.shadowOffsetX = offset.x * unit;
+        ctx.shadowOffsetY = offset.y * unit;
         ctx.fillStyle = ink;
         ctx.strokeStyle = ink;
         ctx.lineJoin = "round";
@@ -610,15 +686,19 @@ function drawCard(
   return hits;
 }
 
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  // Large files are still being read when click() returns.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 function downloadCanvas(canvas: HTMLCanvasElement, filename: string): void {
   canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+    if (blob) downloadBlob(blob, filename);
   }, "image/png");
 }
 
@@ -772,13 +852,106 @@ function textStyleControls(kind: TextKind, name: string, layer: TextLayer): stri
           </div>`;
 }
 
-function themeOptions(captures: CaptureRecord[], activeSrc: string): string {
-  const option = (src: string, image: string, label: string) => {
+export type StudioSource = { src: string; url: string; thumb: string; label: string; kind: "theme" | "speaker" | "logo" };
+export type StudioSourceGroup = { id: string; label: string; items: StudioSource[] };
+/** What differs between Online Studio and Conference. The editor itself is shared. */
+export type StudioConfig = {
+  id: "studio" | "conference";
+  presets: readonly StudioPreset[];
+  presetThumbs: Record<string, string>;
+  groups: StudioSourceGroup[];
+  conference: ConferenceIndex | null;
+};
+
+export function onlineStudioConfig(captures: CaptureRecord[]): StudioConfig {
+  return {
+    id: "studio",
+    presets: STUDIO_PRESETS,
+    presetThumbs: PRESET_THUMBS,
+    groups: [
+      {
+        id: "theme",
+        label: "아카이브 테마",
+        items: captures.map((capture) => ({
+          src: capture.slug,
+          url: assetUrl(capture.asset.path),
+          thumb: assetUrl(capture.asset.thumbPath ?? capture.asset.path),
+          label: capture.title,
+          kind: "theme",
+        })),
+      },
+    ],
+    conference: null,
+  };
+}
+
+export function conferenceStudioConfig(index: ConferenceIndex): StudioConfig {
+  const source = (kind: StudioSource["kind"]) => (item: ConferenceIndex["speakers"][number]): StudioSource => ({
+    src: conferenceSrc(item),
+    url: assetUrl(item.path),
+    thumb: assetUrl(item.thumbPath),
+    label: item.label,
+    kind,
+  });
+  const thumbs: Record<string, string> = {};
+  for (const preset of CONFERENCE_PRESETS) {
+    const thumb = index.backgrounds.find((item) => item.id === preset.background)?.thumbPath;
+    if (thumb) thumbs[preset.id] = assetUrl(thumb);
+  }
+  return {
+    id: "conference",
+    presets: CONFERENCE_PRESETS,
+    presetThumbs: thumbs,
+    groups: [
+      { id: "speaker", label: "Speecher", items: index.speakers.map(source("speaker")) },
+      { id: "logo", label: "SVG", items: index.logos.map(source("logo")) },
+    ],
+    conference: index,
+  };
+}
+
+/** True when the logo is ink on transparency, with no light or colored pixels. Those marks vanish on the dark code ground. */
+function monoDarkLogo(img: HTMLImageElement): boolean {
+  if (!img.naturalWidth) return false;
+  const size = 48;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return false;
+  ctx.drawImage(img, 0, 0, size, size);
+  const data = ctx.getImageData(0, 0, size, size).data;
+  let dark = 0;
+  let light = 0;
+  let chromatic = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 16) continue;
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 24) chromatic += 1;
+    else if ((r + g + b) / 3 < 96) dark += 1;
+    else light += 1;
+  }
+  const opaque = dark + light + chromatic;
+  return opaque > 30 && chromatic / opaque < 0.08 && dark > light * 3;
+}
+
+function markMonoLogos(root: ParentNode): void {
+  for (const img of root.querySelectorAll<HTMLImageElement>(".studio__theme--logo img")) {
+    const apply = () => img.parentElement?.classList.toggle("is-mono", monoDarkLogo(img));
+    if (img.complete && img.naturalWidth) apply();
+    else img.addEventListener("load", apply, { once: true });
+  }
+}
+
+function themeOptions(config: StudioConfig, activeSrc: string): string {
+  const option = (src: string, image: string, label: string, kind: StudioSource["kind"] = "theme") => {
     const selected = src === activeSrc;
     return `
       <button
         type="button"
-        class="studio__theme"
+        class="studio__theme${kind === "theme" ? "" : ` studio__theme--${kind}`}"
         role="radio"
         data-theme-slug="${escapeHtml(src)}"
         aria-checked="${selected ? "true" : "false"}"
@@ -789,9 +962,6 @@ function themeOptions(captures: CaptureRecord[], activeSrc: string): string {
       </button>
     `;
   };
-  const archive = captures.map((capture) =>
-    option(capture.slug, assetUrl(capture.asset.thumbPath ?? capture.asset.path), capture.title),
-  );
   const uploads = getUploads().map(
     (upload) => `
       <div class="studio__theme-item">
@@ -801,11 +971,29 @@ function themeOptions(captures: CaptureRecord[], activeSrc: string): string {
     `,
   );
   const add = `<button type="button" class="studio__theme studio__theme--add" id="studio-theme-add" aria-label="이미지 추가" title="이미지 추가">+</button>`;
-  return [...archive, ...uploads, add].join("");
+  return config.groups
+    .map((group, index) => {
+      const last = index === config.groups.length - 1;
+      const labelId = index === 0 ? "studio-theme-label" : `studio-theme-label-${group.id}`;
+      const items = group.items.map((item) => option(item.src, item.thumb, item.label, item.kind));
+      return `
+          <div class="studio__field">
+            <span id="${labelId}">${escapeHtml(group.label)}</span>
+            <div class="studio__themes" role="radiogroup" aria-labelledby="${labelId}">${[...items, ...(last ? [...uploads, add] : [])].join("")}</div>
+          </div>`;
+    })
+    .join("");
 }
 
-export function renderStudio(state: StudioState, captures: CaptureRecord[]): string {
-  if (captures.length === 0) {
+const pauseIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14"/><path d="M16 5v14"/></svg>`;
+const playIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>`;
+
+function hasSources(config: StudioConfig): boolean {
+  return config.groups.some((group) => group.items.length > 0);
+}
+
+export function renderStudio(state: StudioState, config: StudioConfig): string {
+  if (!hasSources(config)) {
     return `
       <section class="state-panel state-panel--soft">
         <h1 class="state-panel__title">Archive is empty</h1>
@@ -847,13 +1035,13 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
   const title = ensureLayer(state, "title");
   const body = ensureLayer(state, "body");
   const image = ensureLayer(state, "image");
-  const preset = presetById(state.presetId);
-  const presets = STUDIO_PRESETS.map((item) => {
+  const preset = config.presets.find((item) => item.id === state.presetId) ?? config.presets[0]!;
+  const presets = config.presets.map((item) => {
     const selected = item.id === preset.id;
     const scale = PRESET_SHAPE / Math.max(item.width, item.height);
     const shapeWidth = (item.width * scale).toFixed(2);
     const shapeHeight = (item.height * scale).toFixed(2);
-    const thumb = PRESET_THUMBS[item.id];
+    const thumb = config.presetThumbs[item.id];
     const shape = thumb
       ? `<img class="studio__preset-shape" alt="" src="${escapeHtml(thumb)}" style="width:${shapeWidth}px;height:${shapeHeight}px">`
       : `<span class="studio__preset-shape" style="width:${shapeWidth}px;height:${shapeHeight}px"></span>`;
@@ -864,7 +1052,34 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
         <span class="studio__preset-size">${item.width}×${item.height}</span>
       </button>`;
   }).join("");
-  const themes = themeOptions(captures, image.src);
+  const themes = themeOptions(config, image.src);
+  const backgroundField = config.conference
+    ? `
+          <div class="studio__field" id="studio-background-field">
+            <span id="studio-background-label">배경</span>
+            <div class="studio__text-style" role="group" aria-labelledby="studio-background-label">
+              <button type="button" class="studio__style-btn studio__style-btn--wide" data-background-mode="image" aria-pressed="true">이미지</button>
+              <button type="button" class="studio__style-btn studio__style-btn--wide" data-background-mode="video" aria-pressed="false">동영상</button>
+            </div>
+          </div>`
+    : "";
+  const logoColorField = config.conference
+    ? `
+          <div class="studio__field" id="studio-tint-field" hidden>
+            <label for="studio-tint">로고 색</label>
+            <div class="studio__color">
+              <button type="button" class="studio__style-btn studio__style-btn--wide" id="studio-tint-original" aria-pressed="true">원래 색</button>
+              <input id="studio-tint" class="studio__color-picker studio__color-picker--text" type="color" value="${rgbToHex(255, 255, 255)}" aria-label="로고 색 피커" />
+              <input id="studio-tint-hex" class="studio__control" type="text" value="${rgbToHex(255, 255, 255)}" spellcheck="false" aria-label="로고 색 hex" />
+            </div>
+          </div>`
+    : "";
+  const conferenceActions = config.conference
+    ? `
+            <button type="button" class="studio__zoom-btn" id="studio-video-toggle" aria-label="일시정지" title="일시정지" hidden>${pauseIcon}</button>
+            <button type="button" class="button button--secondary" id="studio-print" hidden>인쇄용 PNG</button>
+            <button type="button" class="button button--secondary" id="studio-video" hidden>동영상</button>`
+    : "";
   const designSelected = state.panel === "design";
   const fonts = fontChoices();
   const fontMax = maxFontSize(state.cardWidth);
@@ -903,7 +1118,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           <div class="studio__field">
             <span id="studio-preset-label">카드 크기 프리셋</span>
             <div class="studio__presets" role="radiogroup" aria-labelledby="studio-preset-label">${presets}</div>
-          </div>
+          </div>${backgroundField}
           <div class="studio__field">
             <span id="studio-draw-label">도형</span>
             <div class="studio__draw" role="group" aria-labelledby="studio-draw-label">
@@ -1117,11 +1332,8 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
           </div>
           ${textStyleControls("body", "본문", body)}
           <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮기고, 더블 클릭(탭)해 바로 수정할 수 있습니다.</p>
-          <div class="studio__field">
-            <span id="studio-theme-label">아카이브 테마</span>
-            <div class="studio__themes" role="radiogroup" aria-labelledby="studio-theme-label">${themes}</div>
-            <input type="file" id="studio-theme-file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden />
-          </div>
+          <div id="studio-sources">${themes}</div>
+          <input type="file" id="studio-theme-file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden />${logoColorField}
           <div class="studio__field">
             <label for="studio-image-width">카드 이미지 크기</label>
             <div class="studio__radius">
@@ -1220,9 +1432,11 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
               <button type="button" class="studio__zoom-btn" id="studio-zoom-in" aria-label="확대">+</button>
               <button type="button" class="studio__zoom-btn studio__zoom-btn--text" id="studio-zoom-fit" aria-label="프리뷰에 맞춤">Fit</button>
             </div>
+            ${conferenceActions}
             <button type="button" class="button" id="studio-download">PNG 다운로드</button>
           </div>
         </div>
+        ${config.conference ? `<p class="studio__note" id="studio-export-note" role="status" hidden></p>` : ""}
       </div>
     </section>
     </div>
@@ -1235,7 +1449,7 @@ export function renderStudio(state: StudioState, captures: CaptureRecord[]): str
 export function bindStudio(
   root: HTMLElement,
   state: StudioState,
-  captures: CaptureRecord[],
+  config: StudioConfig,
   actions: {
     onReset: () => void;
     onSetBaseline: () => void;
@@ -1244,7 +1458,14 @@ export function bindStudio(
     onAddToLibrary: (thumbnail: string) => Promise<boolean>;
   },
 ): void {
-  if (captures.length === 0) return;
+  stopVideoLoop?.();
+  stopVideoLoop = null;
+  commitOpenGesture?.();
+  commitOpenGesture = null;
+  if (!hasSources(config)) return;
+  useHistory(config.id);
+  const sources = config.groups.flatMap((group) => group.items);
+  const presetOf = (id: string) => config.presets.find((item) => item.id === id) ?? config.presets[0]!;
   const presetButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-preset-id]")];
   const sizeRange = root.querySelector<HTMLInputElement>("#studio-size");
   const sizeNumber = root.querySelector<HTMLInputElement>("#studio-size-number");
@@ -1468,9 +1689,38 @@ export function bindStudio(
   const srcUrl = (src: string): string => {
     const upload = uploadBySrc(src);
     if (upload) return upload.url;
-    const capture =
-      captures.find((item) => item.slug === src) ?? captures.find((item) => item.slug === state.themeSlug) ?? captures[0];
-    return capture ? assetUrl(capture.asset.path) : "";
+    const source =
+      sources.find((item) => item.src === src) ?? sources.find((item) => item.src === state.themeSlug) ?? sources[0];
+    return source?.url ?? "";
+  };
+  const sourceOf = (src: string) => sources.find((item) => item.src === src);
+
+  /** The preset's background record; the still image doubles as the video poster. */
+  const backgroundRecord = (): ConferenceBackground | null =>
+    (state.background && config.conference?.backgrounds.find((item) => item.id === state.background?.id)) || null;
+  const backgroundStill = () => {
+    const path = backgroundRecord()?.image?.path;
+    return path ? assetUrl(path) : "";
+  };
+  const backgroundVideoUrl = () => {
+    const path = state.background?.mode === "video" ? backgroundRecord()?.video?.path : null;
+    return path ? assetUrl(path) : "";
+  };
+  const stillPaint = (): BackgroundPaint | null => {
+    const image = imageCache.get(backgroundStill());
+    return image?.complete && image.naturalWidth > 0
+      ? { source: image, width: image.naturalWidth, height: image.naturalHeight }
+      : null;
+  };
+  const backgroundPaint = (): BackgroundPaint | null => {
+    const url = backgroundVideoUrl();
+    if (url) {
+      const video = backgroundVideo(url);
+      if (video.readyState >= 2 && video.videoWidth > 0) {
+        return { source: video, width: video.videoWidth, height: video.videoHeight };
+      }
+    }
+    return stillPaint();
   };
   const imageOf = (layer: ImageLayer): HTMLImageElement | null => {
     const image = imageCache.get(srcUrl(layer.src));
@@ -1488,6 +1738,14 @@ export function bindStudio(
     const others = [...new Set(state.layers.flatMap((layer) => (layer.kind === "image" && layer.src !== state.themeSlug ? [layer.src] : [])))];
     const [themeData, ...otherData] = await Promise.all([dataOf(state.themeSlug), ...others.map(dataOf)]);
     const images = Object.fromEntries(others.map((src, index) => [src, otherData[index] ?? ""]));
+    const still = backgroundStill();
+    if (still) {
+      // A video stays a URL (too big to inline); the still is inlined as its poster.
+      const stillData = await themeDataUrl(still).catch(() => "");
+      const video = backgroundVideoUrl();
+      images.background = video ? new URL(video, location.href).href : stillData;
+      images["background-poster"] = stillData;
+    }
     return documentInput(state, themeData ?? "", images, aspectOf);
   };
 
@@ -1498,6 +1756,8 @@ export function bindStudio(
   let cropping: { id: string; full: StudioRect; box: StudioRect } | null = null;
   let paint = () => {};
   let syncOverlay = () => {};
+  let syncConference = () => {};
+  let syncVideoLoop = () => {};
 
   const layerById = (id: string) => state.layers.find((layer) => layer.id === id);
   const selectedLayers = () => state.layers.filter((layer) => selected.has(layer.id));
@@ -1630,6 +1890,7 @@ export function bindStudio(
     gestureZoom = previewZoom;
     gestureOwner = owner ?? null;
   };
+  commitOpenGesture = () => finishGesture();
   /** One undo step around a change that re-renders the studio (초기화, loading a preset's baseline). */
   const recordChange = (change: () => boolean): boolean => {
     finishGesture();
@@ -1751,6 +2012,11 @@ export function bindStudio(
   /** A theme goes on the selected images, or on the bottom image when none is selected. */
   const selectTheme = (src: string, focus: boolean) => {
     const picked = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image");
+    if (config.conference && picked.length === 0) {
+      markTheme(src, focus);
+      void insertImage(src, { x: state.cardWidth / 2, y: state.cardHeight / 2 });
+      return;
+    }
     for (const layer of picked.length > 0 ? picked : [ensureLayer(state, "image")]) layer.src = src;
     const bottom = ensureLayer(state, "image");
     if (!isUploadSrc(bottom.src)) state.themeSlug = bottom.src;
@@ -1899,8 +2165,9 @@ export function bindStudio(
     syncForm();
     syncSizeControls();
     root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
-    const preset = presetById(state.presetId);
+    const preset = presetOf(state.presetId);
     meta.textContent = `${state.cardWidth} × ${state.cardHeight} · ${preset.name}`;
+    syncConference();
     exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     fitCodeInput();
     syncRadiusControls();
@@ -1931,7 +2198,7 @@ export function bindStudio(
 
     iframe.hidden = true;
     canvas.hidden = false;
-    const urls = [...new Set(imageLayers().map((layer) => srcUrl(layer.src)).filter(Boolean))];
+    const urls = [...new Set([...imageLayers().map((layer) => srcUrl(layer.src)), backgroundStill()].filter(Boolean))];
     setImageLoading(urls.some((url) => !imageReady(url)));
     await Promise.all(urls.map((url) => loadImage(url).catch(() => null)));
     if (token !== drawToken) return;
@@ -1939,6 +2206,7 @@ export function bindStudio(
     exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     paint();
     setImageLoading(false);
+    syncVideoLoop();
   };
 
   /** Shift+click steps by STEP_SHIFT. Each click is one undo step. */
@@ -1988,7 +2256,7 @@ export function bindStudio(
   };
 
   const pickPreset = (button: HTMLButtonElement) => {
-    const preset = presetById(button.dataset.presetId ?? "");
+    const preset = presetOf(button.dataset.presetId ?? "");
     if (recordChange(() => actions.onLoadPreset(preset.id))) {
       document.querySelector<HTMLButtonElement>(`[data-preset-id="${preset.id}"]`)?.focus();
       return;
@@ -2193,7 +2461,7 @@ export function bindStudio(
         state.cardHeight,
       );
     } else {
-      drawCard(offscreen, state, imageOf);
+      drawCard(offscreen, state, imageOf, undefined, stillPaint());
     }
     const maxEdge = 1080;
     const edge = Math.max(state.cardWidth, state.cardHeight);
@@ -2433,12 +2701,14 @@ export function bindStudio(
     root.querySelector<HTMLButtonElement>(next === "design" ? "#studio-tab-design" : "#studio-tab-code")?.focus();
   });
 
-  const themeGrid = root.querySelector<HTMLElement>(".studio__themes");
+  const themeGrid = root.querySelector<HTMLElement>("#studio-sources");
   const themeFile = root.querySelector<HTMLInputElement>("#studio-theme-file");
   const themeButtons = () => [...root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")];
   const renderThemes = () => {
-    if (themeGrid) themeGrid.innerHTML = themeOptions(captures, panelImage().src);
+    if (themeGrid) themeGrid.innerHTML = themeOptions(config, panelImage().src);
+    markMonoLogos(root);
   };
+  markMonoLogos(root);
   const pickTheme = (button: HTMLButtonElement, focus: boolean) => {
     const src = button.dataset.themeSlug;
     if (!src) return;
@@ -2524,9 +2794,356 @@ export function bindStudio(
     }, 1200);
   });
 
+  const backgroundButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-background-mode]")];
+  const videoToggle = root.querySelector<HTMLButtonElement>("#studio-video-toggle");
+  const printButton = root.querySelector<HTMLButtonElement>("#studio-print");
+  const videoButton = root.querySelector<HTMLButtonElement>("#studio-video");
+  const exportNote = root.querySelector<HTMLElement>("#studio-export-note");
+  const tintField = root.querySelector<HTMLElement>("#studio-tint-field");
+  const tintOriginal = root.querySelector<HTMLButtonElement>("#studio-tint-original");
+  const tintInput = root.querySelector<HTMLInputElement>("#studio-tint");
+  const tintHex = root.querySelector<HTMLInputElement>("#studio-tint-hex");
+  let exporting: { button: HTMLButtonElement; label: string; cancel: () => void } | null = null;
+  const mp4Type = () =>
+    typeof MediaRecorder === "undefined"
+      ? ""
+      : (["video/mp4;codecs=avc1", "video/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "");
+
+  syncConference = () => {
+    if (!config.conference) return;
+    const record = backgroundRecord();
+    const codeMode = Boolean(state.code.trim());
+    const hasVideo = Boolean(record?.video);
+    const video = state.background?.mode === "video" && hasVideo;
+    const backgroundField = root.querySelector<HTMLElement>("#studio-background-field");
+    if (backgroundField) backgroundField.hidden = !hasVideo;
+    for (const button of backgroundButtons) {
+      button.setAttribute("aria-pressed", state.background?.mode === button.dataset.backgroundMode ? "true" : "false");
+    }
+    if (videoToggle) {
+      videoToggle.hidden = !video || codeMode;
+      const label = videoPaused ? "재생" : "일시정지";
+      videoToggle.innerHTML = videoPaused ? playIcon : pauseIcon;
+      videoToggle.setAttribute("aria-label", label);
+      videoToggle.title = label;
+    }
+    if (printButton && exporting?.button !== printButton) {
+      printButton.hidden = !printSize(state.presetId, state.cardWidth, state.cardHeight) || codeMode;
+    }
+    if (videoButton && exporting?.button !== videoButton) {
+      videoButton.hidden = !video || codeMode;
+      videoButton.disabled = !mp4Type();
+      videoButton.title = videoButton.disabled ? "이 브라우저는 MP4 녹화를 지원하지 않습니다. Chrome이나 Safari 최신 버전에서 열어 주세요." : "";
+    }
+    if (tintField && tintOriginal && tintInput && tintHex) {
+      const image = panelImage();
+      tintField.hidden = sourceOf(image.src)?.kind !== "logo";
+      tintOriginal.setAttribute("aria-pressed", image.tint ? "false" : "true");
+      const color = image.tint ?? rgbToHex(255, 255, 255);
+      tintInput.value = color;
+      if (document.activeElement !== tintHex) tintHex.value = color;
+    }
+  };
+
+  syncVideoLoop = () => {
+    const url = backgroundVideoUrl();
+    for (const [key, other] of videoCache) if (key !== url) other.pause();
+    if (!url || state.code.trim() || exporting) {
+      stopVideoLoop?.();
+      stopVideoLoop = null;
+      if (url) backgroundVideo(url).pause();
+      return;
+    }
+    const video = backgroundVideo(url);
+    if (videoPaused) video.pause();
+    else void video.play().catch(() => {});
+    if (stopVideoLoop) return;
+    let frame = 0;
+    let shown = -1;
+    const tick = () => {
+      if (!canvas.isConnected) {
+        stop();
+        video.pause();
+        return;
+      }
+      if (video.readyState >= 2 && video.currentTime !== shown) {
+        shown = video.currentTime;
+        paint();
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    const stop = () => cancelAnimationFrame(frame);
+    stopVideoLoop = stop;
+    frame = requestAnimationFrame(tick);
+  };
+
+  for (const button of backgroundButtons) {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.backgroundMode === "video" ? "video" : "image";
+      const current = state.background;
+      if (!current || current.mode === mode) return;
+      recordChange(() => {
+        state.background = { ...current, mode };
+        return true;
+      });
+      void redraw();
+    });
+  }
+  videoToggle?.addEventListener("click", () => {
+    videoPaused = !videoPaused;
+    syncConference();
+    syncVideoLoop();
+  });
+
+  const tintTargets = (): ImageLayer[] => {
+    const logos = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image" && sourceOf(layer.src)?.kind === "logo");
+    if (logos.length > 0) return logos;
+    const image = panelImage();
+    return sourceOf(image.src)?.kind === "logo" ? [image] : [];
+  };
+  const writeTint = (tint: string | null) => {
+    for (const layer of tintTargets()) {
+      if (tint) layer.tint = tint;
+      else delete layer.tint;
+    }
+    tintOriginal?.setAttribute("aria-pressed", tint ? "false" : "true");
+  };
+  tintOriginal?.addEventListener("click", () => {
+    recordChange(() => {
+      const changed = tintTargets().some((layer) => layer.tint != null);
+      writeTint(null);
+      return changed;
+    });
+    void redraw();
+  });
+  if (tintInput && tintHex) {
+    bindColor(tintInput, tintHex, (hex) => {
+      writeTint(hex);
+      paint();
+    }, () => tintTargets()[0]?.tint ?? rgbToHex(255, 255, 255));
+  }
+
+  /** Locks editing while a file is written. The button turns into a cancel button with a progress. */
+  const startExport = (button: HTMLButtonElement, cancel: () => void) => {
+    exporting = { button, label: button.textContent ?? "", cancel };
+    studio.dataset.recording = "true";
+    for (const other of [printButton, videoButton]) if (other && other !== button) other.disabled = true;
+    syncVideoLoop();
+  };
+  const exportProgress = (note: string, percent: number) => {
+    if (!exporting) return;
+    exporting.button.textContent = `취소 ${Math.min(100, Math.round(percent))}%`;
+    if (exportNote) {
+      exportNote.hidden = false;
+      exportNote.textContent = note;
+    }
+  };
+  const endExport = () => {
+    if (!exporting) return;
+    exporting.button.textContent = exporting.label;
+    exporting = null;
+    delete studio.dataset.recording;
+    if (printButton) printButton.disabled = false;
+    if (exportNote) exportNote.hidden = true;
+    syncConference();
+    syncVideoLoop();
+  };
+  const exportName = (suffix: string) =>
+    `ax-conference-${state.cardWidth}x${state.cardHeight}-${state.background?.id ?? "card"}${suffix}`;
+  const exportBackground = async (): Promise<BackgroundPaint | null> => {
+    const url = backgroundStill();
+    if (url) await loadImage(url).catch(() => null);
+    return stillPaint();
+  };
+
+  const runPrint = async (button: HTMLButtonElement) => {
+    const size = printSize(state.presetId, state.cardWidth, state.cardHeight);
+    if (!size) return;
+    let cancelled = false;
+    startExport(button, () => {
+      cancelled = true;
+    });
+    const encoder = createPngEncoder(size.width, size.height, size.dpi);
+    try {
+      const background = await exportBackground();
+      const scaleX = size.width / state.cardWidth;
+      const scaleY = size.height / state.cardHeight;
+      const strip = document.createElement("canvas");
+      strip.width = size.width;
+      const strips = printStrips(size.width, size.height);
+      for (const [index, part] of strips.entries()) {
+        if (cancelled) break;
+        strip.height = part.h;
+        const ctx = strip.getContext("2d", { willReadFrequently: true });
+        if (!ctx) throw new Error("canvas");
+        ctx.setTransform(scaleX, 0, 0, scaleY, 0, -part.y);
+        paintCard(ctx, state, imageOf, undefined, background);
+        await encoder.writeRows(ctx.getImageData(0, 0, size.width, part.h).data, part.h);
+        exportProgress(`인쇄용 PNG ${size.width} × ${size.height}px · ${size.dpi}dpi 만드는 중`, ((index + 1) / strips.length) * 100);
+        await new Promise((resolve) => window.setTimeout(resolve));
+      }
+      if (cancelled) {
+        encoder.abort();
+        return;
+      }
+      downloadBlob(new Blob(await encoder.finish(), { type: "image/png" }), exportName(`-print-${size.dpi}dpi.png`));
+    } catch {
+      encoder.abort();
+      showToast("인쇄용 PNG를 만들지 못했습니다.");
+    } finally {
+      endExport();
+    }
+  };
+
+  const avcCodec = (width: number, height: number) =>
+    Math.ceil(width / 16) * Math.ceil(height / 16) <= 36864 ? "avc1.640033" : "avc1.64003C";
+  const encoderTakes = async (size: { width: number; height: number }) => {
+    if (typeof VideoEncoder === "undefined") return true;
+    try {
+      const result = await VideoEncoder.isConfigSupported({ codec: avcCodec(size.width, size.height), width: size.width, height: size.height });
+      return Boolean(result.supported);
+    } catch {
+      return false;
+    }
+  };
+  /** One loop of the background, painted with the card on top, recorded at `size`. */
+  const recordLoop = (url: string, size: { width: number; height: number }, mimeType: string, cancel: { on: boolean; stop: () => void }) =>
+    new Promise<Blob>((resolve, reject) => {
+      const out = document.createElement("canvas");
+      out.width = size.width;
+      out.height = size.height;
+      const ctx = out.getContext("2d");
+      if (!ctx) {
+        reject(new Error("canvas"));
+        return;
+      }
+      const source = document.createElement("video");
+      source.muted = true;
+      source.playsInline = true;
+      source.preload = "auto";
+      source.src = url;
+      const scale = size.width / state.cardWidth;
+      const draw = () => {
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        const ready = source.readyState >= 2 && source.videoWidth > 0;
+        paintCard(ctx, state, imageOf, undefined, ready ? { source, width: source.videoWidth, height: source.videoHeight } : null);
+      };
+      const recorder = new MediaRecorder(out.captureStream(30), {
+        mimeType,
+        videoBitsPerSecond: Math.min(40_000_000, Math.round(size.width * size.height * 30 * 0.15)),
+      });
+      const chunks: Blob[] = [];
+      let frame = 0;
+      const finish = () => {
+        cancelAnimationFrame(frame);
+        source.pause();
+        if (recorder.state !== "inactive") recorder.stop();
+      };
+      cancel.stop = finish;
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      });
+      recorder.addEventListener("error", () => reject(new Error("recorder")));
+      recorder.addEventListener("stop", () => {
+        source.removeAttribute("src");
+        source.load();
+        const blob = new Blob(chunks, { type: "video/mp4" });
+        if (cancel.on) reject(new Error("cancelled"));
+        else if (blob.size === 0) reject(new Error("empty"));
+        else resolve(blob);
+      });
+      source.addEventListener("error", () => {
+        finish();
+        reject(new Error("video"));
+      });
+      source.addEventListener("ended", () => {
+        draw();
+        finish();
+      });
+      source.addEventListener(
+        "canplay",
+        () => {
+          const loop = () => {
+            draw();
+            const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 1;
+            exportProgress(`동영상 ${size.width} × ${size.height}px 녹화 중 · 녹화가 끝날 때까지 편집이 잠깁니다.`, (source.currentTime / duration) * 100);
+            frame = requestAnimationFrame(loop);
+          };
+          draw();
+          recorder.start(1000);
+          void source.play().catch(() => {
+            finish();
+            reject(new Error("play"));
+          });
+          frame = requestAnimationFrame(loop);
+        },
+        { once: true },
+      );
+    });
+
+  const runVideo = async (button: HTMLButtonElement) => {
+    const url = backgroundVideoUrl();
+    const mimeType = mp4Type();
+    if (!url || !mimeType) return;
+    const cancel = { on: false, stop: () => {} };
+    startExport(button, () => {
+      cancel.on = true;
+      cancel.stop();
+    });
+    try {
+      const sizes = videoExportSizes(state.presetId, state.cardWidth, state.cardHeight);
+      const fits = await Promise.all(sizes.map(encoderTakes));
+      const tries = sizes.filter((_, index) => fits[index]);
+      if (tries.length === 0) tries.push(sizes[sizes.length - 1]!);
+      let blob: Blob | null = null;
+      let used = tries[0]!;
+      for (const size of tries.slice(0, 2)) {
+        if (cancel.on) break;
+        used = size;
+        try {
+          blob = await recordLoop(url, size, mimeType, cancel);
+          break;
+        } catch {
+          blob = null;
+        }
+      }
+      if (cancel.on) return;
+      if (!blob) {
+        showToast("동영상을 녹화하지 못했습니다.");
+        return;
+      }
+      const first = sizes[0]!;
+      if (used.width !== first.width) showToast(`이 브라우저에서는 ${used.width} × ${used.height}px로 녹화했습니다.`);
+      downloadBlob(blob, exportName(`-${used.width}x${used.height}.mp4`));
+    } finally {
+      endExport();
+    }
+  };
+
+  for (const [button, run] of [
+    [printButton, runPrint],
+    [videoButton, runVideo],
+  ] as const) {
+    button?.addEventListener("click", () => {
+      if (exporting) {
+        if (exporting.button === button) exporting.cancel();
+        return;
+      }
+      void run(button);
+    });
+  }
+
   root.querySelector("#studio-download")?.addEventListener("click", () => {
     void (async () => {
-      const filename = `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}.png`;
+      if (config.conference && !state.code.trim()) {
+        const offscreen = document.createElement("canvas");
+        drawCard(offscreen, state, imageOf, undefined, await exportBackground());
+        downloadCanvas(offscreen, exportName(".png"));
+        return;
+      }
+      const filename = config.conference
+        ? exportName(".png")
+        : `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}.png`;
       if (!state.code.trim()) {
         downloadCanvas(canvas, filename);
         return;
@@ -2912,7 +3529,7 @@ export function bindStudio(
       if (!alive) penEdit = null;
     }
     for (const id of [...selected]) if (!layerById(id)) selected.delete(id);
-    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id);
+    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id, backgroundPaint());
     paintCropGhost();
     paintDragStroke();
     paintPenChrome();
@@ -3968,6 +4585,18 @@ export function bindStudio(
     const hex = rgbToHex(pixel[0] ?? 0, pixel[1] ?? 0, pixel[2] ?? 0);
     const texts = selectedLayers().filter(isTextLayer);
     const vectors = selectedLayers().filter((layer) => layer.kind === "shape" || layer.kind === "line" || layer.kind === "pen");
+    const logos = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image" && sourceOf(layer.src)?.kind === "logo");
+    if (logos.length > 0 && logos.length === selected.size) {
+      recordChange(() => {
+        const changed = logos.some((layer) => layer.tint !== hex);
+        for (const layer of logos) layer.tint = hex;
+        return changed;
+      });
+      syncForm();
+      setDropper(false);
+      void redraw();
+      return;
+    }
     if (texts.length === 0 && vectors.length > 0) {
       recordChange(() => {
         let changed = false;
@@ -4305,9 +4934,17 @@ export function bindStudio(
     const aspect = image && image.naturalWidth > 0 ? image.naturalHeight / image.naturalWidth : 1;
     if (editing) closeEditor(true);
     if (cropping) endCrop(true);
+    const kind = sourceOf(src)?.kind;
+    const wanted =
+      kind === "speaker"
+        ? state.cardHeight / 2 / aspect
+        : kind === "logo"
+          ? Math.min(state.cardWidth / 4, (state.cardHeight * 0.8) / aspect)
+          : state.cardWidth / 2;
+    const radius = kind === "speaker" || kind === "logo" ? 0 : IMAGE_RADIUS_DEFAULT;
     commitLayers(() => {
-      const width = clampImageWidth(state.cardWidth / 2);
-      const layer: ImageLayer = { id: newLayerId(), kind: "image", src, x: 0, y: 0, width, radius: IMAGE_RADIUS_DEFAULT, crop: null };
+      const width = clampImageWidth(wanted);
+      const layer: ImageLayer = { id: newLayerId(), kind: "image", src, x: 0, y: 0, width, radius, crop: null };
       Object.assign(layer, clampLayerPosition(layer, at.x - width / 2, at.y - (width * aspect) / 2));
       state.layers.push(layer);
       selected.clear();
@@ -4384,7 +5021,7 @@ export function bindStudio(
 
   stopHistoryShortcut?.();
   const historyShortcut = (event: KeyboardEvent) => {
-    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || exporting) return;
     // event.code keeps the shortcut working when a Korean IME turns Z/Y into "ㅋ"/"ㅛ".
     const redo = (event.code === "KeyZ" && event.shiftKey) || (event.code === "KeyY" && event.ctrlKey && !event.shiftKey);
     const undo = event.code === "KeyZ" && !event.shiftKey;
@@ -4413,7 +5050,7 @@ export function bindStudio(
     ArrowDown: { x: 0, y: 1 },
   };
   const studioKeys = (event: KeyboardEvent) => {
-    if (!canvas.isConnected) return;
+    if (!canvas.isConnected || exporting) return;
     const mod = (event.metaKey || event.ctrlKey) && !event.altKey;
     // event.code keeps +/- and C/V working under a Korean IME and covers the numpad keys.
     const zoom =

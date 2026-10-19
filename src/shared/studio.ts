@@ -68,11 +68,18 @@ export type ImageLayer = {
   /** Corner radius in card pixels, same range as the card radius. */
   radius: number;
   crop: StudioCrop | null;
+  /** One color painted over every visible pixel (logo color). Absent shows the source colors. */
+  tint?: string | null;
 };
 export type StudioLayer = TextLayer | ImageLayer | ShapeLayer | LineLayer | PenLayer;
 export type LayerKind = StudioLayer["kind"];
 
+/** Conference main background: fills the card under every layer and is not a layer itself. */
+export type StudioBackground = { id: string; mode: "image" | "video" };
+
 export type StudioState = {
+  /** Conference only. */
+  background?: StudioBackground | null;
   presetId: string;
   cardWidth: number;
   cardHeight: number;
@@ -394,6 +401,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
     const cy = num(crop?.y);
     const cw = num(crop?.w);
     const ch = num(crop?.h);
+    const tint = normalizeHex(String(value.tint ?? ""));
     return {
       id,
       kind: "image",
@@ -403,6 +411,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
       width: clampImageWidth(num(value.width) ?? IMAGE_MIN),
       radius: clampRadius(num(value.radius) ?? IMAGE_RADIUS_DEFAULT),
       crop: cx !== null && cy !== null && cw && ch ? { x: cx, y: cy, w: cw, h: ch } : null,
+      ...(tint ? { tint } : {}),
     };
   }
   if (value.kind !== "title" && value.kind !== "body") return null;
@@ -452,6 +461,13 @@ function legacyLayers(value: Record<string, unknown>, ink: string, theme: string
   ];
 }
 
+function parseBackground(raw: unknown): StudioBackground | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  if (typeof value.id !== "string" || !value.id) return null;
+  return { id: value.id, mode: value.mode === "video" ? "video" : "image" };
+}
+
 /** A stored studio state (baseline or saved card), upgraded to layers. Null when it is not a studio state. */
 export function normalizeStudioState(raw: unknown): StudioState | null {
   if (!raw || typeof raw !== "object") return null;
@@ -460,8 +476,10 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
   const num = (field: unknown, fallback: number) => (typeof field === "number" && Number.isFinite(field) ? field : fallback);
   const base = createStudioState(value.themeSlug, value.color);
   const ink = inkHex(value.color);
+  const background = parseBackground(value.background);
   const state: StudioState = {
     ...base,
+    ...(background ? { background } : {}),
     presetId: typeof value.presetId === "string" ? value.presetId : base.presetId,
     cardWidth: clampCardSize(num(value.cardWidth, base.cardWidth)),
     cardHeight: clampCardSize(num(value.cardHeight, base.cardHeight)),
@@ -678,6 +696,14 @@ export function designToCode(
   const body = firstLayer(state, "body");
   const items: string[] = [];
   const rules: string[] = [];
+  if (state.background) {
+    items.push(
+      state.background.mode === "video"
+        ? `  <video class="studio-bg" src="{{image:background}}" poster="{{image:background-poster}}" autoplay muted loop playsinline></video>`
+        : `  <img class="studio-bg" src="{{image:background}}" alt="" />`,
+    );
+    rules.push("  .studio-card .studio-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }");
+  }
   state.layers.forEach((layer, index) => {
     const name = `layer-${index + 1}`;
     if (layer.kind === "shape" || layer.kind === "line" || layer.kind === "pen") {
