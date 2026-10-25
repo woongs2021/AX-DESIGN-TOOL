@@ -25,6 +25,7 @@ import {
   clearBaseline,
   clearInstagramCards,
   clearInstagramOrder,
+  conferenceBuiltinBaseline,
   CONFERENCE_BASELINE_KEY,
   readBaseline,
   writeBaseline,
@@ -169,7 +170,9 @@ function ensureStudio(
 }
 
 function conferenceStore(index: ConferenceIndex): BaselineStore {
-  conferenceBaselines ??= baselineStore(CONFERENCE_BASELINE_KEY, (presetId) => createConferenceState(presetId, index));
+  conferenceBaselines ??= baselineStore(CONFERENCE_BASELINE_KEY, (presetId) =>
+    conferenceBuiltinBaseline(presetId) ?? createConferenceState(presetId, index),
+  );
   return conferenceBaselines;
 }
 
