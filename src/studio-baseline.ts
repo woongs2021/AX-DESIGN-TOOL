@@ -7,6 +7,7 @@
 import { DEFAULT_CONFERENCE_PRESET_ID } from "./shared/conference.ts";
 import { normalizeStudioState, type StudioState } from "./shared/studio.ts";
 import BUILTIN_BASELINES from "./shared/studio-defaults.json";
+import CONFERENCE_DEFAULTS from "./shared/conference-defaults.json";
 
 export type BaselineStore = {
   read: (presetId: string) => StudioState | null;
@@ -57,6 +58,15 @@ const studioBaselines = baselineStore(
 
 export const CONFERENCE_BASELINE_KEY = "ax-conference-baselines";
 
+const conferenceBaselines = CONFERENCE_DEFAULTS.baselines as Record<string, unknown>;
+const conferenceCards = CONFERENCE_DEFAULTS.instagramCards as Record<string, unknown>;
+const conferenceOrder = CONFERENCE_DEFAULTS.instagramOrder;
+
+/** Layout saved in the app, or the built-in card for presets that have one. */
+export function conferenceBuiltinBaseline(presetId: string): unknown | null {
+  return conferenceBaselines[presetId] ?? null;
+}
+
 /** The layout saved with “초기화로 세팅”, without falling back to the built-in card. */
 export function readStoredConferenceBaseline(presetId: string): StudioState | null {
   try {
@@ -96,13 +106,20 @@ function readInstagramCardMap(): Record<string, unknown> {
   }
 }
 
+function asInstagramCard(raw: unknown): StudioState | null {
+  const state = normalizeStudioState(structuredClone(raw));
+  return state?.presetId === DEFAULT_CONFERENCE_PRESET_ID ? state : null;
+}
+
 /** The layout saved for one Instagram speaker card. Keyed by that card's speaker src. */
 export function readInstagramCard(src: string): StudioState | null {
   if (!src) return null;
   const raw = readInstagramCardMap()[src];
-  if (raw === undefined) return null;
-  const state = normalizeStudioState(structuredClone(raw));
-  return state?.presetId === DEFAULT_CONFERENCE_PRESET_ID ? state : null;
+  if (raw !== undefined) {
+    const stored = asInstagramCard(raw);
+    if (stored) return stored;
+  }
+  return asInstagramCard(conferenceCards[src]);
 }
 
 export function writeInstagramCard(src: string, state: StudioState): void {
@@ -122,8 +139,7 @@ export function clearInstagramCards(): void {
 
 const INSTAGRAM_ORDER_KEY = "ax-conference-instagram-order";
 
-/** Speaker srcs in the order the Instagram cards are shown. Empty means the built-in order. */
-export function readInstagramOrder(): string[] {
+function storedInstagramOrder(): string[] {
   try {
     const raw = localStorage.getItem(INSTAGRAM_ORDER_KEY);
     if (!raw) return [];
@@ -133,6 +149,12 @@ export function readInstagramOrder(): string[] {
   } catch {
     return [];
   }
+}
+
+/** Speaker srcs in the order the Instagram cards are shown. An empty store uses the built-in order. */
+export function readInstagramOrder(): string[] {
+  const stored = storedInstagramOrder();
+  return stored.length > 0 ? stored : [...conferenceOrder];
 }
 
 export function writeInstagramOrder(srcs: readonly string[]): void {

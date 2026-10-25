@@ -21,7 +21,7 @@ React, Vue, 라우터 라이브러리, 검색 라이브러리, CSS 프레임워�
 세 층으로 나뉜다.
 
 1. **Vault가 진실이다.** `obsidian/captures/<slug>/index.md`와 같은 폴더의 이미지가 아카이브다. 컬렉션과 위키도 Markdown이다. 치수, 바이트, 해시, 재생 시간은 Markdown에 적지 않고 빌드가 파일에서 계산한다.
-2. **빌드가 두 벌의 사이트를 만든다.** `internal`은 로컬 호스트용 전체다. `public`은 `visibility: public`만 담고, internal 항목은 가리지 않고 빼 둔다. Conference 원본은 internal에 두고, public에는 편집 크기 JPEG와 긴 변 1920 MP4를 넣는다.
+2. **빌드가 두 벌의 사이트를 만든다.** `internal`은 로컬 호스트용 전체다. `public`은 `visibility: public`만 담고, internal 항목은 가리지 않고 빼 둔다. Conference 배경은 internal과 public 모두 100MB 이하 원본을 넣는다.
 3. **브라우저는 결과만 읽는다.** `dist/<target>/data/index.json`과 복사된 자산만 fetch한다. Markdown과 LLM 키는 브라우저에 없다. 카드 합성, PNG, 인쇄용 PNG, MP4는 브라우저 안에서 만든다. 만든 카드는 vault에 저장하지 않고 그 브라우저의 `localStorage`에만 남는다.
 
 사람이 `npm run build`, `npm run build:site`, 배포를 실행한다. 파일 감시나 GitHub Actions 자동 배포는 없다.
@@ -94,7 +94,7 @@ phase 2-resources/        Conference 원본. 웹은 직접 읽지 않음
 
 **동영상 내보내기.** 배경이 동영상이면 `MediaRecorder`로 글자와 도형이 올라간 MP4를 받는다. 길이는 원본 한 바퀴인 약 5.04초다. 브라우저 인코더가 편집 크기를 거부하면 더 작은 변으로 다시 시도한다. MP4를 못 만드는 브라우저에서는 버튼을 끈다.
 
-**공개용 축소.** `buildConference(outRoot, "web")`가 배경 PNG를 편집 크기 JPEG로, MP4를 긴 변 1920·CRF 28로 만든다. `"original"`은 100MB 이하 원본을 복사한다. 123MB Slide 원본은 `.gitignore`에 있고 빌드가 건너뛴다. 원본을 그대로 Pages에 넣으면 배포가 실패했다.
+**Conference 원본.** `buildConference(outRoot, "original")`가 로컬과 공개 사이트에 100MB 이하 원본을 복사한다. `"web"`은 편집 크기 JPEG와 긴 변 1920·CRF 28 사본을 만드는 경로로 남아 있다. 이전 폴더의 123MB Slide 원본은 `.gitignore`에 있고 빌드가 건너뛴다.
 
 **결정적 JSON.** `stableStringify`로 키 순서를 고정한다. 같은 Markdown과 같은 리소스면 `index.json`과 `conference.json`이 바이트 단위로 다시 나온다.
 

@@ -54,7 +54,7 @@ flowchart LR
   studio --> conference["Conference"]
 ```
 
-Online Studio와 Conference는 `src/views/studio.ts` 하나를 `StudioConfig`로 나눈다. 인쇄용 PNG는 `src/shared/print-png.ts`가 `CompressionStream`으로 띠를 나눠 만든다. 동영상 내보내기는 브라우저 `MediaRecorder`다. Conference 공개 파일은 `scripts/lib/conference.ts`가 편집 크기 JPEG와 긴 변 1920 MP4로 줄인다. 로컬 호스트는 100MB 이하 원본을 쓴다.
+Online Studio와 Conference는 `src/views/studio.ts` 하나를 `StudioConfig`로 나눈다. 인쇄용 PNG는 `src/shared/print-png.ts`가 `CompressionStream`으로 띠를 나눠 만든다. 동영상 내보내기는 브라우저 `MediaRecorder`다. Conference 공개 파일과 로컬 호스트는 `scripts/lib/conference.ts`가 100MB 이하 원본을 복사한다.
 
 ## 현재 제품 상태
 

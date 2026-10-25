@@ -1,7 +1,7 @@
 /**
  * Conference resources: phase 2-resources/ → <outRoot>/assets/conference/ + data/conference.json.
- * The internal build copies originals under the Git 100MB limit. The public build writes
- * edit-size JPEG stills and videos whose long edge is 1920, so GitHub Pages can publish them.
+ * Both builds copy originals under the Git 100MB limit. The web mode remains for a smaller
+ * Pages copy: edit-size JPEG stills and videos whose long edge is 1920.
  */
 import { spawnSync } from "node:child_process";
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";

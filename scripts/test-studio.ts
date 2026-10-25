@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import BUILTIN_BASELINES from "../src/shared/studio-defaults.json";
+import CONFERENCE_DEFAULTS from "../src/shared/conference-defaults.json";
 import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
   alignOffsets,
@@ -755,6 +756,20 @@ const reordered = applySpeakerOrder(speakerSrcs, ["conf:speaker-004", "conf:spea
 assert.deepEqual(reordered, ["conf:speaker-004", "conf:speaker-002", "conf:speaker-001", "conf:speaker-003"]);
 assert.deepEqual(applySpeakerOrder(speakerSrcs, []), speakerSrcs);
 assert.deepEqual(speakerSrcs, ["conf:speaker-001", "conf:speaker-002", "conf:speaker-003", "conf:speaker-004"]);
+assert.deepEqual(CONFERENCE_DEFAULTS.instagramOrder, ["conf:speaker-002", "conf:speaker-003", "conf:speaker-004", "conf:speaker-001"]);
+assert.deepEqual(applySpeakerOrder(speakerSrcs, CONFERENCE_DEFAULTS.instagramOrder), CONFERENCE_DEFAULTS.instagramOrder);
+const defaultCards = CONFERENCE_DEFAULTS.instagramCards as Record<string, unknown>;
+for (const src of CONFERENCE_DEFAULTS.instagramOrder) {
+  const card = normalizeStudioState(defaultCards[src]);
+  assert.equal(card?.presetId, "conf-instagram");
+  assert.equal(card ? speakerSrcOf(card) : "", src);
+}
+const kim = normalizeStudioState(CONFERENCE_DEFAULTS.instagramCards["conf:speaker-002"]);
+assert.equal(kim?.layers.some((layer) => layer.kind === "body" && layer.text.startsWith("김규영")), true);
+const poster = normalizeStudioState(CONFERENCE_DEFAULTS.baselines["conf-poster"]);
+assert.equal(poster?.presetId, "conf-poster");
+assert.equal(poster?.cardWidth, 2880);
+assert.ok((poster?.layers.length ?? 0) > 10);
 
 assert.equal(GIF_LONG_EDGE, 1080);
 assert.deepEqual(gifSize(2160, 2160), { width: 1080, height: 1080 });
