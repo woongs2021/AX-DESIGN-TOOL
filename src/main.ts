@@ -23,6 +23,8 @@ import { readPins, togglePin } from "./pins.ts";
 import {
   baselineStore,
   clearBaseline,
+  clearInstagramCards,
+  clearInstagramOrder,
   CONFERENCE_BASELINE_KEY,
   readBaseline,
   writeBaseline,
@@ -42,6 +44,7 @@ import { renderHistory } from "./views/history.ts";
 import { renderNotFound } from "./views/placeholders.ts";
 import {
   bindStudio,
+  clearSpeakerDeck,
   conferenceStudioConfig,
   onlineStudioConfig,
   renderStudio,
@@ -383,6 +386,9 @@ function bindSettingsMenu(app: HTMLElement): void {
       if (!ok) return;
       clearBaseline();
       conferenceBaselines?.clear();
+      clearInstagramCards();
+      clearInstagramOrder();
+      clearSpeakerDeck();
       appliedCard = null;
       appliedConferenceCard = null;
       const conference = loadState.status === "ready" ? loadState.conference : null;

@@ -4,7 +4,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 Conference를 GitHub Pages에도 열었다. 로컬은 원본, Pages는 편집용으로 줄인 사본이다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 Conference를 GitHub Pages에도 열었다. 2026-10-25에 배경을 `[Graphic_Resources] 2`로 바꾸고, 연사별 인스타그램 카드·PDF·무한 루프 GIF·그룹·색 보정을 더했다. 로컬은 원본, Pages는 편집용으로 줄인 사본이다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -12,7 +12,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 |---|---|---|---|
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
 | 1 Online Studio | 35개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
-| 2 Conference | 컨퍼런스 행사물(Instagram, Poster, Slide, X배너, L배너)을 같은 편집기로 만든다. 배경 이미지·동영상, 인쇄용 PNG, MP4, 연사·로고. 로컬은 원본, Pages는 편집용 사본 | 구현됨 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) |
+| 2 Conference | 컨퍼런스 행사물(Instagram, Poster, Slide, X배너, L배너)을 같은 편집기로 만든다. 배경 이미지·동영상, PNG, PDF, 인쇄용 PNG, MP4, 무한 루프 GIF, 연사·로고. 로컬은 원본, Pages는 편집용 사본 | 구현됨 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) |
 
 ## Phase 0 — Archive Foundation
 
@@ -123,6 +123,11 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-10-25 | Conference 배경을 `[Graphic_Resources] 2`로 바꿨다. 정지 이미지는 PNG·JPEG이고, 동영상은 Instagram·Poster·Slide·X배너에 있다. L배너는 정지 이미지만 쓴다. 연사 사진 004를 더해 Speecher는 네 장이다. |
+| 2026-10-25 | 인스타그램 카드는 연사마다 기준을 따로 갖고, 초기화로 세팅·초기화는 지금 카드만 바꾼다. 좌우로 넘길 때 슬라이드되고, 아래 순서를 끌어 바꿀 수 있다. 선택이 없을 때 키보드 좌우로도 넘긴다. |
+| 2026-10-25 | 도형·이미지에 투명도, 레이어 블러, 하단 블러를 넣었다. 선은 전체·왼쪽·오른쪽 페이드가 있다. 이미지 밝기·콘트라스트·채도·색조는 두 번 누르거나 수정 메뉴로 연다. 도형 줄의 T로 텍스트를 추가하고, 선택한 객체에 맞는 조절만 두 열로 보인다. |
+| 2026-10-25 | Cmd+G로 그룹하고 Shift+Cmd+G로 푼다. 그룹의 선택 사각형은 하나다. Shift는 펜·선·이동을 먼저 움직인 가로 또는 세로로 고정한다. Option 드래그는 원본을 두고 복제본을 옮기며, 커서는 모드에 맞는 겹친 카드 모양이다. |
+| 2026-10-25 | 이미지 모드에서 PDF를, 동영상 모드에서 무한 반복 GIF를 받는다. PDF는 카드 픽셀과 같은 포인트 크기고, GIF는 긴 변 1080px 이하로 영상 한 바퀴를 담는다. PNG·인쇄용 PNG·MP4는 그대로다. |
 | 2026-10-20 | 디자인 시스템 v3와 개발 노트를 정리했다. [woongdesignv3.md](woongdesignv3.md), [development-note.md](development-note.md). |
 | 2026-10-20 | GitHub Pages 네비에 Conference를 넣었다. 배경은 편집 크기 JPEG, 동영상은 긴 변 1920 MP4로 줄여 올린다. 로컬 호스트는 원본을 쓴다. |
 | 2026-10-20 | 연사 사진과 대학·단체 로고 공개를 허락하고 Conference 원본 리소스를 저장소에 넣었다. Slide 원본 동영상(123MB)은 제외하고 줄인 사본을 넣는다. |

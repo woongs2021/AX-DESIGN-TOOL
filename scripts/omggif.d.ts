@@ -20,7 +20,7 @@ declare module "omggif" {
       width: number,
       height: number,
       indexedPixels: Buffer | Uint8Array,
-      options?: { palette?: number[]; delay?: number },
+      options?: { palette?: number[]; delay?: number; disposal?: number; transparent?: number },
     ): number;
     end(): number;
   }

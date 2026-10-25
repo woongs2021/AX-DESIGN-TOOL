@@ -1,4 +1,4 @@
-import { shapeBlend, vectorSvg, type LineLayer, type LinearGradient, type PenLayer, type ShapeLayer, parseGradient, parseVectorLayer } from "./studio-shapes.ts";
+import { LAYER_BLUR_MAX, clampUnit, layerBlurBottom, parseBlend, parseShadow, shadowOffset, shapeBlend, shapeShadow, vectorSvg, type LineLayer, type LinearGradient, type PenLayer, type ShapeBlend, type ShapeLayer, type ShapeShadow, parseGradient, parseVectorLayer } from "./studio-shapes.ts";
 import { DEFAULT_PRESET_ID, presetById } from "./studio-presets.ts";
 
 export const RADIUS_MIN = 0;
@@ -55,6 +55,10 @@ export type TextLayer = {
   underline: boolean;
   /** Lines align inside the block; x stays the block's left edge. */
   align: TextAlign;
+  /** Absent means normal. Same modes as a shape. */
+  blend?: ShapeBlend;
+  /** Absent means no shadow. Same size, blur, distance, and opacity as a shape. */
+  shadow?: ShapeShadow;
 };
 /** x/y/width describe the cropped part on the card. */
 export type ImageLayer = {
@@ -70,6 +74,24 @@ export type ImageLayer = {
   crop: StudioCrop | null;
   /** One color painted over every visible pixel (logo color). Absent shows the source colors. */
   tint?: string | null;
+  /** Absent means normal. Same modes as a shape. */
+  blend?: ShapeBlend;
+  /** Absent means no shadow. Same size, blur, distance, and opacity as a shape. */
+  shadow?: ShapeShadow;
+  /** 0–100. Absent means fully opaque. */
+  opacity?: number;
+  /** Uniform layer blur in card pixels. Absent means sharp. */
+  blur?: number;
+  /** Blur at the bottom edge. The top stays at the layer blur. Absent or 0 keeps an even blur. */
+  blurBottom?: number;
+  /** -100–100. Absent means unchanged. */
+  brightness?: number;
+  /** -100–100. Absent means unchanged. */
+  contrast?: number;
+  /** -100–100. Absent means unchanged. -100 is gray. */
+  saturation?: number;
+  /** Hue rotation in degrees, -180–180. Absent means unchanged. */
+  hue?: number;
 };
 export type StudioLayer = TextLayer | ImageLayer | ShapeLayer | LineLayer | PenLayer;
 export type LayerKind = StudioLayer["kind"];
@@ -91,6 +113,8 @@ export type StudioState = {
   controlsWidth: number;
   /** Bottom to top. */
   layers: StudioLayer[];
+  /** Sets of layer ids that select, move, copy, and delete together. Each set has at least two ids. */
+  groups?: string[][];
 };
 
 export type Rgb = { r: number; g: number; b: number };
@@ -295,6 +319,103 @@ export function isTextLayer(layer: StudioLayer): layer is TextLayer {
   return layer.kind === "title" || layer.kind === "body";
 }
 
+export function textBlend(layer: Pick<TextLayer, "blend">): ShapeBlend {
+  return parseBlend(layer.blend);
+}
+
+export function imageBlend(layer: Pick<ImageLayer, "blend">): ShapeBlend {
+  return parseBlend(layer.blend);
+}
+
+/** 0–100. A missing value is fully opaque. */
+export function layerOpacity(layer: { opacity?: number | null }): number {
+  return clampUnit(layer.opacity ?? 100, 100);
+}
+
+/** Uniform image blur in card pixels. */
+export function imageBlur(layer: Pick<ImageLayer, "blur">): number {
+  return clampUnit(layer.blur ?? 0, LAYER_BLUR_MAX);
+}
+
+export function layerOpacityCss(layer: { opacity?: number | null }): string {
+  const opacity = layerOpacity(layer);
+  return opacity < 100 ? `opacity: ${opacity / 100};` : "";
+}
+
+export function imageBlurCss(layer: Pick<ImageLayer, "blur">): string {
+  const blur = imageBlur(layer);
+  return blur > 0 ? `filter: blur(${blur}px);` : "";
+}
+
+/** Brightness, contrast, and saturation. 0 leaves the photo unchanged. */
+export const IMAGE_TONE_LIMIT = 100;
+/** Hue rotation in degrees. */
+export const IMAGE_HUE_LIMIT = 180;
+
+export function clampSigned(value: number, limit: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(limit, Math.max(-limit, Math.round(value)));
+}
+
+export type ImageAdjust = { brightness: number; contrast: number; saturation: number; hue: number };
+
+/** Neutral values are 0. Missing fields stay unchanged. */
+export function imageAdjust(layer: Pick<ImageLayer, "brightness" | "contrast" | "saturation" | "hue">): ImageAdjust {
+  return {
+    brightness: clampSigned(layer.brightness ?? 0, IMAGE_TONE_LIMIT),
+    contrast: clampSigned(layer.contrast ?? 0, IMAGE_TONE_LIMIT),
+    saturation: clampSigned(layer.saturation ?? 0, IMAGE_TONE_LIMIT),
+    hue: clampSigned(layer.hue ?? 0, IMAGE_HUE_LIMIT),
+  };
+}
+
+/** CSS filter functions for the photo. Empty when every control is neutral. */
+export function imageAdjustFilter(adjust: ImageAdjust): string {
+  const parts: string[] = [];
+  if (adjust.brightness !== 0) parts.push(`brightness(${100 + adjust.brightness}%)`);
+  if (adjust.contrast !== 0) parts.push(`contrast(${100 + adjust.contrast}%)`);
+  if (adjust.saturation !== 0) parts.push(`saturate(${100 + adjust.saturation}%)`);
+  if (adjust.hue !== 0) parts.push(`hue-rotate(${adjust.hue}deg)`);
+  return parts.join(" ");
+}
+
+/** One filter declaration: color adjust, then blur. Empty when the photo is untouched. */
+export function imageFilterCss(
+  layer: Pick<ImageLayer, "blur" | "brightness" | "contrast" | "saturation" | "hue">,
+  blur = imageBlur(layer),
+): string {
+  const parts = [imageAdjustFilter(imageAdjust(layer)), blur > 0 ? `blur(${blur}px)` : ""].filter(Boolean);
+  return parts.length > 0 ? `filter: ${parts.join(" ")};` : "";
+}
+
+export { layerBlurBottom };
+
+/** CSS for an image shadow. Size is the box-shadow spread. */
+export function imageShadowCss(layer: Pick<ImageLayer, "shadow">): string {
+  const shadow = shapeShadow(layer);
+  if (shadow.opacity <= 0 || (shadow.size <= 0 && shadow.blur <= 0 && shadow.distance <= 0)) return "";
+  const offset = shadowOffset(shadow.distance);
+  return `box-shadow: ${offset.x}px ${offset.y}px ${shadow.blur}px ${shadow.size}px rgba(0, 0, 0, ${shadow.opacity / 100});`;
+}
+
+/** CSS for a text shadow. Size is drawn as a ring, since text-shadow has no spread. */
+export function textShadowCss(layer: Pick<TextLayer, "shadow">): string {
+  const shadow = shapeShadow(layer);
+  if (shadow.opacity <= 0 || (shadow.size <= 0 && shadow.blur <= 0 && shadow.distance <= 0)) return "";
+  const offset = shadowOffset(shadow.distance);
+  const color = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
+  if (shadow.size <= 0) return `text-shadow: ${offset.x}px ${offset.y}px ${shadow.blur}px ${color};`;
+  const steps = 8;
+  const parts: string[] = [];
+  for (let index = 0; index < steps; index += 1) {
+    const angle = (index / steps) * Math.PI * 2;
+    const x = Math.round(offset.x + Math.cos(angle) * shadow.size);
+    const y = Math.round(offset.y + Math.sin(angle) * shadow.size);
+    parts.push(`${x}px ${y}px ${shadow.blur}px ${color}`);
+  }
+  return `text-shadow: ${parts.join(", ")};`;
+}
+
 export const UPLOAD_PREFIX = "upload:";
 
 export function isUploadSrc(src: string): boolean {
@@ -390,6 +511,10 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   const num = (field: unknown) => (typeof field === "number" && Number.isFinite(field) ? field : null);
+  const tune = (field: unknown, limit: number, key: "brightness" | "contrast" | "saturation" | "hue") => {
+    const amount = clampSigned(num(field) ?? 0, limit);
+    return amount === 0 ? {} : { [key]: amount };
+  };
   const id = typeof value.id === "string" && value.id ? value.id : newLayerId();
   const vector = parseVectorLayer({ ...value, id }, ink);
   if (vector) return vector;
@@ -412,6 +537,17 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
       radius: clampRadius(num(value.radius) ?? IMAGE_RADIUS_DEFAULT),
       crop: cx !== null && cy !== null && cw && ch ? { x: cx, y: cy, w: cw, h: ch } : null,
       ...(tint ? { tint } : {}),
+      blend: parseBlend(value.blend),
+      ...(value.shadow && typeof value.shadow === "object" ? { shadow: parseShadow(value.shadow) } : {}),
+      ...(num(value.opacity) !== null && (num(value.opacity) ?? 100) < 100 ? { opacity: clampUnit(num(value.opacity) ?? 100, 100) } : {}),
+      ...(num(value.blur) !== null && (num(value.blur) ?? 0) > 0 ? { blur: clampUnit(num(value.blur) ?? 0, LAYER_BLUR_MAX) } : {}),
+      ...(clampUnit(num(value.blurBottom) ?? 0, LAYER_BLUR_MAX) > 0
+        ? { blurBottom: clampUnit(num(value.blurBottom) ?? 0, LAYER_BLUR_MAX) }
+        : {}),
+      ...tune(value.brightness, IMAGE_TONE_LIMIT, "brightness"),
+      ...tune(value.contrast, IMAGE_TONE_LIMIT, "contrast"),
+      ...tune(value.saturation, IMAGE_TONE_LIMIT, "saturation"),
+      ...tune(value.hue, IMAGE_HUE_LIMIT, "hue"),
     };
   }
   if (value.kind !== "title" && value.kind !== "body") return null;
@@ -425,6 +561,8 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
     fontId: typeof value.fontId === "string" && value.fontId ? value.fontId : "pretendard",
     color: normalizeHex(String(value.color ?? "")) ?? ink,
     gradient: parseGradient(value.gradient),
+    blend: parseBlend(value.blend),
+    ...(value.shadow && typeof value.shadow === "object" ? { shadow: parseShadow(value.shadow) } : {}),
     ...textStyle(value, value.kind),
   };
 }
@@ -461,6 +599,17 @@ function legacyLayers(value: Record<string, unknown>, ink: string, theme: string
   ];
 }
 
+function parseGroups(raw: unknown, ids: Set<string>): string[][] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const groups: string[][] = [];
+  for (const item of raw) {
+    if (!Array.isArray(item)) continue;
+    const group = [...new Set(item.filter((id): id is string => typeof id === "string" && ids.has(id)))];
+    if (group.length >= 2) groups.push(group);
+  }
+  return groups.length > 0 ? groups : undefined;
+}
+
 function parseBackground(raw: unknown): StudioBackground | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -477,6 +626,12 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
   const base = createStudioState(value.themeSlug, value.color);
   const ink = inkHex(value.color);
   const background = parseBackground(value.background);
+  const layers = Array.isArray(value.layers)
+    ? value.layers
+        .map((layer) => parseLayer(layer, ink, value.themeSlug as string))
+        .filter((layer): layer is StudioLayer => layer !== null)
+    : legacyLayers(value, ink, value.themeSlug);
+  const groups = parseGroups(value.groups, new Set(layers.map((layer) => layer.id)));
   const state: StudioState = {
     ...base,
     ...(background ? { background } : {}),
@@ -487,11 +642,8 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
     code: typeof value.code === "string" ? value.code : "",
     panel: value.panel === "code" ? "code" : "design",
     controlsWidth: num(value.controlsWidth, base.controlsWidth),
-    layers: Array.isArray(value.layers)
-      ? value.layers
-          .map((layer) => parseLayer(layer, ink, value.themeSlug as string))
-          .filter((layer): layer is StudioLayer => layer !== null)
-      : legacyLayers(value, ink, value.themeSlug),
+    layers,
+    ...(groups ? { groups } : {}),
   };
   ensureLayer(state, "image");
   ensureLayer(state, "body");
@@ -499,12 +651,18 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
   return state;
 }
 
+/** Copy every field, and drop groups when the incoming card has none. */
+export function assignStudio(state: StudioState, next: StudioState): void {
+  Object.assign(state, next);
+  if (!next.groups?.length) delete state.groups;
+}
+
 /** Restore the card to its starting values. The chosen theme, size preset, and panel width stay. */
 export function resetStudioState(state: StudioState, color: string): void {
   const next = createStudioState(state.themeSlug, color, state.presetId);
   next.controlsWidth = state.controlsWidth;
   next.panel = state.panel;
-  Object.assign(state, next);
+  assignStudio(state, next);
 }
 
 /** 초기화: a saved baseline replaces the factory start. A missing baseline uses resetStudioState. */
@@ -514,7 +672,9 @@ export function applyStudioBaseline(state: StudioState, baseline: StudioState | 
     return;
   }
   const { controlsWidth, panel } = state;
-  Object.assign(state, structuredClone(baseline), { controlsWidth, panel });
+  assignStudio(state, structuredClone(baseline));
+  state.controlsWidth = controlsWidth;
+  state.panel = panel;
 }
 
 export function normalizeHex(value: string): string | null {
@@ -696,6 +856,7 @@ export function designToCode(
   const body = firstLayer(state, "body");
   const items: string[] = [];
   const rules: string[] = [];
+  let imageFade = false;
   if (state.background) {
     items.push(
       state.background.mode === "video"
@@ -708,10 +869,12 @@ export function designToCode(
     const name = `layer-${index + 1}`;
     if (layer.kind === "shape" || layer.kind === "line" || layer.kind === "pen") {
       const blend = layer.kind === "shape" && shapeBlend(layer) !== "normal" ? ` mix-blend-mode: ${shapeBlend(layer)};` : "";
+      const fade = layer.kind === "shape" ? layerOpacityCss(layer) : "";
+      const opacity = fade ? ` ${fade}` : "";
       items.push(
         `  <svg class="${name}" viewBox="0 0 ${state.cardWidth} ${state.cardHeight}" preserveAspectRatio="none">${vectorSvg(layer)}</svg>`,
       );
-      rules.push(`  .studio-card .${name} { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible;${blend} }`);
+      rules.push(`  .studio-card .${name} { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible;${blend}${opacity} }`);
       return;
     }
     const place = `left: ${px(layer.x)}; top: ${px(layer.y)};`;
@@ -719,25 +882,60 @@ export function designToCode(
       const src = layer.src === state.themeSlug ? "{{themeImage}}" : `{{image:${escapeHtml(layer.src)}}}`;
       const ratio = aspectOf(layer);
       const corner = `border-radius: ${px(clampRadius(layer.radius))};`;
+      const blend = imageBlend(layer);
+      const bottom = layerBlurBottom(layer);
+      const box = [
+        blend !== "normal" ? `mix-blend-mode: ${blend};` : "",
+        layerOpacityCss(layer),
+        bottom > 0 ? "" : imageFilterCss(layer),
+        imageShadowCss(layer),
+      ].filter(Boolean).join(" ");
+      const fx = box ? ` ${box}` : "";
+      if (bottom > 0) {
+        imageFade = true;
+        const baseBlur = imageFilterCss(layer, imageBlur(layer));
+        const fade = imageFilterCss(layer, bottom);
+        const height = imageLayerHeight(layer, ratio);
+        if (layer.crop) {
+          const full = uncroppedRect(layer, ratio);
+          items.push(`  <div class="${name}"><div class="studio-crop"><img src="${src}" alt="" /></div><div class="studio-fade"><div class="studio-crop"><img src="${src}" alt="" /></div></div></div>`);
+          rules.push(`  .studio-card .${name} { position: absolute; ${place} width: ${px(layer.width)}; height: ${px(height)}; ${corner}${fx} }`);
+          rules.push(`  .studio-card .${name} .studio-crop { inset: 0; border-radius: inherit; }`);
+          if (baseBlur) rules.push(`  .studio-card .${name} > .studio-crop { ${baseBlur} }`);
+          rules.push(`  .studio-card .${name} .studio-fade { ${fade} }`);
+          rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
+        } else {
+          items.push(`  <div class="${name}"><img src="${src}" alt="" /><img class="studio-fade" src="${src}" alt="" /></div>`);
+          rules.push(`  .studio-card .${name} { position: absolute; ${place} width: ${px(layer.width)}; height: ${px(height)}; ${corner}${fx} }`);
+          rules.push(`  .studio-card .${name} > img { inset: 0; width: 100%; height: 100%; object-fit: fill; border-radius: inherit; }`);
+          if (baseBlur) rules.push(`  .studio-card .${name} > img:first-child { ${baseBlur} }`);
+          rules.push(`  .studio-card .${name} .studio-fade { ${fade} }`);
+        }
+        return;
+      }
       if (layer.crop) {
         const full = uncroppedRect(layer, ratio);
-        items.push(`  <div class="studio-crop ${name}"><img src="${src}" alt="" /></div>`);
-        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; ${corner} }`);
+        items.push(`  <div class="${name}"><div class="studio-crop"><img src="${src}" alt="" /></div></div>`);
+        rules.push(`  .studio-card .${name} { position: absolute; ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; ${corner}${fx} }`);
+        rules.push(`  .studio-card .${name} .studio-crop { inset: 0; border-radius: inherit; }`);
         rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
       } else {
         items.push(`  <img class="${name}" src="${src}" alt="" />`);
-        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; ${corner} }`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; ${corner}${fx} }`);
       }
       return;
     }
     const tag = layer.kind === "title" ? "h1" : "p";
     const text = layer === title ? "{{title}}" : layer === body ? "{{body}}" : escapeHtml(layer.text);
     items.push(`  <${tag} class="${name}">${text}</${tag}>`);
+    const blend = textBlend(layer);
     const style = [
       `font-weight: ${layer.weight};`,
       layer.italic ? "font-style: italic;" : "",
       layer.underline ? "text-decoration: underline;" : "",
       layer.align !== "left" ? `text-align: ${layer.align};` : "",
+      blend !== "normal" ? `mix-blend-mode: ${blend};` : "",
+      textShadowCss(layer),
     ].filter(Boolean).join(" ");
     const gradient = layer.gradient;
     const paint = gradient
@@ -747,6 +945,9 @@ export function designToCode(
       `  .studio-card .${name} { ${place} font-size: ${px(layer.size)}; font-family: ${fontStack(layer.fontId, extras)}; ${paint} ${style} }`,
     );
   });
+  if (imageFade) {
+    rules.push("  .studio-card .studio-fade { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(to bottom, transparent, #000); mask-image: linear-gradient(to bottom, transparent, #000); }");
+  }
   return `<article class="studio-card">
 ${items.join("\n")}
 </article>
@@ -869,6 +1070,150 @@ function spaceOffsets(boxes: readonly StudioRect[], axis: "x" | "y"): number[] {
     at += box[size] + gap;
   }
   return offsets;
+}
+
+export type ShiftAxis = "x" | "y";
+
+/**
+ * While Shift is held, keep the axis the gesture first moved along.
+ * A larger horizontal delta locks Y; a larger vertical delta locks X.
+ */
+export function shiftAxisDelta(
+  dx: number,
+  dy: number,
+  shift: boolean,
+  axis: ShiftAxis | null,
+  threshold = 4,
+): { dx: number; dy: number; axis: ShiftAxis | null } {
+  if (!shift) return { dx, dy, axis: null };
+  let next = axis;
+  if (!next && Math.hypot(dx, dy) >= threshold) next = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+  if (next === "x") return { dx, dy: 0, axis: "x" };
+  if (next === "y") return { dx: 0, dy, axis: "y" };
+  return { dx, dy, axis: null };
+}
+
+/** Snap a point onto the locked axis through an anchor. Used while aiming a line. */
+export function shiftAxisPoint(
+  point: { x: number; y: number },
+  anchor: { x: number; y: number },
+  shift: boolean,
+  axis: ShiftAxis | null,
+  threshold = 4,
+): { x: number; y: number; axis: ShiftAxis | null } {
+  const locked = shiftAxisDelta(point.x - anchor.x, point.y - anchor.y, shift, axis, threshold);
+  return { x: anchor.x + locked.dx, y: anchor.y + locked.dy, axis: locked.axis };
+}
+
+function liveGroup(state: StudioState, id: string): string[] | null {
+  const found = state.groups?.find((group) => group.includes(id));
+  if (!found) return null;
+  const live = found.filter((member, index) => found.indexOf(member) === index && state.layers.some((layer) => layer.id === member));
+  return live.length >= 2 ? live : null;
+}
+
+/** The group that contains this layer, or the layer on its own. */
+export function groupedIds(state: StudioState, id: string): string[] {
+  return liveGroup(state, id) ?? [id];
+}
+
+export function canGroupLayers(state: StudioState, ids: readonly string[]): boolean {
+  const unique = [...new Set(ids)].filter((id) => state.layers.some((layer) => layer.id === id));
+  if (unique.length < 2) return false;
+  const current = liveGroup(state, unique[0]!);
+  return !(current && current.length === unique.length && unique.every((id) => current.includes(id)));
+}
+
+/** Replace any groups that overlap this selection with one group. */
+export function groupLayers(state: StudioState, ids: readonly string[]): boolean {
+  if (!canGroupLayers(state, ids)) return false;
+  const unique = [...new Set(ids)].filter((id) => state.layers.some((layer) => layer.id === id));
+  const drop = new Set(unique);
+  const rest = (state.groups ?? [])
+    .map((group) => group.filter((id) => !drop.has(id)))
+    .filter((group) => group.length >= 2);
+  state.groups = [...rest, unique];
+  return true;
+}
+
+export function canUngroupLayers(state: StudioState, ids: readonly string[]): boolean {
+  const picked = new Set(ids);
+  return (state.groups ?? []).some((group) => {
+    const live = liveGroup(state, group[0] ?? "");
+    return Boolean(live && live.every((id) => picked.has(id)));
+  });
+}
+
+/** Dissolve every fully selected group. */
+export function ungroupLayers(state: StudioState, ids: readonly string[]): boolean {
+  if (!canUngroupLayers(state, ids)) return false;
+  const picked = new Set(ids);
+  const next = (state.groups ?? []).filter((group) => {
+    const live = liveGroup(state, group[0] ?? "");
+    return !(live && live.every((id) => picked.has(id)));
+  });
+  if (next.length === 0) delete state.groups;
+  else state.groups = next;
+  return true;
+}
+
+export function pruneGroups(state: StudioState): void {
+  const ids = new Set(state.layers.map((layer) => layer.id));
+  const next = (state.groups ?? [])
+    .map((group) => [...new Set(group.filter((id) => ids.has(id)))])
+    .filter((group) => group.length >= 2);
+  if (next.length === 0) delete state.groups;
+  else state.groups = next;
+}
+
+/** Groups for duplicated layers. `ids` maps an original id to its copy. */
+export function copiedGroups(groups: readonly (readonly string[])[] | undefined, ids: ReadonlyMap<string, string>): string[][] {
+  if (!groups) return [];
+  const next: string[][] = [];
+  for (const group of groups) {
+    const copy = group.map((id) => ids.get(id)).filter((id): id is string => Boolean(id));
+    if (copy.length >= 2) next.push(copy);
+  }
+  return next;
+}
+
+/**
+ * Selection rectangles. A fully selected group is one box around its members.
+ * Layers that are not in such a group keep their own boxes.
+ */
+export function selectionOutlines(
+  state: StudioState,
+  selected: Iterable<string>,
+  boxes: readonly (StudioRect & { id: string })[],
+): { key: string; box: StudioRect }[] {
+  const picked = new Set(selected);
+  const byId = new Map(boxes.map((box) => [box.id, box]));
+  const outlines: { key: string; box: StudioRect }[] = [];
+  const seen = new Set<string>();
+  for (const id of picked) {
+    if (seen.has(id)) continue;
+    const members = groupedIds(state, id);
+    const whole = members.length > 1 && members.every((member) => picked.has(member));
+    const ids = whole ? members : [id];
+    for (const member of ids) seen.add(member);
+    const found = ids.flatMap((member) => {
+      const box = byId.get(member);
+      return box ? [box] : [];
+    });
+    if (found.length === 0) continue;
+    const box = found.length === 1 ? { x: found[0]!.x, y: found[0]!.y, w: found[0]!.w, h: found[0]!.h } : selectionBounds(found);
+    outlines.push({ key: whole ? `group:${[...members].sort().join("\0")}` : id, box });
+  }
+  return outlines;
+}
+
+/** The rectangle that wraps every box. Several selected objects align inside it. */
+export function selectionBounds(boxes: readonly StudioRect[]): StudioRect {
+  const x = Math.min(...boxes.map((box) => box.x));
+  const y = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.w));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.h));
+  return { x, y, w: right - x, h: bottom - y };
 }
 
 /** How far each box moves to line up on one edge or center of `bounds`, or to space the boxes evenly inside their own span. */

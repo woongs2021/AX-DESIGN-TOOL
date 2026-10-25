@@ -209,3 +209,65 @@ export function createConferenceState(presetId: string, index: ConferenceIndex |
     layers: [image, text("body", bodySize, margin + Math.round(titleSize * 1.6)), text("title", titleSize, margin)],
   };
 }
+
+/** The speaker photo on a card, when one is placed. */
+export function speakerSrcOf(state: StudioState): string {
+  const prefix = `${CONFERENCE_SRC_PREFIX}speaker-`;
+  const layer = state.layers.find((item) => item.kind === "image" && item.src.startsWith(prefix));
+  if (layer?.kind === "image") return layer.src;
+  return state.themeSlug.startsWith(prefix) ? state.themeSlug : "";
+}
+
+/** Copies a card and swaps every speaker photo. Logos and text stay. */
+export function replaceSpeakerSrc(state: StudioState, src: string): StudioState {
+  const prefix = `${CONFERENCE_SRC_PREFIX}speaker-`;
+  const next = structuredClone(state);
+  if (next.themeSlug.startsWith(prefix)) next.themeSlug = src;
+  for (const layer of next.layers) {
+    if (layer.kind === "image" && layer.src.startsWith(prefix)) layer.src = src;
+  }
+  return next;
+}
+
+/**
+ * One card per speaker, copied from the saved layout.
+ * The slide that already uses a listed photo stays an exact copy.
+ */
+export function speakerSlides(master: StudioState, srcs: readonly string[]): { index: number; slides: StudioState[] } {
+  const current = speakerSrcOf(master);
+  const found = srcs.indexOf(current);
+  const index = found < 0 ? 0 : found;
+  const slides = srcs.map((src, order) => (order === index && current === src ? structuredClone(master) : replaceSpeakerSrc(master, src)));
+  return { index, slides };
+}
+
+/** Keeps a saved snapshot for the slots that have one. Other slots stay copies of the shared layout. */
+export function instagramDeck(
+  master: StudioState,
+  srcs: readonly string[],
+  saved: Readonly<Record<string, StudioState | null | undefined>>,
+): { index: number; slides: StudioState[] } {
+  const built = speakerSlides(master, srcs);
+  return {
+    index: built.index,
+    slides: built.slides.map((slide, order) => {
+      const src = srcs[order] ?? "";
+      const card = src ? saved[src] : null;
+      return card ? structuredClone(card) : slide;
+    }),
+  };
+}
+
+/** Saved speaker order first. Speakers missing from that list keep their original order at the end. */
+export function applySpeakerOrder(srcs: readonly string[], saved: readonly string[]): string[] {
+  const known = new Set(srcs);
+  const ordered: string[] = [];
+  for (const src of saved) {
+    if (!known.has(src) || ordered.includes(src)) continue;
+    ordered.push(src);
+  }
+  for (const src of srcs) {
+    if (!ordered.includes(src)) ordered.push(src);
+  }
+  return ordered;
+}

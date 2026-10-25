@@ -19,6 +19,18 @@ import {
   isUploadSrc,
   TEXT_ALIGNS,
   alignOffsets,
+  assignStudio,
+  canGroupLayers,
+  canUngroupLayers,
+  copiedGroups,
+  groupedIds,
+  groupLayers,
+  pruneGroups,
+  selectionBounds,
+  selectionOutlines,
+  shiftAxisDelta,
+  shiftAxisPoint,
+  ungroupLayers,
   LAYER_ALIGNS,
   LAYER_DISTRIBUTES,
   type LayerAlign,
@@ -35,7 +47,16 @@ import {
   imageLayerHeight,
   IMAGE_MIN,
   inkHex,
+  imageAdjust,
+  imageAdjustFilter,
+  imageBlend,
+  imageBlur,
+  IMAGE_HUE_LIMIT,
+  IMAGE_TONE_LIMIT,
+  clampSigned,
+  layerOpacity,
   isTextLayer,
+  textBlend,
   maxFontSize,
   moveCropBox,
   newLayerId,
@@ -56,6 +77,7 @@ import {
   wrapText,
   type ImageLayer,
   type LayerKind,
+  type ShiftAxis,
   type StudioDocumentInput,
   type StudioLayer,
   type StudioRect,
@@ -67,12 +89,20 @@ import {
 import { STUDIO_PRESETS, type StudioPreset } from "../shared/studio-presets.ts";
 import {
   CONFERENCE_PRESETS,
+  DEFAULT_CONFERENCE_PRESET_ID,
   conferenceSrc,
   printSize,
+  applySpeakerOrder,
+  instagramDeck,
+  replaceSpeakerSrc,
+  speakerSrcOf,
   videoExportSizes,
   type ConferenceBackground,
   type ConferenceIndex,
 } from "../shared/conference.ts";
+import { readInstagramCard, readInstagramOrder, readStoredConferenceBaseline, writeInstagramCard, writeInstagramOrder } from "../studio-baseline.ts";
+import { cardPdf } from "../shared/card-pdf.ts";
+import { GIF_LONG_EDGE, createGifEncoder, gifFrameDelays, gifSize } from "../shared/card-gif.ts";
 import { createPngEncoder, printStrips } from "../shared/print-png.ts";
 import {
   BLEND_LABELS,
@@ -91,10 +121,13 @@ import {
   arrowLength,
   arrowPolygon,
   clampUnit,
+  layerBlurBottom,
   emptyShadow,
   emptyStroke,
   lineBounds,
   lineContains,
+  lineFade,
+  lineFadeStops,
   lineSegment,
   penBounds,
   nodeBounds,
@@ -155,6 +188,16 @@ let gestureZoom = 1;
 let commitOpenGesture: (() => void) | null = null;
 /** Online Studio and Conference each keep their own undo history. */
 let historyOwner = "";
+/** Instagram speaker copies. Kept across rebinds so arrows remember the current card. */
+type SpeakerDeck = { index: number; srcs: string[]; slides: StudioState[] };
+let speakerDeck: SpeakerDeck | null = null;
+/** keep copies live edits back; apply restores a slide; reset rewrites the current slide from the shared baseline. */
+let speakerDeckMode: "keep" | "apply" | "reset" = "keep";
+
+export function clearSpeakerDeck(): void {
+  speakerDeck = null;
+  speakerDeckMode = "keep";
+}
 const histories = new Map<string, { undo: StudioState[]; redo: StudioState[]; undoZoom: number[]; redoZoom: number[] }>();
 
 function useHistory(owner: string): void {
@@ -212,6 +255,7 @@ let stopDeviceWatch: (() => void) | null = null;
 let stopHistoryShortcut: (() => void) | null = null;
 let stopStudioKeys: (() => void) | null = null;
 let layerClipboard: StudioLayer[] = [];
+let clipboardGroups: string[][] = [];
 let layerMenu: HTMLElement | null = null;
 const LONG_PRESS_MS = 500;
 const PASTE_OFFSET = 20;
@@ -232,6 +276,14 @@ function activeDevice(): Device {
 
 function cloneStudio(state: StudioState): StudioState {
   return structuredClone(state);
+}
+
+function replaceStudio(state: StudioState, next: StudioState): void {
+  const controlsWidth = state.controlsWidth;
+  const panel = state.panel;
+  assignStudio(state, structuredClone(next));
+  state.controlsWidth = controlsWidth;
+  state.panel = panel;
 }
 
 function sameStudio(a: StudioState, b: StudioState): boolean {
@@ -414,6 +466,47 @@ function blurMask(index: number, steps: number): Array<[number, number]> {
   return [[at(index - 1), 0], [at(index), 1], [at(index + 1), 0]];
 }
 
+/** Draws a sharp layer, then covers it with blur that ramps from `from` to `to` along one axis. */
+function paintFadedBlur(
+  ctx: CanvasRenderingContext2D,
+  sharp: HTMLCanvasElement,
+  destX: number,
+  destY: number,
+  origin: number,
+  span: number,
+  from: number,
+  to: number,
+  axis: "x" | "y",
+  scratchIndex: number,
+): void {
+  const bw = sharp.width;
+  const bh = sharp.height;
+  ctx.drawImage(sharp, destX, destY);
+  for (let index = 0; index < BLUR_STEPS; index += 1) {
+    const t = index / (BLUR_STEPS - 1);
+    const radius = from + (to - from) * t;
+    if (radius < 0.5) continue;
+    const blurred = effectBuffer(scratchIndex, bw, bh);
+    const blurredCtx = blurred.getContext("2d");
+    if (!blurredCtx) continue;
+    blurredCtx.filter = "none";
+    blurredCtx.globalCompositeOperation = "source-over";
+    blurredCtx.clearRect(0, 0, bw, bh);
+    blurredCtx.filter = `blur(${radius}px)`;
+    blurredCtx.drawImage(sharp, 0, 0);
+    blurredCtx.filter = "none";
+    blurredCtx.globalCompositeOperation = "destination-in";
+    const mask = axis === "y"
+      ? blurredCtx.createLinearGradient(0, origin, 0, origin + span)
+      : blurredCtx.createLinearGradient(origin, 0, origin + span, 0);
+    for (const [at, alpha] of blurMask(index, BLUR_STEPS)) mask.addColorStop(at, `rgba(0, 0, 0, ${alpha})`);
+    blurredCtx.fillStyle = mask;
+    blurredCtx.fillRect(0, 0, bw, bh);
+    blurredCtx.globalCompositeOperation = "source-over";
+    ctx.drawImage(blurred, destX, destY);
+  }
+}
+
 function compositeFor(blend: ShapeBlend): GlobalCompositeOperation {
   return blend === "normal" ? "source-over" : blend;
 }
@@ -467,28 +560,98 @@ function paintCard(
     const height = imageLayerHeight(layer, source.naturalHeight / source.naturalWidth);
     if (layer.id !== hiddenId) {
       const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2));
+      const shadow = shapeShadow(layer);
+      const blur = imageBlur(layer);
+      const blurBottom = layerBlurBottom(layer);
       ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(layer.x, layer.y, layer.width, height, radius);
-      ctx.clip();
+      ctx.globalAlpha *= layerOpacity(layer) / 100;
+      if (shadow.opacity > 0 && (shadow.size > 0 || shadow.blur > 0 || shadow.distance > 0)) {
+        const offset = shadowOffset(shadow.distance);
+        const ink = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
+        const spread = shadow.size;
+        ctx.save();
+        // Shadow offsets ignore the canvas transform, so a scaled card scales them by hand.
+        ctx.shadowColor = ink;
+        ctx.shadowBlur = shadow.blur * unit;
+        ctx.shadowOffsetX = offset.x * unit;
+        ctx.shadowOffsetY = offset.y * unit;
+        ctx.fillStyle = ink;
+        ctx.beginPath();
+        ctx.roundRect(layer.x - spread, layer.y - spread, layer.width + spread * 2, height + spread * 2, radius + spread);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = compositeFor(imageBlend(layer));
       const crop = layer.crop;
       const sw = source.naturalWidth;
       const sh = source.naturalHeight;
       const from = crop ? [crop.x * sw, crop.y * sh, crop.w * sw, crop.h * sh] as const : [0, 0, sw, sh] as const;
-      if (layer.tint) {
+      const adjustFilter = imageAdjustFilter(imageAdjust(layer));
+      const drawPhoto = (target: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) => {
+        target.save();
+        target.beginPath();
+        target.roundRect(x, y, w, h, radius);
+        target.clip();
+        target.drawImage(source, ...from, x, y, w, h);
+        if (layer.tint) {
+          target.globalCompositeOperation = "source-in";
+          target.fillStyle = layer.tint;
+          target.fillRect(x, y, w, h);
+        }
+        target.restore();
+      };
+      const drawAdjusted = (target: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) => {
+        if (!adjustFilter) {
+          drawPhoto(target, x, y, w, h);
+          return;
+        }
+        target.save();
+        target.filter = adjustFilter;
+        drawPhoto(target, x, y, w, h);
+        target.restore();
+      };
+      if (blur > 0 || blurBottom > 0) {
+        const amount = Math.max(blur, blurBottom);
+        const pad = Math.ceil(amount * 3);
+        const bw = Math.ceil(layer.width + pad * 2);
+        const bh = Math.ceil(height + pad * 2);
+        const sharp = effectBuffer(2, bw, bh);
+        const sharpCtx = sharp.getContext("2d");
+        const soft = effectBuffer(3, bw, bh);
+        const softCtx = soft.getContext("2d");
+        if (sharpCtx && softCtx) {
+          drawAdjusted(sharpCtx, pad, pad, layer.width, height);
+          if (blurBottom > 0 && blurBottom !== blur) {
+            paintFadedBlur(ctx, sharp, layer.x - pad, layer.y - pad, pad, height, blur, blurBottom, "y", 3);
+          } else {
+            softCtx.filter = `blur(${amount}px)`;
+            softCtx.drawImage(sharp, 0, 0);
+            softCtx.filter = "none";
+            ctx.drawImage(soft, layer.x - pad, layer.y - pad);
+          }
+        } else drawAdjusted(ctx, layer.x, layer.y, layer.width, height);
+      } else if (layer.tint) {
         tintBuffer.width = Math.max(1, Math.ceil(layer.width * unit));
         tintBuffer.height = Math.max(1, Math.ceil(height * unit));
         const tint = tintBuffer.getContext("2d");
         if (tint) {
+          tint.save();
+          if (adjustFilter) tint.filter = adjustFilter;
           tint.drawImage(source, ...from, 0, 0, tintBuffer.width, tintBuffer.height);
           tint.globalCompositeOperation = "source-in";
           tint.fillStyle = layer.tint;
           tint.fillRect(0, 0, tintBuffer.width, tintBuffer.height);
+          tint.restore();
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(layer.x, layer.y, layer.width, height, radius);
+          ctx.clip();
           ctx.drawImage(tintBuffer, layer.x, layer.y, layer.width, height);
+          ctx.restore();
         }
-      } else {
-        ctx.drawImage(source, ...from, layer.x, layer.y, layer.width, height);
-      }
+      } else drawAdjusted(ctx, layer.x, layer.y, layer.width, height);
+      ctx.restore();
       ctx.restore();
     }
     hits.push({ id: layer.id, kind: "image", x: layer.x, y: layer.y, w: layer.width, h: height });
@@ -504,15 +667,40 @@ function paintCard(
     const underline = Math.max(1, Math.round(layer.size / 16));
     const blockWidth = Math.max(widest, layer.size);
     const blockHeight = Math.max(lines.length, 1) * lineHeight;
-    ctx.fillStyle = layer.gradient ? boxGradient(ctx, layer.gradient, layer.x, layer.y, blockWidth, blockHeight) : layer.color;
-    lines.forEach((line, index) => {
-      if (layer.id === hiddenId) return;
-      const lineWidth = widths[index] ?? 0;
-      const x = layer.x + (layer.align === "center" ? (widest - lineWidth) / 2 : layer.align === "right" ? widest - lineWidth : 0);
-      const y = layer.y + index * lineHeight;
-      ctx.fillText(line, x, y);
-      if (layer.underline) ctx.fillRect(x, y + layer.size * 0.98, lineWidth, underline);
-    });
+    const glyphs = (target: CanvasRenderingContext2D, spread: number) => {
+      target.lineJoin = "round";
+      target.lineWidth = spread * 2;
+      lines.forEach((line, index) => {
+        const lineWidth = widths[index] ?? 0;
+        const x = layer.x + (layer.align === "center" ? (widest - lineWidth) / 2 : layer.align === "right" ? widest - lineWidth : 0);
+        const y = layer.y + index * lineHeight;
+        if (spread > 0) target.strokeText(line, x, y);
+        target.fillText(line, x, y);
+        if (layer.underline) target.fillRect(x - spread, y + layer.size * 0.98 - spread, lineWidth + spread * 2, underline + spread * 2);
+      });
+    };
+    if (layer.id !== hiddenId) {
+      const shadow = shapeShadow(layer);
+      if (shadow.opacity > 0 && (shadow.size > 0 || shadow.blur > 0 || shadow.distance > 0)) {
+        const offset = shadowOffset(shadow.distance);
+        const ink = `rgba(0, 0, 0, ${shadow.opacity / 100})`;
+        ctx.save();
+        // Shadow offsets ignore the canvas transform, so a scaled card scales them by hand.
+        ctx.shadowColor = ink;
+        ctx.shadowBlur = shadow.blur * unit;
+        ctx.shadowOffsetX = offset.x * unit;
+        ctx.shadowOffsetY = offset.y * unit;
+        ctx.fillStyle = ink;
+        ctx.strokeStyle = ink;
+        glyphs(ctx, shadow.size);
+        ctx.restore();
+      }
+      ctx.save();
+      ctx.globalCompositeOperation = compositeFor(textBlend(layer));
+      ctx.fillStyle = layer.gradient ? boxGradient(ctx, layer.gradient, layer.x, layer.y, blockWidth, blockHeight) : layer.color;
+      glyphs(ctx, 0);
+      ctx.restore();
+    }
     hits.push({
       id: layer.id,
       kind: layer.kind,
@@ -534,10 +722,14 @@ function paintCard(
   });
   const paintShape = (layer: ShapeLayer): void => {
     if (layer.id !== hiddenId) {
+      ctx.save();
+      ctx.globalAlpha *= layerOpacity(layer) / 100;
       const shadow = shapeShadow(layer);
       const stroke = shapeStroke(layer);
       const blurFrom = clampUnit(layer.blurFrom ?? 0, LAYER_BLUR_MAX);
       const blurTo = clampUnit(layer.blurTo ?? 0, LAYER_BLUR_MAX);
+      const blurBottom = layerBlurBottom(layer);
+      const topBlur = blurFrom === blurTo ? blurFrom : Math.round((blurFrom + blurTo) / 2);
       const fillShape = (target: CanvasRenderingContext2D) => {
         target.beginPath();
         traceShape(pathOf(target), layer);
@@ -581,8 +773,57 @@ function paintCard(
       }
       ctx.save();
       ctx.globalCompositeOperation = compositeFor(shapeBlend(layer));
-      if (blurFrom === 0 && blurTo === 0) {
+      if (blurBottom > 0 && blurBottom !== topBlur) {
+        const amount = Math.max(topBlur, blurBottom);
+        const pad = Math.ceil(amount * 3) + 4;
+        const left = Math.max(0, Math.floor(layer.x - pad));
+        const top = Math.max(0, Math.floor(layer.y - pad));
+        const right = Math.min(width, Math.ceil(layer.x + layer.width + pad));
+        const bottomEdge = Math.min(height, Math.ceil(layer.y + layer.height + pad));
+        const bw = Math.max(1, right - left);
+        const bh = Math.max(1, bottomEdge - top);
+        const sharp = effectBuffer(0, bw, bh);
+        const sharpCtx = sharp.getContext("2d");
+        if (!sharpCtx) {
+          fillShape(ctx);
+          paintStroke(ctx);
+        } else {
+          sharpCtx.save();
+          sharpCtx.translate(-left, -top);
+          fillShape(sharpCtx);
+          paintStroke(sharpCtx);
+          sharpCtx.restore();
+          paintFadedBlur(ctx, sharp, left, top, layer.y - top, layer.height, topBlur, blurBottom, "y", 1);
+        }
+      } else if (blurFrom === 0 && blurTo === 0) {
         fillShape(ctx);
+        paintStroke(ctx);
+      } else if (blurFrom === blurTo) {
+        const pad = Math.ceil(blurFrom * 3) + 4;
+        const left = Math.max(0, Math.floor(layer.x - pad));
+        const top = Math.max(0, Math.floor(layer.y - pad));
+        const right = Math.min(width, Math.ceil(layer.x + layer.width + pad));
+        const bottom = Math.min(height, Math.ceil(layer.y + layer.height + pad));
+        const bw = Math.max(1, right - left);
+        const bh = Math.max(1, bottom - top);
+        const sharp = effectBuffer(0, bw, bh);
+        const soft = effectBuffer(1, bw, bh);
+        const sharpCtx = sharp.getContext("2d");
+        const softCtx = soft.getContext("2d");
+        if (!sharpCtx || !softCtx) {
+          fillShape(ctx);
+          paintStroke(ctx);
+        } else {
+          sharpCtx.save();
+          sharpCtx.translate(-left, -top);
+          fillShape(sharpCtx);
+          paintStroke(sharpCtx);
+          sharpCtx.restore();
+          softCtx.filter = `blur(${blurFrom}px)`;
+          softCtx.drawImage(sharp, 0, 0);
+          softCtx.filter = "none";
+          ctx.drawImage(soft, left, top);
+        }
       } else {
         const pad = Math.ceil(Math.max(blurFrom, blurTo) * 2) + 4;
         const left = Math.max(0, Math.floor(layer.x - pad));
@@ -620,36 +861,66 @@ function paintCard(
             ctx.drawImage(blurred, left, top);
           }
         }
+        paintStroke(ctx);
       }
-      paintStroke(ctx);
+      ctx.restore();
       ctx.restore();
     }
     hits.push({ id: layer.id, kind: "shape", x: layer.x, y: layer.y, w: layer.width, h: layer.height });
   };
   const paintLine = (layer: LineLayer): void => {
     if (layer.id !== hiddenId) {
-      const segment = lineSegment(layer);
-      ctx.beginPath();
-      ctx.strokeStyle = layer.color;
-      ctx.fillStyle = layer.color;
-      ctx.lineWidth = layer.stroke;
-      ctx.lineCap = layer.cap;
-      ctx.moveTo(segment.x1, segment.y1);
-      ctx.lineTo(segment.x2, segment.y2);
-      ctx.stroke();
-      const length = arrowLength(layer);
-      const heads = [
-        layer.start ? arrowPolygon({ x: layer.x, y: layer.y }, { x: layer.x2, y: layer.y2 }, length) : null,
-        layer.end ? arrowPolygon({ x: layer.x2, y: layer.y2 }, { x: layer.x, y: layer.y }, length) : null,
-      ];
-      for (const points of heads) {
-        const tip = points?.[0];
-        if (!points || !tip) continue;
-        ctx.beginPath();
-        ctx.moveTo(tip.x, tip.y);
-        for (const point of points.slice(1)) ctx.lineTo(point.x, point.y);
-        ctx.closePath();
-        ctx.fill();
+      const drawLine = (target: CanvasRenderingContext2D) => {
+        const segment = lineSegment(layer);
+        target.beginPath();
+        target.strokeStyle = layer.color;
+        target.fillStyle = layer.color;
+        target.lineWidth = layer.stroke;
+        target.lineCap = layer.cap;
+        target.moveTo(segment.x1, segment.y1);
+        target.lineTo(segment.x2, segment.y2);
+        target.stroke();
+        const length = arrowLength(layer);
+        const heads = [
+          layer.start ? arrowPolygon({ x: layer.x, y: layer.y }, { x: layer.x2, y: layer.y2 }, length) : null,
+          layer.end ? arrowPolygon({ x: layer.x2, y: layer.y2 }, { x: layer.x, y: layer.y }, length) : null,
+        ];
+        for (const points of heads) {
+          const tip = points?.[0];
+          if (!points || !tip) continue;
+          target.beginPath();
+          target.moveTo(tip.x, tip.y);
+          for (const point of points.slice(1)) target.lineTo(point.x, point.y);
+          target.closePath();
+          target.fill();
+        }
+      };
+      const fade = lineFade(layer);
+      const span = Math.hypot(layer.x2 - layer.x, layer.y2 - layer.y);
+      if ((fade.start <= 0 && fade.end <= 0) || span < 1) drawLine(ctx);
+      else {
+        const box = lineBounds(layer);
+        const pad = 4;
+        const left = Math.floor(box.x - pad);
+        const top = Math.floor(box.y - pad);
+        const bw = Math.max(1, Math.ceil(box.x + box.w + pad) - left);
+        const bh = Math.max(1, Math.ceil(box.y + box.h + pad) - top);
+        const buffer = effectBuffer(4, bw, bh);
+        const faded = buffer.getContext("2d");
+        if (!faded) drawLine(ctx);
+        else {
+          faded.save();
+          faded.translate(-left, -top);
+          drawLine(faded);
+          faded.restore();
+          faded.globalCompositeOperation = "destination-in";
+          const mask = faded.createLinearGradient(layer.x - left, layer.y - top, layer.x2 - left, layer.y2 - top);
+          for (const stop of lineFadeStops(fade.start, fade.end)) mask.addColorStop(stop.offset, `rgba(0, 0, 0, ${stop.alpha})`);
+          faded.fillStyle = mask;
+          faded.fillRect(0, 0, bw, bh);
+          faded.globalCompositeOperation = "source-over";
+          ctx.drawImage(buffer, left, top);
+        }
       }
     }
     const box = lineBounds(layer);
@@ -684,6 +955,12 @@ function paintCard(
   }
   ctx.restore();
   return hits;
+}
+
+function bytesBlob(bytes: Uint8Array, type: string): Blob {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return new Blob([copy], { type });
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -774,6 +1051,7 @@ const DRAW_TOOLS = [
   { id: "star", label: "별", path: "M12 4.5 14.2 9.6 19.7 10.1 15.5 13.8 16.7 19.2 12 16.4 7.3 19.2 8.5 13.8 4.3 10.1 9.8 9.6z" },
   { id: "line", label: "선", path: "M5 12h14" },
   { id: "pen", label: "펜", path: "M15.5 4.5 19.5 8.5 8 20H4v-4z" },
+  { id: "text", label: "텍스트", path: "M6 6h12M12 6v13" },
 ] as const;
 const drawIcon = (path: string) =>
   `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${path}" /></svg>`;
@@ -830,6 +1108,28 @@ function weightOptions(weight: number): string {
   return TEXT_WEIGHTS.map(
     (item) => `<option value="${item.value}"${item.value === weight ? " selected" : ""}>${item.label} · ${item.value}</option>`,
   ).join("");
+}
+
+function blendOptions(current: ShapeBlend): string {
+  return SHAPE_BLENDS.map(
+    (blend) => `<option value="${blend}"${blend === current ? " selected" : ""}>${BLEND_LABELS[blend]}</option>`,
+  ).join("");
+}
+
+function textBlendField(kind: TextKind, name: string, layer: TextLayer): string {
+  return `
+          <div class="studio__field">
+            <label for="studio-${kind}-blend">${name} 블렌딩</label>
+            <select id="studio-${kind}-blend" class="studio__control">${blendOptions(textBlend(layer))}</select>
+          </div>`;
+}
+
+function imageBlendField(layer: ImageLayer): string {
+  return `
+          <div class="studio__field">
+            <label for="studio-image-blend">이미지 블렌딩</label>
+            <select id="studio-image-blend" class="studio__control">${blendOptions(imageBlend(layer))}</select>
+          </div>`;
 }
 
 function textStyleControls(kind: TextKind, name: string, layer: TextLayer): string {
@@ -1023,13 +1323,22 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               </div>
             </div>
           </div>`;
-  const shadowRow = (id: string, label: string, max: number) => `
+  const shadowRow = (id: string, label: string, max: number, value = 0) => `
             <div class="studio__field">
               <label for="${id}">${label}</label>
               <div class="studio__radius">
-                <input id="${id}" type="range" min="0" max="${max}" step="1" value="0" />
+                <input id="${id}" type="range" min="0" max="${max}" step="1" value="${value}" />
                 ${stepButtons(label)}
-                <input id="${id}-number" class="studio__control studio__control--number" type="number" min="0" max="${max}" step="1" value="0" aria-label="${label} 수치" />
+                <input id="${id}-number" class="studio__control studio__control--number" type="number" min="0" max="${max}" step="1" value="${value}" aria-label="${label} 수치" />
+              </div>
+            </div>`;
+  const signedRow = (id: string, label: string, min: number, max: number) => `
+            <div class="studio__field">
+              <label for="${id}">${label}</label>
+              <div class="studio__radius">
+                <input id="${id}" type="range" min="${min}" max="${max}" step="1" value="0" />
+                ${stepButtons(label)}
+                <input id="${id}-number" class="studio__control studio__control--number" type="number" min="${min}" max="${max}" step="1" value="0" aria-label="${label} 수치" />
               </div>
             </div>`;
   const title = ensureLayer(state, "title");
@@ -1078,7 +1387,22 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
     ? `
             <button type="button" class="studio__zoom-btn" id="studio-video-toggle" aria-label="일시정지" title="일시정지" hidden>${pauseIcon}</button>
             <button type="button" class="button button--secondary" id="studio-print" hidden>인쇄용 PNG</button>
-            <button type="button" class="button button--secondary" id="studio-video" hidden>동영상</button>`
+            <button type="button" class="button button--secondary" id="studio-video" hidden>동영상</button>
+            <button type="button" class="button button--secondary" id="studio-gif" hidden title="동영상 한 바퀴를 무한 반복 GIF로 받습니다. 긴 변은 ${GIF_LONG_EDGE}px까지입니다.">GIF 다운로드</button>`
+    : "";
+  const showSpeakerNav =
+    config.id === "conference" && state.presetId === DEFAULT_CONFERENCE_PRESET_ID && (config.conference?.speakers.length ?? 0) > 1;
+  const speakerNav = showSpeakerNav
+    ? `
+          <button type="button" class="studio__zoom-btn studio__speaker-btn studio__speaker-btn--prev" id="studio-speaker-prev" aria-label="이전 연사"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg></button>
+          <button type="button" class="studio__zoom-btn studio__speaker-btn studio__speaker-btn--next" id="studio-speaker-next" aria-label="다음 연사"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 6 6 6-6 6"/></svg></button>`
+    : "";
+  const speakerCount = showSpeakerNav ? `<p class="studio__speaker-count" id="studio-speaker-count"></p>` : "";
+  const speakerOrder = showSpeakerNav
+    ? `<div class="studio__order" id="studio-speaker-order">
+          <p class="studio__order-label">카드 순서</p>
+          <div class="studio__order-list" id="studio-speaker-order-list" aria-label="인스타그램 카드 순서"></div>
+        </div>`
     : "";
   const designSelected = state.panel === "design";
   const fonts = fontChoices();
@@ -1127,7 +1451,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
                   `<button type="button" class="studio__draw-btn" data-draw="${tool.id}" aria-label="${tool.label}" title="${tool.label}"${tool.id === "select" ? ' aria-pressed="true"' : tool.id === "pen" ? ' aria-pressed="false"' : ""}>${drawIcon(tool.path)}</button>`,
               ).join("")}
             </div>
-            <p class="studio__hint">원, 사각형, 삼각형, 별과 선, 펜으로 카드에 형태를 그리는 도구입니다.</p>
+            <p class="studio__hint">원, 사각형, 삼각형, 별, 선, 펜, 텍스트로 카드에 형태를 더합니다.</p>
           </div>
           <div class="studio__field" id="studio-shape-size-field" hidden>
             <label for="studio-shape-size">도형 크기</label>
@@ -1153,8 +1477,10 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               ${gradientControls("studio-shape", "도형")}
           </div>
           <div id="studio-shape-stroke" hidden>
+            <div class="studio__sliders">
             ${shadowRow("studio-stroke-width", "선 두께", LINE_WIDTH_MAX)}
             ${shadowRow("studio-stroke-opacity", "선 투명도", 100)}
+            </div>
             <div class="studio__field">
               <label for="studio-stroke-color">선 색</label>
               <div class="studio__color">
@@ -1164,30 +1490,22 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
             </div>
           </div>
           <div id="studio-shape-effects" hidden>
+            <div class="studio__sliders">
+            ${shadowRow("studio-shape-opacity", "도형 투명도", 100, 100).replace('class="studio__field"', 'class="studio__field studio__field--span"')}
+            ${shadowRow("studio-shape-blur", "레이어 블러", LAYER_BLUR_MAX)}
+            ${shadowRow("studio-shape-blur-bottom", "하단 블러", LAYER_BLUR_MAX)}
             ${shadowRow("studio-shadow-size", "그림자 크기", SHADOW_SIZE_MAX)}
             ${shadowRow("studio-shadow-blur", "그림자 블러", SHADOW_BLUR_MAX)}
             ${shadowRow("studio-shadow-distance", "그림자 거리", SHADOW_DISTANCE_MAX)}
             ${shadowRow("studio-shadow-opacity", "그림자 투명도", 100)}
+            </div>
             <div class="studio__field">
               <label for="studio-shape-blend">블렌딩</label>
               <select id="studio-shape-blend" class="studio__control">${SHAPE_BLENDS.map((blend) => `<option value="${blend}">${BLEND_LABELS[blend]}</option>`).join("")}</select>
             </div>
-            <div class="studio__field">
-              <span id="studio-layer-blur-label">레이어 블러</span>
-              <div class="studio__dual" role="group" aria-labelledby="studio-layer-blur-label">
-                <div class="studio__dual-ends">
-                  <label>왼쪽 <input id="studio-blur-from-number" class="studio__control studio__control--number" type="number" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="왼쪽 블러 수치" /></label>
-                  <label>오른쪽 <input id="studio-blur-to-number" class="studio__control studio__control--number" type="number" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="오른쪽 블러 수치" /></label>
-                </div>
-                <div class="studio__dual-range">
-                  <div class="studio__dual-track"></div>
-                  <input id="studio-blur-from" type="range" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="왼쪽 블러" />
-                  <input id="studio-blur-to" type="range" min="0" max="${LAYER_BLUR_MAX}" step="1" value="0" aria-label="오른쪽 블러" />
-                </div>
-              </div>
-            </div>
           </div>
           <div id="studio-line-fields" hidden>
+            <div class="studio__sliders">
             <div class="studio__field">
               <label for="studio-line-width">선 두께</label>
               <div class="studio__radius">
@@ -1195,6 +1513,10 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
                 ${stepButtons("선 두께")}
                 <input id="studio-line-width-number" class="studio__control studio__control--number" type="number" min="${LINE_WIDTH_MIN}" max="${LINE_WIDTH_MAX}" step="1" value="${LINE_WIDTH_DEFAULT}" aria-label="선 두께 수치" />
               </div>
+            </div>
+            ${shadowRow("studio-line-fade", "전체 페이드", 100)}
+            ${shadowRow("studio-line-fade-start", "왼쪽 페이드", 100)}
+            ${shadowRow("studio-line-fade-end", "오른쪽 페이드", 100)}
             </div>
             <div class="studio__field">
               <span id="studio-line-cap-label">선 끝</span>
@@ -1243,7 +1565,8 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               </div>
             </div>
           </div>
-          <div class="studio__field">
+          <div class="studio__sliders">
+          <div class="studio__field studio__field--span">
             <label for="studio-size">너비·높이 함께</label>
             <div class="studio__radius">
               <input id="studio-size" type="range" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardWidth}" />
@@ -1267,6 +1590,8 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               <input id="studio-height-number" class="studio__control studio__control--number" type="number" min="${CARD_MIN}" max="${CARD_MAX}" step="1" value="${state.cardHeight}" aria-label="카드 높이 수치" />
             </div>
           </div>
+          </div>
+          <div id="studio-text-fields" hidden>
           <div class="studio__field" id="studio-font-scale-field" hidden>
             <label for="studio-font-scale">폰트 크기 함께</label>
             <div class="studio__radius">
@@ -1275,6 +1600,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               <input id="studio-font-scale-number" class="studio__control studio__control--number" type="number" min="5" max="${fontMax}" step="1" value="${Math.max(title.size, body.size)}" aria-label="폰트 크기 함께 수치" />
             </div>
           </div>
+          <div id="studio-title-fields" hidden>
           <div class="studio__field">
             <label for="studio-title">카드 타이틀</label>
             <input id="studio-title" class="studio__control" type="text" value="${escapeHtml(title.text)}" placeholder="타이틀" />
@@ -1303,6 +1629,15 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
             <select id="studio-title-weight" class="studio__control">${weightOptions(title.weight)}</select>
           </div>
           ${textStyleControls("title", "타이틀", title)}
+          ${textBlendField("title", "타이틀", title)}
+          <div class="studio__sliders">
+          ${shadowRow("studio-title-shadow-size", "타이틀 그림자 크기", SHADOW_SIZE_MAX)}
+          ${shadowRow("studio-title-shadow-blur", "타이틀 그림자 블러", SHADOW_BLUR_MAX)}
+          ${shadowRow("studio-title-shadow-distance", "타이틀 그림자 거리", SHADOW_DISTANCE_MAX)}
+          ${shadowRow("studio-title-shadow-opacity", "타이틀 그림자 투명도", 100)}
+          </div>
+          </div>
+          <div id="studio-body-fields" hidden>
           <div class="studio__field">
             <label for="studio-body">본문</label>
             <textarea id="studio-body" class="studio__control studio__control--area" placeholder="본문">${escapeHtml(body.text)}</textarea>
@@ -1331,10 +1666,29 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
             <select id="studio-body-weight" class="studio__control">${weightOptions(body.weight)}</select>
           </div>
           ${textStyleControls("body", "본문", body)}
-          <p class="studio__hint">프리뷰에서 타이틀과 본문을 드래그해 옮기고, 더블 클릭(탭)해 바로 수정할 수 있습니다.</p>
+          ${textBlendField("body", "본문", body)}
+          <div class="studio__sliders">
+          ${shadowRow("studio-body-shadow-size", "본문 그림자 크기", SHADOW_SIZE_MAX)}
+          ${shadowRow("studio-body-shadow-blur", "본문 그림자 블러", SHADOW_BLUR_MAX)}
+          ${shadowRow("studio-body-shadow-distance", "본문 그림자 거리", SHADOW_DISTANCE_MAX)}
+          ${shadowRow("studio-body-shadow-opacity", "본문 그림자 투명도", 100)}
+          </div>
+          </div>
+          <p class="studio__hint">프리뷰에서 텍스트를 드래그해 옮기고, 더블 클릭(탭)해 바로 수정할 수 있습니다.</p>
+          </div>
           <div id="studio-sources">${themes}</div>
-          <input type="file" id="studio-theme-file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden />${logoColorField}
-          <div class="studio__field">
+          <input type="file" id="studio-theme-file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" multiple hidden />
+          <div id="studio-image-fields" hidden>${logoColorField}
+          <div id="studio-image-adjust" hidden>
+          <div class="studio__sliders">
+          ${signedRow("studio-image-brightness", "밝기", -IMAGE_TONE_LIMIT, IMAGE_TONE_LIMIT)}
+          ${signedRow("studio-image-contrast", "콘트라스트", -IMAGE_TONE_LIMIT, IMAGE_TONE_LIMIT)}
+          ${signedRow("studio-image-saturation", "채도", -IMAGE_TONE_LIMIT, IMAGE_TONE_LIMIT)}
+          ${signedRow("studio-image-hue", "색조", -IMAGE_HUE_LIMIT, IMAGE_HUE_LIMIT)}
+          </div>
+          </div>
+          <div class="studio__sliders">
+          <div class="studio__field studio__field--span">
             <label for="studio-image-width">카드 이미지 크기</label>
             <div class="studio__radius">
               <input id="studio-image-width" type="range" min="${IMAGE_MIN}" max="${IMAGE_MAX}" step="1" value="${image.width}" />
@@ -1350,7 +1704,19 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               <input id="studio-image-radius-number" class="studio__control studio__control--number" type="number" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${image.radius}" aria-label="이미지 radius 수치" />
             </div>
           </div>
-          <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮기고, 핀치하거나 클릭 후 가장자리 핸들을 끌어 크기를 조절할 수 있습니다.</p>
+          ${shadowRow("studio-image-opacity", "이미지 투명도", 100, 100)}
+          ${shadowRow("studio-image-blur", "레이어 블러", LAYER_BLUR_MAX)}
+          ${shadowRow("studio-image-blur-bottom", "하단 블러", LAYER_BLUR_MAX)}
+          </div>
+          ${imageBlendField(image)}
+          <div class="studio__sliders">
+          ${shadowRow("studio-image-shadow-size", "이미지 그림자 크기", SHADOW_SIZE_MAX)}
+          ${shadowRow("studio-image-shadow-blur", "이미지 그림자 블러", SHADOW_BLUR_MAX)}
+          ${shadowRow("studio-image-shadow-distance", "이미지 그림자 거리", SHADOW_DISTANCE_MAX)}
+          ${shadowRow("studio-image-shadow-opacity", "이미지 그림자 투명도", 100)}
+          </div>
+          <p class="studio__hint">프리뷰에서 이미지를 드래그해 옮기고, 핀치하거나 가장자리 핸들로 크기를 조절합니다. 더블 클릭하면 밝기·콘트라스트·채도·색조를 수정할 수 있습니다.</p>
+          </div>
           <div class="studio__field">
             <label for="studio-color">카드 컬러</label>
             <div class="studio__color">
@@ -1391,6 +1757,8 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
           ${LAYER_ALIGNS.map(layerAlignButton).join("")}
           <span class="studio__align-divider" aria-hidden="true"></span>
           ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
+          <span class="studio__align-divider" id="studio-image-adjust-divider" hidden></span>
+          <button type="button" class="studio__zoom-btn" id="studio-image-adjust-btn" aria-label="이미지 수정" title="이미지 수정" aria-pressed="false" hidden><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg></button>
         </div>
         <div class="studio__stage" id="studio-stage">
           <p class="studio__loading" id="studio-loading" role="status" hidden>이미지를 로딩중입니다...</p>
@@ -1413,14 +1781,18 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
                 <span class="studio__handle" data-line-end="end" hidden></span>
                 <div class="studio__pen-handles" id="studio-pen-handles"></div>
                 <div class="studio__select-frame studio__crop-frame" id="studio-crop-frame" hidden></div>
+                <div class="studio__marquee" id="studio-marquee" hidden></div>
                 ${["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((edge) => `<span class="studio__handle studio__handle--crop" data-crop="${edge}" hidden></span>`).join("")}
                 <textarea class="studio__editor" id="studio-editor" rows="1" spellcheck="false" aria-label="텍스트 편집" hidden></textarea>
               </div>
             </div>
           </div>
+          ${speakerNav}
         </div>
+        ${speakerOrder}
         <div class="studio__bar">
           <p class="studio__meta" id="studio-meta" aria-live="polite"></p>
+          ${speakerCount}
           <div class="studio__bar-actions">
             <div class="studio__history" role="group" aria-label="편집 기록">
               <button type="button" class="studio__zoom-btn" id="studio-undo" aria-label="이전 동작" disabled>${undoIcon}</button>
@@ -1433,6 +1805,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               <button type="button" class="studio__zoom-btn studio__zoom-btn--text" id="studio-zoom-fit" aria-label="프리뷰에 맞춤">Fit</button>
             </div>
             ${conferenceActions}
+            <button type="button" class="button button--secondary" id="studio-pdf" title="카드 이미지를 PDF로 받습니다.">PDF 다운로드</button>
             <button type="button" class="button" id="studio-download">PNG 다운로드</button>
           </div>
         </div>
@@ -1477,6 +1850,10 @@ export function bindStudio(
   const titleColorInput = root.querySelector<HTMLInputElement>("#studio-title-color");
   const titleHexInput = root.querySelector<HTMLInputElement>("#studio-title-hex");
   const fontScaleField = root.querySelector<HTMLElement>("#studio-font-scale-field");
+  const textFields = root.querySelector<HTMLElement>("#studio-text-fields");
+  const titleFields = root.querySelector<HTMLElement>("#studio-title-fields");
+  const bodyFields = root.querySelector<HTMLElement>("#studio-body-fields");
+  const imageFields = root.querySelector<HTMLElement>("#studio-image-fields");
   const fontScaleRange = root.querySelector<HTMLInputElement>("#studio-font-scale");
   const fontScaleNumber = root.querySelector<HTMLInputElement>("#studio-font-scale-number");
   const titleSizeRange = root.querySelector<HTMLInputElement>("#studio-title-size");
@@ -1490,10 +1867,25 @@ export function bindStudio(
   const bodyFontSelect = root.querySelector<HTMLSelectElement>("#studio-body-font");
   const titleWeightSelect = root.querySelector<HTMLSelectElement>("#studio-title-weight");
   const bodyWeightSelect = root.querySelector<HTMLSelectElement>("#studio-body-weight");
+  const titleBlendSelect = root.querySelector<HTMLSelectElement>("#studio-title-blend");
+  const bodyBlendSelect = root.querySelector<HTMLSelectElement>("#studio-body-blend");
+  const textShadowKeys = ["size", "blur", "distance", "opacity"] as const;
+  const textShadowMax = { size: SHADOW_SIZE_MAX, blur: SHADOW_BLUR_MAX, distance: SHADOW_DISTANCE_MAX, opacity: 100 };
+  const textShadows = (["title", "body"] as const).flatMap((kind) => textShadowKeys.map((key) => {
+    const range = root.querySelector<HTMLInputElement>(`#studio-${kind}-shadow-${key}`);
+    const number = root.querySelector<HTMLInputElement>(`#studio-${kind}-shadow-${key}-number`);
+    return range && number ? { kind, key, range, number, max: textShadowMax[key] } : null;
+  }));
   const imageRange = root.querySelector<HTMLInputElement>("#studio-image-width");
   const imageNumber = root.querySelector<HTMLInputElement>("#studio-image-width-number");
   const imageRadiusRange = root.querySelector<HTMLInputElement>("#studio-image-radius");
   const imageRadiusNumber = root.querySelector<HTMLInputElement>("#studio-image-radius-number");
+  const imageBlendSelect = root.querySelector<HTMLSelectElement>("#studio-image-blend");
+  const imageShadows = textShadowKeys.map((key) => {
+    const range = root.querySelector<HTMLInputElement>(`#studio-image-shadow-${key}`);
+    const number = root.querySelector<HTMLInputElement>(`#studio-image-shadow-${key}-number`);
+    return range && number ? { key, range, number, max: textShadowMax[key] } : null;
+  });
   const shapeSizeField = root.querySelector<HTMLElement>("#studio-shape-size-field");
   const shapeSizeRange = root.querySelector<HTMLInputElement>("#studio-shape-size");
   const shapeSizeNumber = root.querySelector<HTMLInputElement>("#studio-shape-size-number");
@@ -1520,15 +1912,40 @@ export function bindStudio(
   const strokeColorInput = root.querySelector<HTMLInputElement>("#studio-stroke-color");
   const strokeHexInput = root.querySelector<HTMLInputElement>("#studio-stroke-hex");
   const shapeBlendSelect = root.querySelector<HTMLSelectElement>("#studio-shape-blend");
-  const blurFromRange = root.querySelector<HTMLInputElement>("#studio-blur-from");
-  const blurFromNumber = root.querySelector<HTMLInputElement>("#studio-blur-from-number");
-  const blurToRange = root.querySelector<HTMLInputElement>("#studio-blur-to");
-  const blurToNumber = root.querySelector<HTMLInputElement>("#studio-blur-to-number");
+  const shapeOpacityRange = root.querySelector<HTMLInputElement>("#studio-shape-opacity");
+  const shapeOpacityNumber = root.querySelector<HTMLInputElement>("#studio-shape-opacity-number");
+  const shapeBlurRange = root.querySelector<HTMLInputElement>("#studio-shape-blur");
+  const shapeBlurNumber = root.querySelector<HTMLInputElement>("#studio-shape-blur-number");
+  const shapeBlurBottomRange = root.querySelector<HTMLInputElement>("#studio-shape-blur-bottom");
+  const shapeBlurBottomNumber = root.querySelector<HTMLInputElement>("#studio-shape-blur-bottom-number");
+  const imageOpacityRange = root.querySelector<HTMLInputElement>("#studio-image-opacity");
+  const imageOpacityNumber = root.querySelector<HTMLInputElement>("#studio-image-opacity-number");
+  const imageBlurRange = root.querySelector<HTMLInputElement>("#studio-image-blur");
+  const imageBlurNumber = root.querySelector<HTMLInputElement>("#studio-image-blur-number");
+  const imageBlurBottomRange = root.querySelector<HTMLInputElement>("#studio-image-blur-bottom");
+  const imageBlurBottomNumber = root.querySelector<HTMLInputElement>("#studio-image-blur-bottom-number");
+  const imageAdjustFields = root.querySelector<HTMLElement>("#studio-image-adjust");
+  const imageAdjustButton = root.querySelector<HTMLButtonElement>("#studio-image-adjust-btn");
+  const imageAdjustDivider = root.querySelector<HTMLElement>("#studio-image-adjust-divider");
+  const imageBrightnessRange = root.querySelector<HTMLInputElement>("#studio-image-brightness");
+  const imageBrightnessNumber = root.querySelector<HTMLInputElement>("#studio-image-brightness-number");
+  const imageContrastRange = root.querySelector<HTMLInputElement>("#studio-image-contrast");
+  const imageContrastNumber = root.querySelector<HTMLInputElement>("#studio-image-contrast-number");
+  const imageSaturationRange = root.querySelector<HTMLInputElement>("#studio-image-saturation");
+  const imageSaturationNumber = root.querySelector<HTMLInputElement>("#studio-image-saturation-number");
+  const imageHueRange = root.querySelector<HTMLInputElement>("#studio-image-hue");
+  const imageHueNumber = root.querySelector<HTMLInputElement>("#studio-image-hue-number");
   const lineFields = root.querySelector<HTMLElement>("#studio-line-fields");
   const lineWidthRange = root.querySelector<HTMLInputElement>("#studio-line-width");
   const lineWidthNumber = root.querySelector<HTMLInputElement>("#studio-line-width-number");
   const lineColorInput = root.querySelector<HTMLInputElement>("#studio-line-color");
   const lineHexInput = root.querySelector<HTMLInputElement>("#studio-line-hex");
+  const lineFadeRange = root.querySelector<HTMLInputElement>("#studio-line-fade");
+  const lineFadeNumber = root.querySelector<HTMLInputElement>("#studio-line-fade-number");
+  const lineFadeStartRange = root.querySelector<HTMLInputElement>("#studio-line-fade-start");
+  const lineFadeStartNumber = root.querySelector<HTMLInputElement>("#studio-line-fade-start-number");
+  const lineFadeEndRange = root.querySelector<HTMLInputElement>("#studio-line-fade-end");
+  const lineFadeEndNumber = root.querySelector<HTMLInputElement>("#studio-line-fade-end-number");
   const penFields = root.querySelector<HTMLElement>("#studio-pen-fields");
   const penWidthRange = root.querySelector<HTMLInputElement>("#studio-pen-width");
   const penWidthNumber = root.querySelector<HTMLInputElement>("#studio-pen-width-number");
@@ -1566,12 +1983,14 @@ export function bindStudio(
   const studio = root.querySelector<HTMLElement>(".studio");
   const overlay = root.querySelector<HTMLElement>("#studio-overlay");
   const cropFrame = root.querySelector<HTMLElement>("#studio-crop-frame");
+  const marqueeEl = root.querySelector<HTMLElement>("#studio-marquee");
   const editor = root.querySelector<HTMLTextAreaElement>("#studio-editor");
   const handles = [...root.querySelectorAll<HTMLElement>(".studio__handle[data-handle]")];
   const cropHandles = [...root.querySelectorAll<HTMLElement>(".studio__handle[data-crop]")];
   if (
     !overlay ||
     !cropFrame ||
+    !marqueeEl ||
     !editor ||
     !sizeRange ||
     !sizeNumber ||
@@ -1583,6 +2002,10 @@ export function bindStudio(
     !titleColorInput ||
     !titleHexInput ||
     !fontScaleField ||
+    !textFields ||
+    !titleFields ||
+    !bodyFields ||
+    !imageFields ||
     !fontScaleRange ||
     !fontScaleNumber ||
     !titleSizeRange ||
@@ -1596,10 +2019,15 @@ export function bindStudio(
     !bodyFontSelect ||
     !titleWeightSelect ||
     !bodyWeightSelect ||
+    !titleBlendSelect ||
+    !bodyBlendSelect ||
+    textShadows.some((item) => !item) ||
     !imageRange ||
     !imageNumber ||
     !imageRadiusRange ||
     !imageRadiusNumber ||
+    !imageBlendSelect ||
+    imageShadows.some((item) => !item) ||
     !shapeSizeField ||
     !shapeSizeRange ||
     !shapeSizeNumber ||
@@ -1626,15 +2054,40 @@ export function bindStudio(
     !strokeColorInput ||
     !strokeHexInput ||
     !shapeBlendSelect ||
-    !blurFromRange ||
-    !blurFromNumber ||
-    !blurToRange ||
-    !blurToNumber ||
+    !shapeOpacityRange ||
+    !shapeOpacityNumber ||
+    !shapeBlurRange ||
+    !shapeBlurNumber ||
+    !shapeBlurBottomRange ||
+    !shapeBlurBottomNumber ||
+    !imageOpacityRange ||
+    !imageOpacityNumber ||
+    !imageBlurRange ||
+    !imageBlurNumber ||
+    !imageBlurBottomRange ||
+    !imageBlurBottomNumber ||
+    !imageAdjustFields ||
+    !imageAdjustButton ||
+    !imageAdjustDivider ||
+    !imageBrightnessRange ||
+    !imageBrightnessNumber ||
+    !imageContrastRange ||
+    !imageContrastNumber ||
+    !imageSaturationRange ||
+    !imageSaturationNumber ||
+    !imageHueRange ||
+    !imageHueNumber ||
     !lineFields ||
     !lineWidthRange ||
     !lineWidthNumber ||
     !lineColorInput ||
     !lineHexInput ||
+    !lineFadeRange ||
+    !lineFadeNumber ||
+    !lineFadeStartRange ||
+    !lineFadeStartNumber ||
+    !lineFadeEndRange ||
+    !lineFadeEndNumber ||
     !penFields ||
     !penWidthRange ||
     !penWidthNumber ||
@@ -1674,11 +2127,122 @@ export function bindStudio(
     return;
   }
 
+  const speakerSources = () => {
+    const srcs = [...(config.conference?.speakers ?? [])].map((item) => conferenceSrc(item)).sort((a, b) => a.localeCompare(b, "en"));
+    return applySpeakerOrder(srcs, readInstagramOrder());
+  };
+  const orderList = root.querySelector<HTMLElement>("#studio-speaker-order-list");
+  let orderDrag: { pointerId: number; node: HTMLElement; moved: boolean; startX: number } | null = null;
+  const speakerCardLabel = (slide: StudioState, src: string) => {
+    const layer = slide.layers.find((item) => item.kind === "body" && item.text.trim());
+    if (layer?.kind === "body") return layer.text.trim().replace(/\s+/g, " ");
+    return sources.find((item) => item.src === src)?.label || "카드";
+  };
+  const renderSpeakerOrder = () => {
+    if (!(orderList instanceof HTMLElement) || !speakerDeck) return;
+    const srcs = speakerDeck.srcs;
+    const same =
+      orderList.childElementCount === srcs.length &&
+      [...orderList.children].every((node, index) => node instanceof HTMLElement && node.dataset.src === srcs[index]);
+    if (!same && orderDrag) return;
+    if (!same) {
+      orderList.innerHTML = srcs
+        .map((src) => {
+          const thumb = sources.find((item) => item.src === src)?.thumb ?? "";
+          return `<button type="button" class="studio__order-card" data-src="${escapeHtml(src)}" draggable="false"><span class="studio__order-index"></span><img src="${escapeHtml(thumb)}" alt="" draggable="false" /><span class="studio__order-name"></span></button>`;
+        })
+        .join("");
+    }
+    [...orderList.children].forEach((node, index) => {
+      if (!(node instanceof HTMLElement)) return;
+      const src = srcs[index] ?? "";
+      const slide = index === speakerDeck!.index ? state : speakerDeck!.slides[index];
+      const label = slide ? speakerCardLabel(slide, src) : "";
+      const indexLabel = node.querySelector(".studio__order-index");
+      const caption = node.querySelector(".studio__order-name");
+      if (indexLabel) indexLabel.textContent = String(index + 1);
+      if (caption && caption.textContent !== label) caption.textContent = label;
+      node.title = "드래그하면 순서가 바뀝니다";
+      node.setAttribute("aria-current", index === speakerDeck!.index ? "true" : "false");
+      node.setAttribute("aria-label", `${index + 1}번째 카드, ${label}. 드래그하면 순서가 바뀝니다.`);
+    });
+  };
+  const labelSpeaker = () => {
+    const label = root.querySelector("#studio-speaker-count");
+    if (label instanceof HTMLElement && speakerDeck) label.textContent = `${speakerDeck.index + 1} / ${speakerDeck.slides.length}`;
+    renderSpeakerOrder();
+  };
+  const placeSpeaker = (from: number, to: number) => {
+    if (!speakerDeck || !(orderList instanceof HTMLElement)) return;
+    if (from === to || from < 0 || to < 0 || from >= speakerDeck.srcs.length || to >= speakerDeck.srcs.length) return;
+    speakerDeck.slides[speakerDeck.index] = cloneStudio(state);
+    const current = speakerDeck.srcs[speakerDeck.index] ?? "";
+    const [src] = speakerDeck.srcs.splice(from, 1);
+    const [slide] = speakerDeck.slides.splice(from, 1);
+    if (!src || !slide) return;
+    speakerDeck.srcs.splice(to, 0, src);
+    speakerDeck.slides.splice(to, 0, slide);
+    const nextIndex = speakerDeck.srcs.indexOf(current);
+    speakerDeck.index = nextIndex < 0 ? 0 : nextIndex;
+    const cards = [...orderList.children];
+    const node = cards[from];
+    if (node instanceof HTMLElement) orderList.insertBefore(node, to > from ? (cards[to + 1] ?? null) : (cards[to] ?? null));
+    labelSpeaker();
+  };
+  const syncSpeakerDeck = () => {
+    if (config.id !== "conference" || state.presetId !== DEFAULT_CONFERENCE_PRESET_ID) return;
+    const srcs = speakerSources();
+    if (srcs.length < 2) return;
+    if (!speakerDeck) {
+      const stored = readStoredConferenceBaseline(DEFAULT_CONFERENCE_PRESET_ID);
+      const saved: Record<string, StudioState | null> = {};
+      for (const src of srcs) saved[src] = readInstagramCard(src);
+      const built = instagramDeck(stored ?? cloneStudio(state), srcs, saved);
+      speakerDeck = { ...built, srcs };
+      speakerDeckMode = "keep";
+      replaceStudio(state, speakerDeck.slides[speakerDeck.index]!);
+    } else if (speakerDeckMode === "apply") {
+      replaceStudio(state, speakerDeck.slides[speakerDeck.index]!);
+      speakerDeckMode = "keep";
+    } else if (speakerDeckMode === "reset") {
+      const src = speakerDeck.srcs[speakerDeck.index] ?? srcs[speakerDeck.index];
+      if (src) {
+        const next = replaceSpeakerSrc(state, src);
+        speakerDeck.slides[speakerDeck.index] = next;
+        replaceStudio(state, next);
+      }
+      speakerDeckMode = "keep";
+    } else {
+      speakerDeck.slides[speakerDeck.index] = cloneStudio(state);
+    }
+    labelSpeaker();
+  };
+  syncSpeakerDeck();
+
   let dropper = false;
   let blockPresetClick = false;
   let penMode = false;
   let penEdit: { id: string; snapshot: PenAnchor[] | null; box: { x: number; y: number; width: number; height: number } | null; active: number | null } | null = null;
-  let penDraft: { points: PenAnchor[]; hover: { x: number; y: number } | null; pointerId: number | null; dragging: number | null; closing: boolean } | null = null;
+  let penDraft: {
+    points: PenAnchor[];
+    hover: { x: number; y: number } | null;
+    pointerId: number | null;
+    dragging: number | null;
+    closing: boolean;
+    /** Axis locked by Shift for the current segment. Cleared when Shift is released. */
+    axis: ShiftAxis | null;
+    cursor: { x: number; y: number } | null;
+    /** Card point where the last click ended, so the next segment does not inherit that offset. */
+    aimFrom: { x: number; y: number } | null;
+  } | null = null;
+  /** The line endpoint currently being aimed, so Shift can snap it without another move. */
+  let lineAim: {
+    id: string;
+    start: boolean;
+    fixed: { x: number; y: number };
+    axis: ShiftAxis | null;
+    raw: { x: number; y: number };
+  } | null = null;
   const setDropper = (on: boolean) => {
     dropper = on;
     if (on) studio.dataset.dropper = "true";
@@ -1791,9 +2355,11 @@ export function bindStudio(
     const image = imageCache.get(url);
     return Boolean(image?.complete && image.naturalWidth > 0);
   };
+  let holdSlide = false;
   const setImageLoading = (on: boolean) => {
-    imageLoading.hidden = !on;
-    if (on) stage.dataset.loading = "true";
+    const show = on && !holdSlide;
+    imageLoading.hidden = !show;
+    if (show) stage.dataset.loading = "true";
     else delete stage.dataset.loading;
   };
   const hasImage = () => imageLayers().some((layer) => imageOf(layer));
@@ -1962,6 +2528,10 @@ export function bindStudio(
     writeControl(heightRange, heightNumber, state.cardHeight);
     writeControl(titleSizeRange, titleSizeNumber, title.size);
     writeControl(bodySizeRange, bodySizeNumber, body.size);
+    for (const control of textShadows) {
+      if (!control) continue;
+      writeControl(control.range, control.number, shapeShadow(panelText(control.kind))[control.key]);
+    }
     const selectedSizes = selectedLayers().filter(isTextLayer).map((layer) => layer.size);
     const fontScale = selectedSizes.length > 0 ? Math.max(...selectedSizes) : FONT_MIN;
     const fontScaleMax = String(Math.max(fontCap, fontScale));
@@ -1972,6 +2542,18 @@ export function bindStudio(
     writeControl(fontScaleRange, fontScaleNumber, fontScale);
     writeControl(imageRange, imageNumber, panelImage().width);
     writeControl(imageRadiusRange, imageRadiusNumber, panelImage().radius);
+    writeControl(imageOpacityRange, imageOpacityNumber, layerOpacity(panelImage()));
+    writeControl(imageBlurRange, imageBlurNumber, imageBlur(panelImage()));
+    writeControl(imageBlurBottomRange, imageBlurBottomNumber, layerBlurBottom(panelImage()));
+    const adjust = imageAdjust(panelImage());
+    writeControl(imageBrightnessRange, imageBrightnessNumber, adjust.brightness);
+    writeControl(imageContrastRange, imageContrastNumber, adjust.contrast);
+    writeControl(imageSaturationRange, imageSaturationNumber, adjust.saturation);
+    writeControl(imageHueRange, imageHueNumber, adjust.hue);
+    for (const control of imageShadows) {
+      if (!control) continue;
+      writeControl(control.range, control.number, shapeShadow(panelImage())[control.key]);
+    }
     const shape = panelShape();
     if (shape) {
       const shadow = shapeShadow(shape);
@@ -1984,11 +2566,18 @@ export function bindStudio(
       writeControl(shadowOpacityRange, shadowOpacityNumber, shadow.opacity);
       writeControl(strokeWidthRange, strokeWidthNumber, stroke.width);
       writeControl(strokeOpacityRange, strokeOpacityNumber, stroke.opacity);
-      writeControl(blurFromRange, blurFromNumber, clampUnit(shape.blurFrom ?? 0, LAYER_BLUR_MAX));
-      writeControl(blurToRange, blurToNumber, clampUnit(shape.blurTo ?? 0, LAYER_BLUR_MAX));
+      writeControl(shapeOpacityRange, shapeOpacityNumber, layerOpacity(shape));
+      writeControl(shapeBlurRange, shapeBlurNumber, Math.round((clampUnit(shape.blurFrom ?? 0, LAYER_BLUR_MAX) + clampUnit(shape.blurTo ?? 0, LAYER_BLUR_MAX)) / 2));
+      writeControl(shapeBlurBottomRange, shapeBlurBottomNumber, layerBlurBottom(shape));
     }
     const line = panelLine();
-    if (line) writeControl(lineWidthRange, lineWidthNumber, line.stroke);
+    if (line) {
+      const fade = lineFade(line);
+      writeControl(lineWidthRange, lineWidthNumber, line.stroke);
+      writeControl(lineFadeRange, lineFadeNumber, fade.start === fade.end ? fade.start : Math.round((fade.start + fade.end) / 2));
+      writeControl(lineFadeStartRange, lineFadeStartNumber, fade.start);
+      writeControl(lineFadeEndRange, lineFadeEndNumber, fade.end);
+    }
     const pen = panelPen();
     if (pen) writeControl(penWidthRange, penWidthNumber, pen.strokeWidth);
     imageRadiusRange.setAttribute("aria-valuenow", String(panelImage().radius));
@@ -2071,6 +2660,20 @@ export function bindStudio(
     }
   };
 
+  let imageAdjustOpen = false;
+  const adjustTarget = (): ImageLayer | null => {
+    const images = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image");
+    return images.at(-1) ?? null;
+  };
+  const openImageAdjust = () => {
+    if (!adjustTarget() || state.code.trim()) return;
+    imageAdjustOpen = true;
+    syncForm();
+    syncSizeControls();
+    imageAdjustFields.scrollIntoView({ block: "nearest" });
+    paint();
+  };
+
   const syncForm = () => {
     const title = panelText("title");
     const body = panelText("body");
@@ -2079,7 +2682,15 @@ export function bindStudio(
       button.setAttribute("aria-checked", selected ? "true" : "false");
       button.tabIndex = selected ? 0 : -1;
     }
-    fontScaleField.hidden = selectedLayers().filter(isTextLayer).length < 2;
+    const texts = selectedLayers().filter(isTextLayer);
+    textFields.hidden = texts.length === 0;
+    titleFields.hidden = !texts.some((layer) => layer.kind === "title");
+    bodyFields.hidden = !texts.some((layer) => layer.kind === "body");
+    const imageSelected = selectedLayers().some((layer) => layer.kind === "image");
+    if (!imageSelected) imageAdjustOpen = false;
+    imageFields.hidden = !imageSelected;
+    imageAdjustFields.hidden = !imageAdjustOpen;
+    fontScaleField.hidden = texts.length < 2;
     if (document.activeElement !== titleInput) titleInput.value = title.text;
     if (document.activeElement !== bodyInput) bodyInput.value = body.text;
     if (document.activeElement !== titleHexInput) {
@@ -2098,6 +2709,9 @@ export function bindStudio(
     bodyFontSelect.value = body.fontId;
     titleWeightSelect.value = String(title.weight);
     bodyWeightSelect.value = String(body.weight);
+    titleBlendSelect.value = textBlend(title);
+    bodyBlendSelect.value = textBlend(body);
+    imageBlendSelect.value = imageBlend(panelImage());
     for (const button of root.querySelectorAll<HTMLButtonElement>("[data-text-kind]")) {
       const layer = button.dataset.textKind === "title" ? title : body;
       const style = button.dataset.textStyle as TextToggle | undefined;
@@ -2257,6 +2871,12 @@ export function bindStudio(
 
   const pickPreset = (button: HTMLButtonElement) => {
     const preset = presetOf(button.dataset.presetId ?? "");
+    const onInstagram = state.presetId === DEFAULT_CONFERENCE_PRESET_ID;
+    const toInstagram = preset.id === DEFAULT_CONFERENCE_PRESET_ID;
+    if (speakerDeck && onInstagram && !toInstagram) speakerDeck.slides[speakerDeck.index] = cloneStudio(state);
+    if (speakerDeck && toInstagram && !onInstagram) speakerDeckMode = "apply";
+    else if (speakerDeck && toInstagram && onInstagram) speakerDeckMode = "reset";
+    else speakerDeckMode = "keep";
     if (recordChange(() => actions.onLoadPreset(preset.id))) {
       document.querySelector<HTMLButtonElement>(`[data-preset-id="${preset.id}"]`)?.focus();
       return;
@@ -2390,24 +3010,97 @@ export function bindStudio(
     const layer = panelShape();
     if (layer) withStroke(layer, { opacity: clampUnit(value, 100) });
   }, () => (panelShape() ? shapeStroke(panelShape()!).opacity : 100));
-  bindPair(blurFromRange, blurFromNumber, (value) => {
+  bindPair(shapeOpacityRange, shapeOpacityNumber, (value) => {
     const layer = panelShape();
-    if (layer) layer.blurFrom = clampUnit(value, LAYER_BLUR_MAX);
-  }, () => clampUnit(panelShape()?.blurFrom ?? 0, LAYER_BLUR_MAX));
-  bindPair(blurToRange, blurToNumber, (value) => {
+    if (!layer) return;
+    const opacity = clampUnit(value, 100);
+    if (opacity >= 100) delete layer.opacity;
+    else layer.opacity = opacity;
+  }, () => layerOpacity(panelShape() ?? { opacity: 100 }));
+  bindPair(shapeBlurRange, shapeBlurNumber, (value) => {
     const layer = panelShape();
-    if (layer) layer.blurTo = clampUnit(value, LAYER_BLUR_MAX);
-  }, () => clampUnit(panelShape()?.blurTo ?? 0, LAYER_BLUR_MAX));
-  for (const range of [blurFromRange, blurToRange]) {
-    range.addEventListener("pointerdown", () => {
-      range.style.zIndex = "2";
-      (range === blurFromRange ? blurToRange : blurFromRange).style.zIndex = "1";
-    });
-  }
+    if (!layer) return;
+    const blur = clampUnit(value, LAYER_BLUR_MAX);
+    layer.blurFrom = blur;
+    layer.blurTo = blur;
+  }, () => {
+    const layer = panelShape();
+    if (!layer) return 0;
+    return Math.round((clampUnit(layer.blurFrom ?? 0, LAYER_BLUR_MAX) + clampUnit(layer.blurTo ?? 0, LAYER_BLUR_MAX)) / 2);
+  });
+  bindPair(shapeBlurBottomRange, shapeBlurBottomNumber, (value) => {
+    const layer = panelShape();
+    if (!layer) return;
+    const blur = clampUnit(value, LAYER_BLUR_MAX);
+    if (blur <= 0) delete layer.blurBottom;
+    else layer.blurBottom = blur;
+  }, () => layerBlurBottom(panelShape() ?? {}));
+  bindPair(imageOpacityRange, imageOpacityNumber, (value) => {
+    const layer = panelImage();
+    const opacity = clampUnit(value, 100);
+    if (opacity >= 100) delete layer.opacity;
+    else layer.opacity = opacity;
+  }, () => layerOpacity(panelImage()));
+  bindPair(imageBlurRange, imageBlurNumber, (value) => {
+    const layer = panelImage();
+    const blur = clampUnit(value, LAYER_BLUR_MAX);
+    if (blur <= 0) delete layer.blur;
+    else layer.blur = blur;
+  }, () => imageBlur(panelImage()));
+  bindPair(imageBlurBottomRange, imageBlurBottomNumber, (value) => {
+    const layer = panelImage();
+    const blur = clampUnit(value, LAYER_BLUR_MAX);
+    if (blur <= 0) delete layer.blurBottom;
+    else layer.blurBottom = blur;
+  }, () => layerBlurBottom(panelImage()));
+  const setImageAdjust = (key: "brightness" | "contrast" | "saturation" | "hue", value: number, limit: number) => {
+    const layer = adjustTarget() ?? panelImage();
+    if (layer.kind !== "image" || !selected.has(layer.id)) return;
+    const amount = clampSigned(value, limit);
+    if (amount === 0) delete layer[key];
+    else layer[key] = amount;
+  };
+  bindPair(imageBrightnessRange, imageBrightnessNumber, (value) => {
+    setImageAdjust("brightness", value, IMAGE_TONE_LIMIT);
+  }, () => imageAdjust(adjustTarget() ?? panelImage()).brightness);
+  bindPair(imageContrastRange, imageContrastNumber, (value) => {
+    setImageAdjust("contrast", value, IMAGE_TONE_LIMIT);
+  }, () => imageAdjust(adjustTarget() ?? panelImage()).contrast);
+  bindPair(imageSaturationRange, imageSaturationNumber, (value) => {
+    setImageAdjust("saturation", value, IMAGE_TONE_LIMIT);
+  }, () => imageAdjust(adjustTarget() ?? panelImage()).saturation);
+  bindPair(imageHueRange, imageHueNumber, (value) => {
+    setImageAdjust("hue", value, IMAGE_HUE_LIMIT);
+  }, () => imageAdjust(adjustTarget() ?? panelImage()).hue);
   bindPair(lineWidthRange, lineWidthNumber, (value) => {
     const layer = panelLine();
     if (layer) layer.stroke = Math.min(LINE_WIDTH_MAX, Math.max(LINE_WIDTH_MIN, Math.round(value)));
   }, () => panelLine()?.stroke ?? LINE_WIDTH_DEFAULT);
+  const setLineFade = (layer: LineLayer, key: "fadeStart" | "fadeEnd", value: number) => {
+    const amount = clampUnit(value, 100);
+    if (amount <= 0) delete layer[key];
+    else layer[key] = amount;
+  };
+  bindPair(lineFadeRange, lineFadeNumber, (value) => {
+    const layer = panelLine();
+    if (!layer) return;
+    const amount = clampUnit(value, 100);
+    setLineFade(layer, "fadeStart", amount);
+    setLineFade(layer, "fadeEnd", amount);
+  }, () => {
+    const layer = panelLine();
+    if (!layer) return 0;
+    const fade = lineFade(layer);
+    return fade.start === fade.end ? fade.start : Math.round((fade.start + fade.end) / 2);
+  });
+  bindPair(lineFadeStartRange, lineFadeStartNumber, (value) => {
+    const layer = panelLine();
+    if (layer) setLineFade(layer, "fadeStart", value);
+  }, () => (panelLine() ? lineFade(panelLine()!).start : 0));
+  bindPair(lineFadeEndRange, lineFadeEndNumber, (value) => {
+    const layer = panelLine();
+    if (layer) setLineFade(layer, "fadeEnd", value);
+  }, () => (panelLine() ? lineFade(panelLine()!).end : 0));
   bindPair(penWidthRange, penWidthNumber, (value) => {
     const layer = panelPen();
     if (layer) layer.strokeWidth = Math.min(LINE_WIDTH_MAX, Math.max(0, Math.round(value)));
@@ -2438,6 +3131,32 @@ export function bindStudio(
   bindSelect(bodyWeightSelect, () => {
     panelText("body").weight = Number(bodyWeightSelect.value);
   });
+  const bindTextBlend = (select: HTMLSelectElement, kind: TextKind) => {
+    bindSelect(select, () => {
+      const blend = SHAPE_BLENDS.find((item) => item === select.value);
+      if (blend) panelText(kind).blend = blend;
+    });
+  };
+  bindTextBlend(titleBlendSelect, "title");
+  bindTextBlend(bodyBlendSelect, "body");
+  bindSelect(imageBlendSelect, () => {
+    const blend = SHAPE_BLENDS.find((item) => item === imageBlendSelect.value);
+    if (blend) panelImage().blend = blend;
+  });
+  for (const control of imageShadows) {
+    if (!control) continue;
+    bindPair(control.range, control.number, (value) => {
+      const layer = panelImage();
+      layer.shadow = { ...shapeShadow(layer), [control.key]: clampUnit(value, control.max) };
+    }, () => shapeShadow(panelImage())[control.key]);
+  }
+  for (const control of textShadows) {
+    if (!control) continue;
+    bindPair(control.range, control.number, (value) => {
+      const layer = panelText(control.kind);
+      layer.shadow = { ...shapeShadow(layer), [control.key]: clampUnit(value, control.max) };
+    }, () => shapeShadow(panelText(control.kind))[control.key]);
+  }
   for (const button of root.querySelectorAll<HTMLButtonElement>("[data-text-kind]")) {
     button.addEventListener("click", () => {
       const layer = panelText(button.dataset.textKind === "body" ? "body" : "title");
@@ -2476,10 +3195,22 @@ export function bindStudio(
 
   root.querySelector("#studio-set-baseline")?.addEventListener("click", () => {
     void (async () => {
-      const ok = await confirmProceed("현재 레이아웃을 초기화 기준으로 세팅하고 진행하시겠습니까?");
+      const perCard = Boolean(speakerDeck && state.presetId === DEFAULT_CONFERENCE_PRESET_ID);
+      const ok = await confirmProceed(
+        perCard
+          ? "이 카드만 초기화 기준으로 세팅하고 진행하시겠습니까?"
+          : "현재 레이아웃을 초기화 기준으로 세팅하고 진행하시겠습니까?",
+      );
       if (!ok) return;
-      actions.onSetBaseline();
-      showToast("초기화로 세팅하였습니다.");
+      if (perCard && speakerDeck) {
+        const src = speakerDeck.srcs[speakerDeck.index] ?? speakerSrcOf(state);
+        const card = cloneStudio(state);
+        writeInstagramCard(src, card);
+        speakerDeck.slides[speakerDeck.index] = card;
+      } else {
+        actions.onSetBaseline();
+      }
+      showToast(perCard ? "이 카드를 초기화 기준으로 세팅하였습니다." : "초기화로 세팅하였습니다.");
     })();
   });
   root.querySelector("#studio-save-library")?.addEventListener("click", () => {
@@ -2491,7 +3222,22 @@ export function bindStudio(
     })();
   });
   root.querySelector("#studio-reset")?.addEventListener("click", () => {
+    const perCard = Boolean(speakerDeck && state.presetId === DEFAULT_CONFERENCE_PRESET_ID);
+    const src = perCard && speakerDeck ? speakerDeck.srcs[speakerDeck.index] ?? speakerSrcOf(state) : "";
+    const saved = src ? readInstagramCard(src) : null;
+    if (perCard && speakerDeck && saved) {
+      recordChange(() => {
+        const card = cloneStudio(saved);
+        speakerDeck!.slides[speakerDeck!.index] = card;
+        replaceStudio(state, card);
+        selected.clear();
+        void redraw();
+        return true;
+      });
+      return;
+    }
     recordChange(() => {
+      if (perCard) speakerDeckMode = "reset";
       actions.onReset();
       return true;
     });
@@ -2505,6 +3251,7 @@ export function bindStudio(
   bodyInput.addEventListener("focus", () => beginGesture(bodyInput));
   bodyInput.addEventListener("input", () => {
     panelText("body").text = bodyInput.value;
+    renderSpeakerOrder();
     void redraw();
   });
   bodyInput.addEventListener("blur", () => finishGesture(bodyInput));
@@ -2657,7 +3404,7 @@ export function bindStudio(
   codeInput.addEventListener("blur", () => finishGesture(codeInput));
 
   const applyHistory = (next: StudioState, zoom: number) => {
-    Object.assign(state, next);
+    assignStudio(state, next);
     previewZoom = zoom;
     syncHistoryButtons();
     void redraw();
@@ -2798,6 +3545,8 @@ export function bindStudio(
   const videoToggle = root.querySelector<HTMLButtonElement>("#studio-video-toggle");
   const printButton = root.querySelector<HTMLButtonElement>("#studio-print");
   const videoButton = root.querySelector<HTMLButtonElement>("#studio-video");
+  const gifButton = root.querySelector<HTMLButtonElement>("#studio-gif");
+  const pdfButton = root.querySelector<HTMLButtonElement>("#studio-pdf");
   const exportNote = root.querySelector<HTMLElement>("#studio-export-note");
   const tintField = root.querySelector<HTMLElement>("#studio-tint-field");
   const tintOriginal = root.querySelector<HTMLButtonElement>("#studio-tint-original");
@@ -2810,6 +3559,8 @@ export function bindStudio(
       : (["video/mp4;codecs=avc1", "video/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "");
 
   syncConference = () => {
+    const liveVideo = Boolean(config.conference && state.background?.mode === "video" && backgroundRecord()?.video && !state.code.trim());
+    if (pdfButton && exporting?.button !== pdfButton) pdfButton.hidden = liveVideo;
     if (!config.conference) return;
     const record = backgroundRecord();
     const codeMode = Boolean(state.code.trim());
@@ -2835,6 +3586,7 @@ export function bindStudio(
       videoButton.disabled = !mp4Type();
       videoButton.title = videoButton.disabled ? "이 브라우저는 MP4 녹화를 지원하지 않습니다. Chrome이나 Safari 최신 버전에서 열어 주세요." : "";
     }
+    if (gifButton && exporting?.button !== gifButton) gifButton.hidden = !video || codeMode;
     if (tintField && tintOriginal && tintInput && tintHex) {
       const image = panelImage();
       tintField.hidden = sourceOf(image.src)?.kind !== "logo";
@@ -2927,7 +3679,7 @@ export function bindStudio(
   const startExport = (button: HTMLButtonElement, cancel: () => void) => {
     exporting = { button, label: button.textContent ?? "", cancel };
     studio.dataset.recording = "true";
-    for (const other of [printButton, videoButton]) if (other && other !== button) other.disabled = true;
+    for (const other of [printButton, videoButton, gifButton, pdfButton]) if (other && other !== button) other.disabled = true;
     syncVideoLoop();
   };
   const exportProgress = (note: string, percent: number) => {
@@ -2944,6 +3696,8 @@ export function bindStudio(
     exporting = null;
     delete studio.dataset.recording;
     if (printButton) printButton.disabled = false;
+    if (pdfButton) pdfButton.disabled = false;
+    if (gifButton) gifButton.disabled = false;
     if (exportNote) exportNote.hidden = true;
     syncConference();
     syncVideoLoop();
@@ -3120,9 +3874,142 @@ export function bindStudio(
     }
   };
 
+  const renderedCard = async (): Promise<HTMLCanvasElement> => {
+    const offscreen = document.createElement("canvas");
+    if (config.conference && !state.code.trim()) {
+      drawCard(offscreen, state, imageOf, undefined, await exportBackground());
+      return offscreen;
+    }
+    if (!state.code.trim()) {
+      offscreen.width = canvas.width;
+      offscreen.height = canvas.height;
+      offscreen.getContext("2d")?.drawImage(canvas, 0, 0);
+      return offscreen;
+    }
+    await paintForeignObject(offscreen, studioFragment(await codeDocument()), state.cardWidth, state.cardHeight);
+    return offscreen;
+  };
+  const cardFileName = (suffix: string) =>
+    config.conference ? exportName(suffix) : `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}${suffix}`;
+
+  const runPdf = async (button: HTMLButtonElement) => {
+    let cancelled = false;
+    startExport(button, () => {
+      cancelled = true;
+    });
+    try {
+      exportProgress("PDF 만드는 중", 15);
+      const card = await renderedCard();
+      if (cancelled) return;
+      const ctx = card.getContext("2d", { willReadFrequently: true });
+      if (!ctx) throw new Error("canvas");
+      exportProgress("PDF 만드는 중", 45);
+      const pixels = ctx.getImageData(0, 0, card.width, card.height).data;
+      if (cancelled) return;
+      exportProgress("PDF 만드는 중", 75);
+      const bytes = await cardPdf(pixels, card.width, card.height);
+      if (cancelled) return;
+      downloadBlob(bytesBlob(bytes, "application/pdf"), cardFileName(".pdf"));
+    } catch {
+      if (!cancelled) showToast("PDF를 만들지 못했습니다.");
+    } finally {
+      endExport();
+    }
+  };
+
+  /** One loop of the background video, with the card painted on each sample, saved as a repeating GIF. */
+  const runGif = async (button: HTMLButtonElement) => {
+    const url = backgroundVideoUrl();
+    if (!url) return;
+    const size = gifSize(state.cardWidth, state.cardHeight);
+    const cancel = { on: false, stop: () => {} };
+    startExport(button, () => {
+      cancel.on = true;
+      cancel.stop();
+    });
+    const source = document.createElement("video");
+    source.muted = true;
+    source.playsInline = true;
+    source.preload = "auto";
+    const out = document.createElement("canvas");
+    out.width = size.width;
+    out.height = size.height;
+    const ctx = out.getContext("2d", { willReadFrequently: true });
+    const stopSource = () => {
+      source.pause();
+      source.removeAttribute("src");
+      source.load();
+    };
+    cancel.stop = stopSource;
+    try {
+      if (!ctx) throw new Error("canvas");
+      source.src = url;
+      await new Promise<void>((resolve, reject) => {
+        source.addEventListener("loadeddata", () => resolve(), { once: true });
+        source.addEventListener("error", () => reject(new Error("video")), { once: true });
+      });
+      if (cancel.on) return;
+      const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 5;
+      const delays = gifFrameDelays(duration);
+      let elapsed = 0;
+      const times = delays.map((delay) => {
+        const at = elapsed;
+        elapsed += delay / 100;
+        return at;
+      });
+      const encoder = createGifEncoder(size.width, size.height, delays.length);
+      const scale = size.width / state.cardWidth;
+      const draw = () => {
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        const ready = source.readyState >= 2 && source.videoWidth > 0;
+        paintCard(ctx, state, imageOf, undefined, ready ? { source, width: source.videoWidth, height: source.videoHeight } : null);
+      };
+      const seek = (time: number) =>
+        new Promise<void>((resolve) => {
+          const target = Math.min(Math.max(0, time), Math.max(0, duration - 0.04));
+          if (Math.abs(source.currentTime - target) < 0.02 && source.readyState >= 2) {
+            resolve();
+            return;
+          }
+          const done = () => {
+            source.removeEventListener("seeked", done);
+            window.clearTimeout(timer);
+            resolve();
+          };
+          source.addEventListener("seeked", done);
+          const timer = window.setTimeout(done, 700);
+          source.currentTime = target;
+        });
+      for (let index = 0; index < times.length; index += 1) {
+        if (cancel.on) return;
+        await seek(times[index] ?? 0);
+        if (cancel.on) return;
+        draw();
+        encoder.add(ctx.getImageData(0, 0, size.width, size.height).data, delays[index] ?? 10);
+        exportProgress(
+          `GIF ${size.width} × ${size.height}px · 무한 반복으로 만드는 중`,
+          ((index + 1) / times.length) * 100,
+        );
+        await new Promise((resolve) => window.setTimeout(resolve));
+      }
+      if (cancel.on) return;
+      downloadBlob(bytesBlob(encoder.finish(), "image/gif"), exportName(`-${size.width}x${size.height}.gif`));
+      if (size.width !== state.cardWidth || size.height !== state.cardHeight) {
+        showToast(`GIF는 ${size.width} × ${size.height}px로 만들었습니다.`);
+      }
+    } catch {
+      if (!cancel.on) showToast("GIF를 만들지 못했습니다.");
+    } finally {
+      stopSource();
+      endExport();
+    }
+  };
+
   for (const [button, run] of [
     [printButton, runPrint],
     [videoButton, runVideo],
+    [gifButton, runGif],
+    [pdfButton, runPdf],
   ] as const) {
     button?.addEventListener("click", () => {
       if (exporting) {
@@ -3135,27 +4022,8 @@ export function bindStudio(
 
   root.querySelector("#studio-download")?.addEventListener("click", () => {
     void (async () => {
-      if (config.conference && !state.code.trim()) {
-        const offscreen = document.createElement("canvas");
-        drawCard(offscreen, state, imageOf, undefined, await exportBackground());
-        downloadCanvas(offscreen, exportName(".png"));
-        return;
-      }
-      const filename = config.conference
-        ? exportName(".png")
-        : `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}.png`;
-      if (!state.code.trim()) {
-        downloadCanvas(canvas, filename);
-        return;
-      }
-      const offscreen = document.createElement("canvas");
-      await paintForeignObject(
-        offscreen,
-        studioFragment(await codeDocument()),
-        state.cardWidth,
-        state.cardHeight,
-      );
-      downloadCanvas(offscreen, filename);
+      const card = await renderedCard();
+      downloadCanvas(card, cardFileName(".png"));
     })();
   });
 
@@ -3191,6 +4059,16 @@ export function bindStudio(
     }
     return null;
   };
+
+  type SelectRect = { x: number; y: number; w: number; h: number };
+  const selectRect = (x0: number, y0: number, x1: number, y1: number): SelectRect => ({
+    x: Math.min(x0, x1),
+    y: Math.min(y0, y1),
+    w: Math.abs(x1 - x0),
+    h: Math.abs(y1 - y0),
+  });
+  const rectsOverlap = (a: SelectRect, b: SelectRect) =>
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
   const strokeDragBox = (box: HitBox) => {
     const ctx = canvas.getContext("2d");
@@ -3231,8 +4109,19 @@ export function bindStudio(
 
   type ImageBox = { x: number; y: number; width: number };
   type Point = { x: number; y: number };
-  /** copy: the first move duplicates the selection and drags the copies (Option/Alt drag). */
-  let drag: { id: string; origin: Point; start: Map<string, DragOrigin>; pointerId: number; copy: boolean } | null = null;
+  /** copy: Option/Alt is held, so the next real move duplicates the selection. duplicated: that copy already happened. axis locks a Shift drag. shiftRelease is removed on a Shift click that does not move. */
+  let drag: {
+    id: string;
+    origin: Point;
+    start: Map<string, DragOrigin>;
+    pointerId: number;
+    copy: boolean;
+    duplicated: boolean;
+    axis: ShiftAxis | null;
+    shiftRelease: string[] | null;
+  } | null = null;
+  /** Drag on empty canvas with the select tool. base is the selection kept when Shift is held. */
+  let marquee: { x: number; y: number; x2: number; y2: number; sx: number; sy: number; pointerId: number; base: Set<string>; moved: boolean } | null = null;
   let tapStart: { x: number; y: number; moved: boolean; shift: boolean } | null = null;
   let lastTap: { id: string; time: number; x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
@@ -3386,13 +4275,14 @@ export function bindStudio(
     if (penDraft && penDraft.points.length > 0) {
       const first = penDraft.points[0];
       const closingDrag = penDraft.closing;
+      const aimPointer = penDraft.cursor ?? penDraft.hover;
       const nearFirst = Boolean(
         first &&
           penDraft.points.length >= 2 &&
           !closingDrag &&
           penDraft.dragging === null &&
-          penDraft.hover &&
-          Math.hypot(penDraft.hover.x - first.x, penDraft.hover.y - first.y) <= PEN_CLOSE,
+          aimPointer &&
+          Math.hypot(aimPointer.x - first.x, aimPointer.y - first.y) <= PEN_CLOSE,
       );
       const closing = closingDrag || nearFirst;
       if (closing) canvas.dataset.penClose = "true";
@@ -3480,28 +4370,35 @@ export function bindStudio(
     const base = structuredClone(basePoint);
     const origin = cardPoint(event);
     let moved = false;
+    let axis: ShiftAxis | null = null;
     const moving = part === "anchor" && edit.active === index;
+    const straight = layerById(edit.id)?.kind === "pen";
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== event.pointerId) return;
       const point = cardPoint(ev);
       if (Math.hypot(point.x - origin.x, point.y - origin.y) >= 4) moved = true;
       const next = structuredClone(base);
+      const shift = straight && ev.shiftKey;
       if (part === "anchor" && moving) {
-        const dx = point.x - origin.x;
-        const dy = point.y - origin.y;
-        next.x = roundOffset(base.x + dx);
-        next.y = roundOffset(base.y + dy);
-        next.in = base.in ? { x: roundOffset(base.in.x + dx), y: roundOffset(base.in.y + dy) } : null;
-        next.out = base.out ? { x: roundOffset(base.out.x + dx), y: roundOffset(base.out.y + dy) } : null;
+        const locked = shiftAxisDelta(point.x - origin.x, point.y - origin.y, shift, axis);
+        axis = locked.axis;
+        next.x = roundOffset(base.x + locked.dx);
+        next.y = roundOffset(base.y + locked.dy);
+        next.in = base.in ? { x: roundOffset(base.in.x + locked.dx), y: roundOffset(base.in.y + locked.dy) } : null;
+        next.out = base.out ? { x: roundOffset(base.out.x + locked.dx), y: roundOffset(base.out.y + locked.dy) } : null;
       } else if (part === "anchor") {
-        if (Math.hypot(point.x - base.x, point.y - base.y) >= 4) {
-          next.out = { x: roundOffset(point.x), y: roundOffset(point.y) };
-          if (!ev.altKey) next.in = { x: roundOffset(base.x * 2 - point.x), y: roundOffset(base.y * 2 - point.y) };
+        const snapped = shiftAxisPoint(point, base, shift, axis);
+        axis = snapped.axis;
+        if (Math.hypot(snapped.x - base.x, snapped.y - base.y) >= 4) {
+          next.out = { x: roundOffset(snapped.x), y: roundOffset(snapped.y) };
+          if (!ev.altKey) next.in = { x: roundOffset(base.x * 2 - snapped.x), y: roundOffset(base.y * 2 - snapped.y) };
         }
       } else {
-        next[part] = { x: roundOffset(point.x), y: roundOffset(point.y) };
+        const snapped = shiftAxisPoint(point, base, shift, axis);
+        axis = snapped.axis;
+        next[part] = { x: roundOffset(snapped.x), y: roundOffset(snapped.y) };
         const other = part === "in" ? "out" : "in";
-        if (!ev.altKey && base[other]) next[other] = { x: roundOffset(base.x * 2 - point.x), y: roundOffset(base.y * 2 - point.y) };
+        if (!ev.altKey && base[other]) next[other] = { x: roundOffset(base.x * 2 - snapped.x), y: roundOffset(base.y * 2 - snapped.y) };
       }
       points[index] = next;
       const shape = layerById(edit.id);
@@ -3793,38 +4690,57 @@ export function bindStudio(
       placeAt(handle, tip.x, tip.y);
     }
   };
+  const selectionUnits = (ids: Iterable<string>) => {
+    const seen = new Set<string>();
+    let count = 0;
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      for (const member of groupedIds(state, id)) seen.add(member);
+      count += 1;
+    }
+    return count;
+  };
   syncOverlay = () => {
     const visible = !editing && !cropping && !state.code.trim();
     const shown = new Set<string>();
+    const outlines = visible ? selectionOutlines(state, selected, hits) : [];
     if (visible) {
       for (const id of selected) {
-        const box = hits.find((hit) => hit.id === id);
-        if (!box) continue;
-        let frame = frameEls.get(id);
-        if (!frame) {
-          frame = document.createElement("div");
-          frame.className = "studio__select-frame";
-          overlay.prepend(frame);
-          frameEls.set(id, frame);
-        }
-        placeAt(frame, box.x, box.y);
-        frame.style.width = `${box.w * viewScale}px`;
-        frame.style.height = `${box.h * viewScale}px`;
-        shown.add(id);
+        if (hits.some((hit) => hit.id === id)) shown.add(id);
       }
     }
+    const live = new Set<string>();
+    for (const outline of outlines) {
+      live.add(outline.key);
+      let frame = frameEls.get(outline.key);
+      if (!frame) {
+        frame = document.createElement("div");
+        frame.className = "studio__select-frame";
+        overlay.prepend(frame);
+        frameEls.set(outline.key, frame);
+      }
+      placeAt(frame, outline.box.x, outline.box.y);
+      frame.style.width = `${outline.box.w * viewScale}px`;
+      frame.style.height = `${outline.box.h * viewScale}px`;
+    }
     for (const [id, frame] of frameEls) {
-      if (shown.has(id)) continue;
+      if (live.has(id)) continue;
       frame.remove();
       frameEls.delete(id);
     }
     if (alignBar) {
       alignBar.hidden = shown.size < 1;
+      const imageSelected = [...shown].some((id) => layerById(id)?.kind === "image");
+      if (!imageSelected) imageAdjustOpen = false;
+      imageAdjustButton.hidden = !imageSelected;
+      imageAdjustDivider.hidden = !imageSelected;
+      imageAdjustButton.setAttribute("aria-pressed", imageAdjustOpen && imageSelected ? "true" : "false");
       for (const align of LAYER_DISTRIBUTES) {
         const button = alignBar.querySelector<HTMLButtonElement>(`[data-layer-align="${align}"]`);
         if (!button) continue;
-        button.disabled = shown.size < 3;
-        button.title = shown.size < 3 ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택` : LAYER_ALIGN_LABELS[align];
+      const units = selectionUnits(shown);
+      button.disabled = units < 3;
+      button.title = units < 3 ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택` : LAYER_ALIGN_LABELS[align];
       }
     }
     const image = singleImage();
@@ -3870,6 +4786,14 @@ export function bindStudio(
     else syncRadiusHandles(null);
     syncCropOverlay();
     placeEditor();
+    if (!marquee || state.code.trim()) marqueeEl.hidden = true;
+    else {
+      const rect = selectRect(marquee.x, marquee.y, marquee.x2, marquee.y2);
+      marqueeEl.hidden = false;
+      placeAt(marqueeEl, rect.x, rect.y);
+      marqueeEl.style.width = `${rect.w * viewScale}px`;
+      marqueeEl.style.height = `${rect.h * viewScale}px`;
+    }
   };
 
   for (const handle of handles) {
@@ -3953,6 +4877,23 @@ export function bindStudio(
     });
   }
 
+  const applyLineAim = (shift: boolean) => {
+    if (!lineAim) return;
+    const layer = layerById(lineAim.id);
+    if (layer?.kind !== "line") return;
+    const snapped = shiftAxisPoint(lineAim.raw, lineAim.fixed, shift, lineAim.axis);
+    lineAim.axis = snapped.axis;
+    const pad = 200;
+    const x = roundOffset(Math.min(state.cardWidth + pad, Math.max(-pad, snapped.x)));
+    const y = roundOffset(Math.min(state.cardHeight + pad, Math.max(-pad, snapped.y)));
+    if (lineAim.start) {
+      layer.x = x;
+      layer.y = y;
+    } else {
+      layer.x2 = x;
+      layer.y2 = y;
+    }
+  };
   for (const handle of lineEnds) {
     handle.addEventListener("pointerdown", (event) => {
       const layer = singleLine();
@@ -3965,23 +4906,22 @@ export function bindStudio(
         /* the pointer can already be inactive */
       }
       beginGesture(handle);
+      lineAim = {
+        id: layer.id,
+        start,
+        fixed: start ? { x: layer.x2, y: layer.y2 } : { x: layer.x, y: layer.y },
+        axis: null,
+        raw: cardPoint(event),
+      };
       const move = (ev: PointerEvent) => {
-        if (ev.pointerId !== event.pointerId) return;
-        const point = cardPoint(ev);
-        const pad = 200;
-        const x = roundOffset(Math.min(state.cardWidth + pad, Math.max(-pad, point.x)));
-        const y = roundOffset(Math.min(state.cardHeight + pad, Math.max(-pad, point.y)));
-        if (start) {
-          layer.x = x;
-          layer.y = y;
-        } else {
-          layer.x2 = x;
-          layer.y2 = y;
-        }
+        if (ev.pointerId !== event.pointerId || !lineAim) return;
+        lineAim.raw = cardPoint(ev);
+        applyLineAim(ev.shiftKey);
         paint();
       };
       const end = (ev: PointerEvent) => {
         if (ev.pointerId !== event.pointerId) return;
+        lineAim = null;
         handle.removeEventListener("pointermove", move);
         handle.removeEventListener("pointerup", end);
         handle.removeEventListener("pointercancel", end);
@@ -4045,6 +4985,11 @@ export function bindStudio(
     if (repeat && layer && isTextLayer(layer)) {
       lastTap = null;
       openEditor(layer);
+      return;
+    }
+    if (repeat && layer?.kind === "image") {
+      lastTap = null;
+      openImageAdjust();
       return;
     }
     if (repeat && layer?.kind === "pen" && !penMode && penEdit?.id !== layer.id) {
@@ -4275,6 +5220,37 @@ export function bindStudio(
       selected.add(layer.id);
     });
   };
+  const addText = () => {
+    finishPenWork();
+    const title = ensureLayer(state, "title");
+    commitLayers(() => {
+      const size = title.size;
+      const layer: TextLayer = {
+        id: newLayerId(),
+        kind: "body",
+        text: "텍스트",
+        x: 0,
+        y: 0,
+        size,
+        fontId: title.fontId,
+        color: title.color,
+        weight: title.weight,
+        italic: false,
+        underline: false,
+        align: "left",
+      };
+      const placed = clampLayerPosition(
+        layer,
+        roundOffset((state.cardWidth - size * 2) / 2),
+        roundOffset((state.cardHeight - size) / 2),
+      );
+      layer.x = placed.x;
+      layer.y = placed.y;
+      state.layers.push(layer);
+      selected.clear();
+      selected.add(layer.id);
+    });
+  };
   for (const button of root.querySelectorAll<HTMLButtonElement>("[data-draw]")) {
     // A click would focus the button, and Esc then paints the focus ring. Keep mouse use unfocused.
     button.addEventListener("mousedown", (event) => {
@@ -4302,6 +5278,7 @@ export function bindStudio(
         return;
       }
       if (tool === "line") addLine();
+      else if (tool === "text") addText();
       else if (tool === "ellipse" || tool === "rect" || tool === "triangle" || tool === "star") addShape(tool);
     });
   }
@@ -4337,7 +5314,12 @@ export function bindStudio(
   });
   const copyLayers = () => {
     const picked = selectedLayers();
-    if (picked.length > 0) layerClipboard = structuredClone(picked);
+    if (picked.length === 0) return;
+    layerClipboard = structuredClone(picked);
+    clipboardGroups = (state.groups ?? [])
+      .map((group) => group.filter((id) => selected.has(id)))
+      .filter((group) => group.length >= 2)
+      .map((group) => [...group]);
   };
   const pasteLayers = (at: Point | null) => {
     if (layerClipboard.length === 0) return;
@@ -4349,14 +5331,19 @@ export function bindStudio(
         layer.kind === "line" ? Math.min(layer.y, layer.y2) : layer.kind === "pen" ? Math.min(...layer.points.map((point) => point.y)) : layer.y;
       const dx = at ? at.x - Math.min(...copies.map(leftOf)) : PASTE_OFFSET;
       const dy = at ? at.y - Math.min(...copies.map(topOf)) : PASTE_OFFSET;
+      const idMap = new Map<string, string>();
       selected.clear();
       for (const layer of copies) {
-        layer.id = newLayerId();
+        const nextId = newLayerId();
+        idMap.set(layer.id, nextId);
+        layer.id = nextId;
         const from = originOf(layer);
         const allowed = allowedDelta(layer, from, dx, dy);
         placeFrom(layer, from, allowed.x, allowed.y);
         selected.add(layer.id);
       }
+      const addedGroups = copiedGroups(clipboardGroups, idMap);
+      if (addedGroups.length > 0) state.groups = [...(state.groups ?? []), ...addedGroups];
       state.layers.push(...copies);
     });
   };
@@ -4369,17 +5356,43 @@ export function bindStudio(
     });
   };
   const alignLayers = (align: LayerAlign) => {
-    const boxes = hits.filter((box) => selected.has(box.id));
-    if (boxes.length === 0) return;
-    const offsets = alignOffsets(boxes, align, { x: 0, y: 0, w: state.cardWidth, h: state.cardHeight });
+    const selectedBoxes = hits.filter((box) => selected.has(box.id));
+    if (selectedBoxes.length === 0) return;
+    const units: { ids: string[]; box: StudioRect }[] = [];
+    const seen = new Set<string>();
+    for (const box of selectedBoxes) {
+      if (seen.has(box.id)) continue;
+      const ids = groupedIds(state, box.id).filter((id) => selected.has(id));
+      for (const id of ids) seen.add(id);
+      const memberBoxes = ids.map((id) => hits.find((hit) => hit.id === id)).filter((hit): hit is HitBox => Boolean(hit));
+      const first = memberBoxes[0];
+      if (!first) continue;
+      units.push({ ids, box: memberBoxes.length === 1 ? first : selectionBounds(memberBoxes) });
+    }
+    if (units.length === 0) return;
+    const bounds = units.length > 1 ? selectionBounds(units.map((unit) => unit.box)) : { x: 0, y: 0, w: state.cardWidth, h: state.cardHeight };
+    const offsets = alignOffsets(
+      units.map((unit) => unit.box),
+      align,
+      bounds,
+    );
+    const nearer = (a: number, b: number) => (Math.abs(b) < Math.abs(a) ? b : a);
     commitLayers(() => {
-      boxes.forEach((box, index) => {
-        const layer = layerById(box.id);
+      units.forEach((unit, index) => {
         const offset = offsets[index];
-        if (!layer || !offset) return;
-        const from = originOf(layer);
-        const allowed = allowedDelta(layer, from, offset.dx, offset.dy);
-        placeFrom(layer, from, allowed.x, allowed.y);
+        if (!offset) return;
+        let dx = offset.dx;
+        let dy = offset.dy;
+        const moving = unit.ids.flatMap((id) => {
+          const layer = layerById(id);
+          return layer ? [{ layer, from: originOf(layer) }] : [];
+        });
+        for (const { layer, from } of moving) {
+          const allowed = allowedDelta(layer, from, dx, dy);
+          dx = nearer(dx, allowed.x);
+          dy = nearer(dy, allowed.y);
+        }
+        for (const { layer, from } of moving) placeFrom(layer, from, dx, dy);
       });
     });
   };
@@ -4387,17 +5400,33 @@ export function bindStudio(
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-layer-align]") : null;
     if (button && !button.disabled) alignLayers(button.dataset.layerAlign as LayerAlign);
   });
+  imageAdjustButton.addEventListener("click", () => openImageAdjust());
   /** Copies stack on top in their original order; the copies become the selection and the drag moves them. */
   const duplicateDragged = (current: NonNullable<typeof drag>) => {
     const copies = state.layers
       .filter((layer) => current.start.has(layer.id))
       .map((layer) => ({ from: layer.id, layer: { ...structuredClone(layer), id: newLayerId() } }));
     state.layers.push(...copies.map((item) => item.layer));
+    const addedGroups = copiedGroups(state.groups, new Map(copies.map((item) => [item.from, item.layer.id])));
+    if (addedGroups.length > 0) state.groups = [...(state.groups ?? []), ...addedGroups];
     selected.clear();
     for (const { layer } of copies) selected.add(layer.id);
     current.id = copies.find((item) => item.from === current.id)?.layer.id ?? current.id;
     current.start = positionsOf(selected);
     current.copy = false;
+    current.duplicated = true;
+  };
+  /** Leave the originals in place and drag the copies. Restores a move that already started, then clones it. */
+  const forkDragCopy = () => {
+    if (!drag || drag.duplicated) return;
+    moveGroup(drag.start, 0, 0);
+    duplicateDragged(drag);
+  };
+  const dragDelta = (point: Point, shift: boolean) => {
+    if (!drag) return { dx: 0, dy: 0 };
+    const locked = shiftAxisDelta(point.x - drag.origin.x, point.y - drag.origin.y, shift, drag.axis);
+    drag.axis = locked.axis;
+    return locked;
   };
   // Each kind keeps one layer so the panel always has something to edit.
   const canDelete = (picked: StudioLayer[]) =>
@@ -4412,6 +5441,21 @@ export function bindStudio(
     commitLayers(() => {
       state.layers = state.layers.filter((layer) => !selected.has(layer.id));
       selected.clear();
+      pruneGroups(state);
+    });
+  };
+  const groupSelection = () => {
+    const ids = [...selected];
+    if (!canGroupLayers(state, ids)) return;
+    commitLayers(() => {
+      groupLayers(state, ids);
+    });
+  };
+  const ungroupSelection = () => {
+    const ids = [...selected];
+    if (!canUngroupLayers(state, ids)) return;
+    commitLayers(() => {
+      ungroupLayers(state, ids);
     });
   };
 
@@ -4420,9 +5464,12 @@ export function bindStudio(
   const menuItems: { action: string; label: string; hint?: string }[] = [
     { action: "copy", label: "복사", hint: shortcut("C") },
     { action: "paste", label: "붙여넣기", hint: shortcut("V") },
+    { action: "group", label: "그룹", hint: shortcut("G") },
+    { action: "ungroup", label: "그룹 풀기", hint: IS_MAC ? "⇧⌘G" : "Shift+Ctrl+G" },
     { action: "front", label: "맨 위로 보내기" },
     { action: "back", label: "맨 밑으로 보내기" },
     { action: "crop", label: "크롭하기" },
+    { action: "adjust", label: "수정" },
     { action: "delete", label: "삭제", hint: IS_MAC ? "⌫" : "Delete" },
   ];
   const menu = document.createElement("div");
@@ -4460,9 +5507,9 @@ export function bindStudio(
     const point = cardPoint({ clientX, clientY });
     const hit = hitAt(point.x, point.y);
     if (!hit) selected.clear();
-    else if (!selected.has(hit.id)) {
+    else if (!groupedIds(state, hit.id).every((id) => selected.has(id))) {
       selected.clear();
-      selected.add(hit.id);
+      for (const id of groupedIds(state, hit.id)) selected.add(id);
     }
     menuPoint = point;
     paint();
@@ -4473,6 +5520,16 @@ export function bindStudio(
     };
     enable("copy", picked.length > 0);
     enable("paste", layerClipboard.length > 0);
+    const groupButton = menuButton("group");
+    if (groupButton) {
+      groupButton.disabled = !canGroupLayers(state, [...selected]);
+      groupButton.title = groupButton.disabled ? "두 개 이상 선택하세요." : "";
+    }
+    const ungroupButton = menuButton("ungroup");
+    if (ungroupButton) {
+      ungroupButton.disabled = !canUngroupLayers(state, [...selected]);
+      ungroupButton.title = ungroupButton.disabled ? "그룹을 선택한 뒤 풀 수 있습니다." : "";
+    }
     enable("front", picked.length > 0);
     enable("back", picked.length > 0);
     const crop = menuButton("crop");
@@ -4481,6 +5538,8 @@ export function bindStudio(
       const image = singleImage();
       crop.disabled = !image || !imageOf(image);
     }
+    const adjust = menuButton("adjust");
+    if (adjust) adjust.hidden = !picked.some((layer) => layer.kind === "image");
     const remove = menuButton("delete");
     if (remove) {
       remove.disabled = picked.length === 0 || !canDelete(picked);
@@ -4504,12 +5563,14 @@ export function bindStudio(
     const action = button.dataset.layerAction;
     if (action === "copy") copyLayers();
     else if (action === "paste") pasteLayers(at);
+    else if (action === "group") groupSelection();
+    else if (action === "ungroup") ungroupSelection();
     else if (action === "front" || action === "back") restack(action === "front");
     else if (action === "delete") deleteLayers();
     else if (action === "crop") {
       const layer = singleImage();
       if (layer) startCrop(layer);
-    }
+    } else if (action === "adjust") openImageAdjust();
   });
   menu.addEventListener("keydown", (event) => {
     if (event.key === "Escape" || event.key === "Tab") {
@@ -4639,6 +5700,68 @@ export function bindStudio(
     void redraw();
   };
 
+  const syncPenAim = (raw: { x: number; y: number }, shift: boolean) => {
+    const draft = penDraft;
+    if (!draft) return;
+    draft.cursor = raw;
+    const aimAt = (anchor: { x: number; y: number }) => {
+      const snapped = shiftAxisPoint(raw, anchor, shift, draft.axis);
+      draft.axis = snapped.axis;
+      return snapped;
+    };
+    if (draft.closing) {
+      const first = draft.points[0];
+      if (!first) return;
+      const snapped = aimAt(first);
+      if (Math.hypot(snapped.x - first.x, snapped.y - first.y) < 4) return;
+      first.in = { x: roundOffset(snapped.x), y: roundOffset(snapped.y) };
+      first.out = { x: roundOffset(first.x * 2 - snapped.x), y: roundOffset(first.y * 2 - snapped.y) };
+      return;
+    }
+    const index = draft.dragging;
+    const anchor = index === null ? undefined : draft.points[index];
+    if (anchor && draft.pointerId !== null) {
+      const snapped = aimAt(anchor);
+      if (Math.hypot(snapped.x - anchor.x, snapped.y - anchor.y) < 4) return;
+      anchor.out = { x: roundOffset(snapped.x), y: roundOffset(snapped.y) };
+      anchor.in = { x: roundOffset(anchor.x * 2 - snapped.x), y: roundOffset(anchor.y * 2 - snapped.y) };
+      return;
+    }
+    const first = draft.points[0];
+    const last = draft.points[draft.points.length - 1];
+    if (first && last && draft.points.length >= 2 && Math.hypot(raw.x - first.x, raw.y - first.y) <= PEN_CLOSE) {
+      draft.hover = { x: first.x, y: first.y };
+      return;
+    }
+    if (last) {
+      if (!shift) {
+        draft.aimFrom = null;
+        draft.axis = null;
+        draft.hover = raw;
+        return;
+      }
+      const origin = draft.aimFrom;
+      if (origin && Math.hypot(raw.x - origin.x, raw.y - origin.y) < 4) {
+        draft.hover = { x: last.x, y: last.y };
+        return;
+      }
+      let axis = draft.axis;
+      if (!axis) {
+        const dx = raw.x - (origin?.x ?? last.x);
+        const dy = raw.y - (origin?.y ?? last.y);
+        if (Math.hypot(dx, dy) >= 4) axis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+      }
+      draft.axis = axis;
+      if (!axis) {
+        draft.hover = raw;
+        return;
+      }
+      draft.hover = axis === "x" ? { x: raw.x, y: last.y } : { x: last.x, y: raw.y };
+      return;
+    }
+    draft.hover = raw;
+  };
+
   canvas.addEventListener("pointerdown", (event) => {
     if (state.code.trim()) return;
     const mouse = event.pointerType === "mouse";
@@ -4663,6 +5786,9 @@ export function bindStudio(
         if (index >= 0) {
           penDraft.points = restartPenAt(penDraft.points, index);
           penDraft.dragging = null;
+          penDraft.axis = null;
+          penDraft.aimFrom = null;
+          penDraft.cursor = point;
           penDraft.hover = point;
           paint();
           return;
@@ -4673,7 +5799,10 @@ export function bindStudio(
         penDraft.closing = true;
         penDraft.dragging = null;
         penDraft.pointerId = event.pointerId;
-        penDraft.hover = point;
+        penDraft.axis = null;
+        penDraft.aimFrom = null;
+        penDraft.cursor = point;
+        penDraft.hover = { x: first.x, y: first.y };
         try {
           canvas.setPointerCapture(event.pointerId);
         } catch {
@@ -4684,12 +5813,31 @@ export function bindStudio(
       }
       if (!penDraft) {
         selected.clear();
-        penDraft = { points: [], hover: point, pointerId: event.pointerId, dragging: null, closing: false };
+        penDraft = {
+          points: [],
+          hover: point,
+          pointerId: null,
+          dragging: null,
+          closing: false,
+          axis: null,
+          cursor: point,
+          aimFrom: null,
+        };
       }
-      penDraft.points.push({ x: roundOffset(point.x), y: roundOffset(point.y), in: null, out: null });
+      const prev = penDraft.points[penDraft.points.length - 1];
+      let placed = point;
+      if (prev) {
+        if (!penDraft.axis) penDraft.aimFrom = null;
+        const snapped = shiftAxisPoint(point, prev, event.shiftKey, penDraft.axis);
+        penDraft.axis = snapped.axis;
+        placed = snapped;
+        penDraft.aimFrom = null;
+      }
+      penDraft.cursor = point;
+      penDraft.points.push({ x: roundOffset(placed.x), y: roundOffset(placed.y), in: null, out: null });
       penDraft.dragging = penDraft.points.length - 1;
       penDraft.pointerId = event.pointerId;
-      penDraft.hover = point;
+      penDraft.hover = { x: placed.x, y: placed.y };
       try {
         canvas.setPointerCapture(event.pointerId);
       } catch {
@@ -4719,23 +5867,46 @@ export function bindStudio(
       return;
     }
     if (penEdit) commitPenEdit();
+    const members = hit ? groupedIds(state, hit.id) : [];
+    const membersOn = members.length > 0 && members.every((id) => selected.has(id));
+    let shiftRelease: string[] | null = null;
     if (!mouse) {
       selected.clear();
-      if (hit) selected.add(hit.id);
-    } else if (event.shiftKey) {
-      if (hit && selected.has(hit.id)) selected.delete(hit.id);
-      else if (hit) selected.add(hit.id);
+      for (const id of members) selected.add(id);
+    } else if (event.shiftKey && hit) {
+      if (membersOn) shiftRelease = members;
+      else for (const id of members) selected.add(id);
     } else if (!hit) selected.clear();
-    else if (!selected.has(hit.id)) {
+    else if (!membersOn) {
       selected.clear();
-      selected.add(hit.id);
+      for (const id of members) selected.add(id);
     }
     if (!hit || (mouse && !selected.has(hit.id))) {
       tapStart = null;
+      if (mouse && !hit) {
+        marquee = {
+          x: point.x,
+          y: point.y,
+          x2: point.x,
+          y2: point.y,
+          sx: event.clientX,
+          sy: event.clientY,
+          pointerId: event.pointerId,
+          base: new Set(selected),
+          moved: false,
+        };
+        canvas.dataset.selecting = "true";
+        try {
+          canvas.setPointerCapture(event.pointerId);
+        } catch {
+          /* the pointer can already be inactive */
+        }
+      }
       paint();
       return;
     }
     tapStart = { x: event.clientX, y: event.clientY, moved: false, shift: event.shiftKey };
+    event.preventDefault();
     try {
       canvas.setPointerCapture(event.pointerId);
     } catch {
@@ -4745,12 +5916,20 @@ export function bindStudio(
     drag = {
       id: hit.id,
       origin: point,
-      start: positionsOf(mouse ? selected : [hit.id]),
+      start: positionsOf(selected),
       pointerId: event.pointerId,
       copy: mouse && event.altKey,
+      duplicated: false,
+      axis: null,
+      shiftRelease,
     };
     canvas.dataset.dragging = "true";
+    if (drag.copy) canvas.dataset.copy = "true";
+    else delete canvas.dataset.copy;
     paint();
+  });
+  canvas.addEventListener("dragstart", (event) => {
+    event.preventDefault();
   });
   canvas.addEventListener("contextmenu", (event) => {
     event.preventDefault();
@@ -4785,34 +5964,52 @@ export function bindStudio(
     const point = cardPoint(event);
     lastPointer = point;
     if (penMode && penDraft) {
-      penDraft.hover = point;
-      if (penDraft.closing && penDraft.pointerId === event.pointerId) {
-        const first = penDraft.points[0];
-        if (first && Math.hypot(point.x - first.x, point.y - first.y) >= 4) {
-          first.in = { x: roundOffset(point.x), y: roundOffset(point.y) };
-          first.out = { x: roundOffset(first.x * 2 - point.x), y: roundOffset(first.y * 2 - point.y) };
+      if (penDraft.pointerId !== null && penDraft.pointerId !== event.pointerId) return;
+      syncPenAim(point, event.shiftKey);
+      paint();
+      return;
+    }
+    if (marquee && marquee.pointerId === event.pointerId) {
+      const moved = Math.hypot(event.clientX - marquee.sx, event.clientY - marquee.sy) > 4;
+      marquee.x2 = point.x;
+      marquee.y2 = point.y;
+      marquee.moved = marquee.moved || moved;
+      const next = new Set(marquee.base);
+      if (marquee.moved) {
+        const rect = selectRect(marquee.x, marquee.y, marquee.x2, marquee.y2);
+        for (const box of hits) {
+          if (!rectsOverlap(rect, box)) continue;
+          for (const id of groupedIds(state, box.id)) next.add(id);
         }
-        paint();
-        return;
       }
-      const index = penDraft.dragging;
-      const anchor = index === null ? undefined : penDraft.points[index];
-      if (anchor && penDraft.pointerId === event.pointerId && Math.hypot(point.x - anchor.x, point.y - anchor.y) >= 4) {
-        anchor.out = { x: roundOffset(point.x), y: roundOffset(point.y) };
-        anchor.in = { x: roundOffset(anchor.x * 2 - point.x), y: roundOffset(anchor.y * 2 - point.y) };
+      const same = next.size === selected.size && [...next].every((id) => selected.has(id));
+      if (!same) {
+        selected.clear();
+        for (const id of next) selected.add(id);
       }
       paint();
       return;
     }
     if (!drag || drag.pointerId !== event.pointerId) {
-      canvas.dataset.hover = hitAt(point.x, point.y) ? "true" : "false";
+      const hover = hitAt(point.x, point.y);
+      canvas.dataset.hover = hover ? "true" : "false";
+      if (event.altKey && hover) canvas.dataset.copy = "true";
+      else delete canvas.dataset.copy;
       return;
     }
-    if (drag.copy) {
-      if (!tapStart?.moved) return;
-      duplicateDragged(drag);
+    if (!drag.duplicated) {
+      if (event.altKey) drag.copy = true;
+      else if (!tapStart?.moved) drag.copy = false;
+      if (drag.copy && !tapStart?.moved) {
+        canvas.dataset.copy = "true";
+        return;
+      }
+      if (drag.copy) forkDragCopy();
     }
-    moveGroup(drag.start, point.x - drag.origin.x, point.y - drag.origin.y);
+    if (drag.copy || drag.duplicated) canvas.dataset.copy = "true";
+    else delete canvas.dataset.copy;
+    const locked = dragDelta(point, event.shiftKey);
+    moveGroup(drag.start, locked.dx, locked.dy);
     paint();
   });
   canvas.addEventListener("pointerleave", () => {
@@ -4831,27 +6028,50 @@ export function bindStudio(
     }
     if (penDraft && penDraft.pointerId === event.pointerId) {
       const closing = penDraft.closing && event.type === "pointerup";
+      const raw = penDraft.cursor;
       penDraft.dragging = null;
       penDraft.pointerId = null;
       penDraft.closing = false;
+      penDraft.axis = null;
+      penDraft.cursor = raw;
+      penDraft.aimFrom = raw;
       if (closing) {
         commitPen(true);
         return;
       }
+      const last = penDraft.points[penDraft.points.length - 1];
+      const first = penDraft.points[0];
+      if (raw && first && penDraft.points.length >= 2 && Math.hypot(raw.x - first.x, raw.y - first.y) <= PEN_CLOSE) {
+        penDraft.hover = { x: first.x, y: first.y };
+      } else if (last) penDraft.hover = { x: last.x, y: last.y };
+      paint();
+      return;
+    }
+    if (marquee && marquee.pointerId === event.pointerId) {
+      marquee = null;
+      delete canvas.dataset.selecting;
       paint();
       return;
     }
     if (!drag || drag.pointerId !== event.pointerId) return;
     const id = drag.id;
+    const shiftRelease = drag.shiftRelease;
     drag = null;
     delete canvas.dataset.dragging;
+    delete canvas.dataset.copy;
     finishGesture(canvas);
-    if (event.type === "pointerup" && tapStart && !tapStart.moved && !tapStart.shift) {
-      if (selected.size > 1) {
-        selected.clear();
-        selected.add(id);
+    if (event.type === "pointerup" && tapStart && !tapStart.moved) {
+      if (tapStart.shift && shiftRelease) {
+        for (const member of shiftRelease) selected.delete(member);
+      } else if (!tapStart.shift) {
+        const keep = groupedIds(state, id);
+        const same = selected.size === keep.length && keep.every((member) => selected.has(member));
+        if (!same) {
+          selected.clear();
+          for (const member of keep) selected.add(member);
+        }
       }
-      registerTap(id, event);
+      if (!tapStart.shift) registerTap(id, event);
     }
     tapStart = null;
     paint();
@@ -5094,13 +6314,23 @@ export function bindStudio(
     if (penDraft && !mod && !typing && (event.key === "Delete" || event.key === "Backspace")) {
       event.preventDefault();
       penDraft.points.pop();
+      penDraft.axis = null;
+      penDraft.aimFrom = null;
       if (penDraft.points.length === 0) penDraft = null;
+      else if (penDraft.cursor) syncPenAim(penDraft.cursor, event.shiftKey);
       paint();
       return;
     }
     if (dropper && event.key === "Escape" && !mod && !event.altKey) {
       event.preventDefault();
       setDropper(false);
+      return;
+    }
+    if (imageAdjustOpen && event.key === "Escape" && !mod && !event.altKey && !typing) {
+      event.preventDefault();
+      imageAdjustOpen = false;
+      syncForm();
+      paint();
       return;
     }
     if (!mod && !event.altKey && !event.shiftKey && !cropping && !typing && event.code === "KeyI") {
@@ -5119,6 +6349,12 @@ export function bindStudio(
     }
     if (mod && !cropping) {
       if (typing || window.getSelection()?.toString()) return;
+      if (event.code === "KeyG") {
+        event.preventDefault();
+        if (event.shiftKey) ungroupSelection();
+        else groupSelection();
+        return;
+      }
       if (event.code === "KeyC" && selected.size > 0) {
         event.preventDefault();
         copyLayers();
@@ -5127,6 +6363,33 @@ export function bindStudio(
         pasteLayers(lastPointer);
       }
       return;
+    }
+    // Instagram speaker cards follow the left and right keys when nothing is selected.
+    // A selection still nudges, and fields that already use the arrows keep them.
+    if (
+      !mod &&
+      !event.altKey &&
+      !typing &&
+      !cropping &&
+      !penMode &&
+      !penEdit &&
+      !penDraft &&
+      !dropper &&
+      selected.size === 0 &&
+      speakerDeck &&
+      state.presetId === DEFAULT_CONFERENCE_PRESET_ID &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight")
+    ) {
+      const focused = event.target instanceof Element ? event.target : null;
+      const widget = focused?.closest(".studio__preset, #studio-sources, .studio__tabs, #studio-splitter, .studio__order");
+      const range = focused instanceof HTMLInputElement && focused.type === "range";
+      const menu = focused instanceof HTMLSelectElement;
+      if (!widget && !range && !menu) {
+        event.preventDefault();
+        const id = event.key === "ArrowRight" ? "#studio-speaker-next" : "#studio-speaker-prev";
+        document.querySelector<HTMLButtonElement>(id)?.click();
+        return;
+      }
     }
     if (!onCard) return;
     if (cropping) {
@@ -5191,11 +6454,44 @@ export function bindStudio(
     event.stopPropagation();
     preset.blur();
   };
+  const onDrawShift = (event: KeyboardEvent) => {
+    if (event.key === "Alt" && !event.repeat && drag) {
+      if (event.type === "keydown") {
+        drag.copy = true;
+        canvas.dataset.copy = "true";
+        if (tapStart?.moved && lastPointer && !drag.duplicated) {
+          forkDragCopy();
+          const locked = dragDelta(lastPointer, event.shiftKey);
+          moveGroup(drag.start, locked.dx, locked.dy);
+          paint();
+        }
+      } else if (!drag.duplicated) {
+        drag.copy = false;
+        delete canvas.dataset.copy;
+      }
+      return;
+    }
+    if (event.key !== "Shift" || event.repeat) return;
+    const target = event.target;
+    const typing =
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target.matches("textarea, input:not([type=range], [type=color], [type=radio], [type=checkbox], [type=button], [type=file])"));
+    if (typing) return;
+    const shift = event.type === "keydown";
+    if (lineAim) applyLineAim(shift);
+    if (penDraft?.cursor) syncPenAim(penDraft.cursor, shift);
+    if (lineAim || penDraft?.cursor) paint();
+  };
   document.addEventListener("keydown", studioKeys);
+  document.addEventListener("keydown", onDrawShift);
+  document.addEventListener("keyup", onDrawShift);
   document.addEventListener("pointerdown", onDropperPointer, true);
   document.addEventListener("click", onDropperClick, true);
   stopStudioKeys = () => {
     document.removeEventListener("keydown", studioKeys);
+    document.removeEventListener("keydown", onDrawShift);
+    document.removeEventListener("keyup", onDrawShift);
     document.removeEventListener("pointerdown", onDropperPointer, true);
     document.removeEventListener("click", onDropperClick, true);
   };
@@ -5237,5 +6533,172 @@ export function bindStudio(
   previewObserver?.disconnect();
   previewObserver = new ResizeObserver(() => updateScale());
   previewObserver.observe(stage);
+
+  let sliding = false;
+  const cardShot = (): HTMLCanvasElement | null => {
+    if (canvas.hidden || canvas.width < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
+    const rect = fit.getBoundingClientRect();
+    const shot = document.createElement("canvas");
+    shot.className = "studio__slide-ghost";
+    shot.width = Math.max(1, Math.round(rect.width * window.devicePixelRatio));
+    shot.height = Math.max(1, Math.round(rect.height * window.devicePixelRatio));
+    const ctx = shot.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(canvas, 0, 0, shot.width, shot.height);
+    return shot;
+  };
+  const playCardSlide = (outgoing: HTMLCanvasElement, incoming: HTMLCanvasElement, delta: number) =>
+    new Promise<void>((resolve) => {
+      const dir = delta > 0 ? 1 : -1;
+      const gap = 36;
+      outgoing.style.transform = "translateX(0)";
+      incoming.style.transform = `translateX(calc(${dir * 100}% + ${dir * gap}px))`;
+      fit.append(outgoing, incoming);
+      fit.dataset.sliding = "true";
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        outgoing.remove();
+        incoming.remove();
+        delete fit.dataset.sliding;
+        resolve();
+      };
+      window.setTimeout(finish, 560);
+      incoming.addEventListener("transitionend", finish, { once: true });
+      requestAnimationFrame(() => {
+        void fit.offsetWidth;
+        outgoing.classList.add("is-moving");
+        incoming.classList.add("is-moving");
+        outgoing.style.transform = `translateX(calc(${dir * -100}% + ${dir * -gap}px))`;
+        incoming.style.transform = "translateX(0)";
+      });
+    });
+  const stepSpeaker = (delta: number) => {
+    if (!speakerDeck || state.presetId !== DEFAULT_CONFERENCE_PRESET_ID || sliding) return;
+    if (editing) closeEditor(true);
+    if (cropping) endCrop(true);
+    if (penDraft) {
+      penDraft = null;
+      penMode = false;
+      syncPenMode();
+    }
+    if (penEdit) cancelPenEdit();
+    finishGesture();
+    sliding = true;
+    const outgoing = cardShot();
+    if (outgoing) {
+      holdSlide = true;
+      outgoing.style.transform = "translateX(0)";
+      fit.appendChild(outgoing);
+      fit.dataset.sliding = "true";
+    }
+    speakerDeck.slides[speakerDeck.index] = cloneStudio(state);
+    const count = speakerDeck.slides.length;
+    speakerDeck.index = (speakerDeck.index + delta + count) % count;
+    replaceStudio(state, speakerDeck.slides[speakerDeck.index]!);
+    selected.clear();
+    undoStack.length = 0;
+    redoStack.length = 0;
+    gesture = null;
+    syncHistoryButtons();
+    labelSpeaker();
+    void (async () => {
+      try {
+        await redraw();
+        const incoming = outgoing ? cardShot() : null;
+        if (outgoing && incoming) await playCardSlide(outgoing, incoming, delta);
+      } finally {
+        holdSlide = false;
+        outgoing?.remove();
+        delete fit.dataset.sliding;
+        sliding = false;
+      }
+    })();
+  };
+  root.querySelector("#studio-speaker-prev")?.addEventListener("click", () => stepSpeaker(-1));
+  root.querySelector("#studio-speaker-next")?.addEventListener("click", () => stepSpeaker(1));
+  if (orderList) {
+    const draggedIndex = (clientX: number) => {
+      if (!orderDrag) return -1;
+      const cards = [...orderList.querySelectorAll<HTMLElement>(".studio__order-card")];
+      const from = cards.indexOf(orderDrag.node);
+      if (from < 0) return -1;
+      let to = from;
+      for (let index = from + 1; index < cards.length; index += 1) {
+        const rect = cards[index]!.getBoundingClientRect();
+        if (clientX > rect.left + rect.width / 2) to = index;
+      }
+      for (let index = from - 1; index >= 0; index -= 1) {
+        const rect = cards[index]!.getBoundingClientRect();
+        if (clientX < rect.left + rect.width / 2) to = index;
+      }
+      return to === from ? -1 : to;
+    };
+    orderList.addEventListener("pointerdown", (event) => {
+      if (orderDrag || sliding || event.button !== 0) return;
+      const card = event.target instanceof Element ? event.target.closest<HTMLElement>(".studio__order-card") : null;
+      if (!card) return;
+      orderDrag = { pointerId: event.pointerId, node: card, moved: false, startX: event.clientX };
+      try {
+        orderList.setPointerCapture(event.pointerId);
+      } catch {
+        /* a pointer that is already gone still reorders through this listener */
+      }
+    });
+    orderList.addEventListener("pointermove", (event) => {
+      if (!orderDrag || event.pointerId !== orderDrag.pointerId) return;
+      if (!orderDrag.moved && Math.abs(event.clientX - orderDrag.startX) < 4) return;
+      orderDrag.moved = true;
+      orderDrag.node.classList.add("is-dragging");
+      const to = draggedIndex(event.clientX);
+      if (to < 0) return;
+      const from = [...orderList.children].indexOf(orderDrag.node);
+      placeSpeaker(from, to);
+    });
+    const finishOrderDrag = (event: PointerEvent) => {
+      if (!orderDrag || event.pointerId !== orderDrag.pointerId) return;
+      const moved = orderDrag.moved;
+      orderDrag.node.classList.remove("is-dragging");
+      orderDrag = null;
+      try {
+        orderList.releasePointerCapture(event.pointerId);
+      } catch {
+        /* capture was already released */
+      }
+      if (!moved || !speakerDeck) return;
+      const blockClick = (click: Event) => {
+        click.preventDefault();
+        click.stopPropagation();
+      };
+      orderList.addEventListener("click", blockClick, true);
+      window.setTimeout(() => orderList.removeEventListener("click", blockClick, true), 0);
+      writeInstagramOrder(speakerDeck.srcs);
+      renderSpeakerOrder();
+    };
+    orderList.addEventListener("pointerup", finishOrderDrag);
+    orderList.addEventListener("pointercancel", finishOrderDrag);
+    orderList.addEventListener("click", (event) => {
+      const card = event.target instanceof Element ? event.target.closest<HTMLElement>(".studio__order-card") : null;
+      if (!card || !speakerDeck) return;
+      const index = [...orderList.children].indexOf(card);
+      if (index < 0 || index === speakerDeck.index) return;
+      stepSpeaker(index - speakerDeck.index);
+    });
+    orderList.addEventListener("keydown", (event) => {
+      if ((event.key !== "ArrowLeft" && event.key !== "ArrowRight") || event.altKey || event.metaKey || event.ctrlKey) return;
+      const card = event.target instanceof Element ? event.target.closest<HTMLElement>(".studio__order-card") : null;
+      if (!card || !speakerDeck || sliding) return;
+      const from = [...orderList.children].indexOf(card);
+      const to = from + (event.key === "ArrowRight" ? 1 : -1);
+      if (from < 0 || to < 0 || to >= speakerDeck.srcs.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      placeSpeaker(from, to);
+      writeInstagramOrder(speakerDeck.srcs);
+      card.focus();
+    });
+  }
+
   void redraw();
 }

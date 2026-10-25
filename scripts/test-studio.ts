@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import BUILTIN_BASELINES from "../src/shared/studio-defaults.json";
 import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
   alignOffsets,
+  canGroupLayers,
+  canUngroupLayers,
+  copiedGroups,
+  groupedIds,
+  groupLayers,
+  imageAdjust,
+  imageAdjustFilter,
+  imageBlur,
+  layerBlurBottom,
+  layerOpacity,
+  selectionBounds,
+  selectionOutlines,
   clampCardSize,
   scaleCardSize,
   createStudioState,
@@ -34,6 +47,9 @@ import {
   sanitizeStudioCode,
   scaleFontSizes,
   scaleImageAround,
+  shiftAxisDelta,
+  shiftAxisPoint,
+  ungroupLayers,
   isTextLayer,
   setStudioTheme,
   substituteStudioCode,
@@ -41,8 +57,12 @@ import {
   type ImageLayer,
   type StudioState,
 } from "../src/shared/studio.ts";
+import { applySpeakerOrder, instagramDeck, speakerSlides, speakerSrcOf } from "../src/shared/conference.ts";
+import { cardPdf } from "../src/shared/card-pdf.ts";
+import { GIF_LONG_EDGE, createGifEncoder, gifFrameDelays, gifSize } from "../src/shared/card-gif.ts";
+import { GifReader } from "omggif";
 import { DEFAULT_PRESET_ID, presetById, STUDIO_PRESETS } from "../src/shared/studio-presets.ts";
-import { lineContains, nodeBounds, parseGradient, parseVectorLayer, penContains, radiusHandlePoints, restartPenAt, resizeShape, scaleShapeBox, shadowOffset, shapeBlend, shapeContains, shapeNodes, shapeStroke, starInner, starPoints, transformNodes, vectorSvg } from "../src/shared/studio-shapes.ts";
+import { lineContains, lineFade, lineFadeStops, nodeBounds, parseGradient, parseVectorLayer, penContains, radiusHandlePoints, restartPenAt, resizeShape, scaleShapeBox, shadowOffset, shapeBlend, shapeContains, shapeNodes, shapeStroke, starInner, starPoints, transformNodes, vectorSvg } from "../src/shared/studio-shapes.ts";
 
 assert.equal(STUDIO_PRESETS.length, 8);
 assert.equal(new Set(STUDIO_PRESETS.map((preset) => preset.id)).size, 8);
@@ -161,6 +181,15 @@ assert.deepEqual(alignOffsets(alignBoxes, "top", card), [{ dx: 0, dy: -50 }, { d
 assert.deepEqual(alignOffsets(alignBoxes, "bottom", card), [{ dx: 0, dy: 930 }, { dx: 0, dy: 740 }]);
 assert.deepEqual(alignOffsets(alignBoxes, "vcenter", card), [{ dx: 0, dy: 440 }, { dx: 0, dy: 220 }]);
 assert.deepEqual(alignOffsets([{ x: 71, y: 99, w: 280, h: 125 }], "hcenter", card), [{ dx: 329, dy: 0 }]);
+// Several objects line up inside their own group, not the card.
+const group = selectionBounds(alignBoxes);
+assert.deepEqual(group, { x: 100, y: 50, w: 400, h: 290 });
+assert.deepEqual(alignOffsets(alignBoxes, "left", group), [{ dx: 0, dy: 0 }, { dx: -300, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "right", group), [{ dx: 200, dy: 0 }, { dx: 0, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "hcenter", group), [{ dx: 100, dy: 0 }, { dx: -150, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "top", group), [{ dx: 0, dy: 0 }, { dx: 0, dy: -250 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "bottom", group), [{ dx: 0, dy: 190 }, { dx: 0, dy: 0 }]);
+assert.deepEqual(alignOffsets(alignBoxes, "vcenter", group), [{ dx: 0, dy: 95 }, { dx: 0, dy: -125 }]);
 // Even spacing keeps the outer boxes and gives every gap the same size, in position order.
 const spaceBoxes = [
   { x: 600, y: 0, w: 100, h: 100 },
@@ -394,6 +423,91 @@ assert.equal(shapeContains({ id: "s", kind: "shape", shape: "ellipse", x: 0, y: 
 assert.equal(shapeContains({ id: "s", kind: "shape", shape: "ellipse", x: 0, y: 0, width: 40, height: 20, radius: 0, color: "#000000" }, 0, 0), false);
 assert.equal(lineContains({ id: "l", kind: "line", x: 0, y: 10, x2: 40, y2: 10, stroke: 4, cap: "butt", start: false, end: false, color: "#000000" }, 20, 10), true);
 assert.equal(lineContains({ id: "l", kind: "line", x: 0, y: 10, x2: 40, y2: 10, stroke: 4, cap: "butt", start: false, end: false, color: "#000000" }, 20, 40), false);
+assert.deepEqual(lineFadeStops(0, 0), [
+  { offset: 0, alpha: 1 },
+  { offset: 1, alpha: 1 },
+]);
+assert.deepEqual(lineFadeStops(40, 0), [
+  { offset: 0, alpha: 0 },
+  { offset: 0.4, alpha: 1 },
+  { offset: 1, alpha: 1 },
+]);
+assert.deepEqual(lineFadeStops(100, 100), [
+  { offset: 0, alpha: 0 },
+  { offset: 0.5, alpha: 1 },
+  { offset: 1, alpha: 0 },
+]);
+const fadedLine = parseVectorLayer(
+  { id: "fade", kind: "line", x: 0, y: 0, x2: 80, y2: 0, stroke: 8, cap: "butt", start: false, end: true, color: "#112233", fadeStart: 25, fadeEnd: 0 },
+  "#000000",
+);
+assert.equal(fadedLine?.kind, "line");
+if (fadedLine?.kind === "line") {
+  assert.equal(lineFade(fadedLine).start, 25);
+  assert.equal(lineFade(fadedLine).end, 0);
+  assert.equal(fadedLine.fadeEnd, undefined);
+  const svg = vectorSvg(fadedLine);
+  assert.match(svg, /gradientUnits="userSpaceOnUse"/);
+  assert.match(svg, /stop-opacity="0"/);
+  assert.match(svg, /stroke="url\(#line-fade-fade\)"/);
+  assert.match(svg, /fill="url\(#line-fade-fade\)"/);
+}
+const plainLine = parseVectorLayer(
+  { id: "plain", kind: "line", x: 0, y: 0, x2: 10, y2: 0, stroke: 4, color: "#000000" },
+  "#000000",
+);
+assert.equal(plainLine?.kind === "line" ? plainLine.fadeStart : 1, undefined);
+assert.doesNotMatch(plainLine ? vectorSvg(plainLine) : "", /linearGradient/);
+
+const across = shiftAxisDelta(12, 3, true, null);
+assert.deepEqual(across, { dx: 12, dy: 0, axis: "x" });
+assert.deepEqual(shiftAxisDelta(12, 30, true, across.axis), { dx: 12, dy: 0, axis: "x" });
+assert.deepEqual(shiftAxisDelta(2, 20, true, null), { dx: 0, dy: 20, axis: "y" });
+assert.deepEqual(shiftAxisDelta(12, 3, false, "x"), { dx: 12, dy: 3, axis: null });
+assert.deepEqual(shiftAxisPoint({ x: 40, y: 18 }, { x: 10, y: 10 }, true, null), { x: 40, y: 10, axis: "x" });
+assert.deepEqual(shiftAxisDelta(1, 1, true, null), { dx: 1, dy: 1, axis: null });
+
+const grouped = createStudioState("black-mountain-red-horizon", "#000000");
+const groupIds = grouped.layers.slice(0, 2).map((layer) => layer.id);
+assert.equal(groupLayers(grouped, [groupIds[0] ?? ""]), false);
+assert.equal(groupLayers(grouped, groupIds), true);
+assert.deepEqual(groupedIds(grouped, groupIds[0] ?? ""), groupIds);
+assert.equal(canGroupLayers(grouped, groupIds), false);
+const thirdId = grouped.layers[2]?.id ?? "";
+assert.equal(groupLayers(grouped, [...groupIds, thirdId]), true);
+assert.equal(canUngroupLayers(grouped, groupIds), false);
+assert.equal(ungroupLayers(grouped, [...groupIds, thirdId]), true);
+assert.equal(grouped.groups, undefined);
+assert.equal(groupLayers(grouped, groupIds), true);
+const outlineBoxes = [
+  { id: groupIds[0] ?? "", x: 10, y: 20, w: 30, h: 40 },
+  { id: groupIds[1] ?? "", x: 50, y: 10, w: 20, h: 20 },
+  { id: thirdId, x: 0, y: 80, w: 10, h: 10 },
+];
+const united = selectionOutlines(grouped, groupIds, outlineBoxes);
+assert.equal(united.length, 1);
+assert.deepEqual(united[0]?.box, { x: 10, y: 10, w: 60, h: 50 });
+const withThird = selectionOutlines(grouped, [...groupIds, thirdId], outlineBoxes);
+assert.equal(withThird.length, 2);
+assert.deepEqual(withThird[1]?.box, { x: 0, y: 80, w: 10, h: 10 });
+assert.equal(ungroupLayers(grouped, groupIds), true);
+const split = selectionOutlines(grouped, groupIds, outlineBoxes);
+assert.equal(split.length, 2);
+assert.deepEqual(
+  split.map((item) => item.box),
+  [
+    { x: 10, y: 20, w: 30, h: 40 },
+    { x: 50, y: 10, w: 20, h: 20 },
+  ],
+);
+assert.equal(groupLayers(grouped, groupIds), true);
+const stored = normalizeStudioState(JSON.parse(JSON.stringify({ ...grouped, groups: [...(grouped.groups ?? []), ["missing", "gone"]] })));
+assert.ok(stored);
+assert.deepEqual(stored.groups, [groupIds]);
+const copies = copiedGroups(stored.groups, new Map(groupIds.map((id) => [id, `${id}-copy`])));
+assert.deepEqual(copies, [groupIds.map((id) => `${id}-copy`)]);
+resetStudioState(grouped, grouped.color);
+assert.equal(grouped.groups, undefined);
 assert.equal(
   penContains(
     {
@@ -437,8 +551,10 @@ const shaded = normalizeStudioState({
       color: "#112233",
       shadow: { size: 4, blur: 8, distance: 10 },
       blend: "multiply",
-      blurFrom: 0,
-      blurTo: 12,
+      opacity: 25,
+      blurFrom: 8,
+      blurTo: 8,
+      blurBottom: 20,
       gradient: { angle: 0, from: "#000000", to: "#ffffff" },
     },
     {
@@ -451,12 +567,69 @@ const shaded = normalizeStudioState({
       fontId: "pretendard",
       color: "#111111",
       gradient: { angle: 90, from: "#000000", to: "#ffffff" },
+      blend: "screen",
+      shadow: { size: 4, blur: 8, distance: 10, opacity: 40 },
+    },
+    {
+      id: "photo",
+      kind: "image",
+      src: "x",
+      x: 12,
+      y: 16,
+      width: 120,
+      radius: 8,
+      blend: "overlay",
+      opacity: 40,
+      blur: 12,
+      blurBottom: 24,
+      shadow: { size: 6, blur: 4, distance: 12, opacity: 50 },
     },
   ],
 });
 assert.ok(shaded);
+const shadedTitle = shaded.layers.find((layer) => layer.kind === "title");
+assert.equal(shadedTitle && isTextLayer(shadedTitle) ? shadedTitle.blend : "", "screen");
+assert.equal(shadedTitle && isTextLayer(shadedTitle) ? shadedTitle.shadow?.blur : 0, 8);
+assert.equal(shadedTitle && isTextLayer(shadedTitle) ? shadedTitle.shadow?.opacity : 0, 40);
 const shadeCode = designToCode(shaded);
 assert.match(shadeCode, /mix-blend-mode: multiply/);
+assert.match(shadeCode, /mix-blend-mode: screen/);
+assert.match(shadeCode, /mix-blend-mode: overlay/);
+assert.match(shadeCode, /text-shadow:/);
+assert.match(shadeCode, /box-shadow: [\d.]+px [\d.]+px 4px 6px rgba\(0, 0, 0, 0\.5\)/);
+const shadedImage = shaded.layers.find((layer) => layer.kind === "image");
+assert.equal(shadedImage?.kind === "image" ? shadedImage.blend : "", "overlay");
+assert.equal(shadedImage?.kind === "image" ? shadedImage.shadow?.size : 0, 6);
+assert.equal(shadedImage?.kind === "image" ? shadedImage.shadow?.opacity : 0, 50);
+assert.equal(shadedImage?.kind === "image" ? layerOpacity(shadedImage) : 0, 40);
+assert.equal(shadedImage?.kind === "image" ? imageBlur(shadedImage) : 0, 12);
+assert.equal(shadedImage?.kind === "image" ? layerBlurBottom(shadedImage) : 0, 24);
+assert.equal(shaded.layers.find((layer) => layer.kind === "shape" && layer.blurBottom === 20) ? 20 : 0, 20);
+assert.match(shadeCode, /opacity: 0\.4/);
+assert.match(shadeCode, /filter: blur\(12px\)/);
+assert.match(shadeCode, /filter: blur\(24px\)/);
+assert.match(shadeCode, /mask-image: linear-gradient\(to bottom, transparent, #000\)/);
+assert.match(shadeCode, /stdDeviation="10"/);
+assert.match(shadeCode, /opacity: 0\.25/);
+assert.equal(layerOpacity({}), 100);
+assert.equal(imageBlur({}), 0);
+assert.equal(
+  imageAdjustFilter(imageAdjust({ brightness: 20, contrast: 0, saturation: -100, hue: 30 })),
+  "brightness(120%) saturate(0%) hue-rotate(30deg)",
+);
+const tuned = normalizeStudioState({
+  themeSlug: "x",
+  color: "#ffffff",
+  layers: [{ id: "i", kind: "image", src: "x", x: 0, y: 0, width: 100, brightness: 20, contrast: 0, saturation: 15, hue: -40 }],
+});
+assert.ok(tuned);
+const tunedImage = tuned.layers.find((layer) => layer.kind === "image");
+assert.equal(tunedImage?.kind === "image" ? tunedImage.brightness : 0, 20);
+assert.equal(tunedImage?.kind === "image" ? tunedImage.contrast : 0, undefined);
+assert.equal(tunedImage?.kind === "image" ? tunedImage.saturation : 0, 15);
+assert.equal(tunedImage?.kind === "image" ? tunedImage.hue : 0, -40);
+assert.match(designToCode(tuned), /filter: brightness\(120%\) saturate\(115%\) hue-rotate\(-40deg\)/);
+assert.equal(layerBlurBottom({}), 0);
 assert.match(shadeCode, /linearGradient/);
 assert.match(shadeCode, /background-clip: text/);
 const drop = shadowOffset(100);
@@ -544,5 +717,113 @@ assert.equal(moved[0]?.x, 0);
 assert.equal(nodeBounds(shapeNodes(sharpRect)).width > 30, true);
 const starred = parseVectorLayer({ id: "star", kind: "shape", shape: "star", x: 0, y: 0, width: 80, height: 80, radius: 0, color: "#112233", inner: 0.5 }, "#000000");
 assert.equal(starred?.kind === "shape" ? starred.inner : 0, 0.5);
+
+const speakerSrcs = ["conf:speaker-001", "conf:speaker-002", "conf:speaker-003", "conf:speaker-004"];
+const speakerMaster = createStudioState("conf:speaker-001", "#102a4a");
+speakerMaster.layers.push({ id: "logo", kind: "image", src: "conf:logo-skku-4", x: 10, y: 10, width: 200, radius: 0, crop: null });
+const title = speakerMaster.layers.find((layer) => layer.kind === "title");
+if (title?.kind === "title") title.text = "AI + DESIGN FUTURE";
+const deck = speakerSlides(speakerMaster, speakerSrcs);
+assert.equal(deck.index, 0);
+assert.equal(deck.slides.length, 4);
+assert.equal(speakerSrcOf(deck.slides[0]!), "conf:speaker-001");
+assert.equal(speakerSrcOf(deck.slides[2]!), "conf:speaker-003");
+assert.equal(deck.slides[2]!.themeSlug, "conf:speaker-003");
+const copiedTitle = deck.slides[2]!.layers.find((layer) => layer.kind === "title");
+assert.equal(copiedTitle?.kind === "title" ? copiedTitle.text : "", "AI + DESIGN FUTURE");
+const copiedLogo = deck.slides[2]!.layers.find((layer) => layer.kind === "image" && layer.src.startsWith("conf:logo"));
+assert.equal(copiedLogo?.kind === "image" ? copiedLogo.src : "", "conf:logo-skku-4");
+const customThird = structuredClone(deck.slides[2]!);
+const customTitle = customThird.layers.find((layer) => layer.kind === "title");
+if (customTitle?.kind === "title") customTitle.text = "ONLY THREE";
+const mixed = instagramDeck(speakerMaster, speakerSrcs, { "conf:speaker-003": customThird });
+const mixedTitle = (index: number) => {
+  const layer = mixed.slides[index]?.layers.find((item) => item.kind === "title");
+  return layer?.kind === "title" ? layer.text : "";
+};
+assert.equal(mixed.index, 0);
+assert.equal(mixedTitle(0), "AI + DESIGN FUTURE");
+assert.equal(mixedTitle(2), "ONLY THREE");
+assert.equal(speakerSrcOf(mixed.slides[1]!), "conf:speaker-002");
+assert.notEqual(mixed.slides[2], customThird);
+const third = createStudioState("conf:speaker-003", "#102a4a");
+const fromThird = speakerSlides(third, speakerSrcs);
+assert.equal(fromThird.index, 2);
+assert.equal(speakerSrcOf(fromThird.slides[2]!), "conf:speaker-003");
+assert.equal(speakerSrcOf(fromThird.slides[0]!), "conf:speaker-001");
+const reordered = applySpeakerOrder(speakerSrcs, ["conf:speaker-004", "conf:speaker-002", "conf:missing"]);
+assert.deepEqual(reordered, ["conf:speaker-004", "conf:speaker-002", "conf:speaker-001", "conf:speaker-003"]);
+assert.deepEqual(applySpeakerOrder(speakerSrcs, []), speakerSrcs);
+assert.deepEqual(speakerSrcs, ["conf:speaker-001", "conf:speaker-002", "conf:speaker-003", "conf:speaker-004"]);
+
+assert.equal(GIF_LONG_EDGE, 1080);
+assert.deepEqual(gifSize(2160, 2160), { width: 1080, height: 1080 });
+assert.deepEqual(gifSize(100, 50), { width: 100, height: 50 });
+assert.deepEqual(gifSize(1280, 3840), { width: 360, height: 1080 });
+const delays = gifFrameDelays(5.04);
+assert.equal(delays.length, 50);
+assert.equal(delays.reduce((sum, delay) => sum + delay, 0), 504);
+assert.ok(delays.every((delay) => delay >= 1));
+
+function solidFrame(width: number, height: number, red: number, green: number, blue: number, alpha = 255): Uint8ClampedArray {
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < width * height; index += 1) {
+    pixels[index * 4] = red;
+    pixels[index * 4 + 1] = green;
+    pixels[index * 4 + 2] = blue;
+    pixels[index * 4 + 3] = alpha;
+  }
+  return pixels;
+}
+const gifEncoder = createGifEncoder(2, 2, 2);
+gifEncoder.add(solidFrame(2, 2, 220, 10, 10), 10);
+gifEncoder.add(solidFrame(2, 2, 10, 10, 220), 10);
+const gifBytes = gifEncoder.finish();
+const netscape = new TextEncoder().encode("NETSCAPE2.0");
+const netscapeAt = gifBytes.findIndex((_, index) => netscape.every((byte, offset) => gifBytes[index + offset] === byte));
+assert.ok(netscapeAt > 0);
+assert.equal(gifBytes[netscapeAt + 13], 0);
+assert.equal(gifBytes[netscapeAt + 14], 0);
+const gifReader = new GifReader(gifBytes);
+assert.equal(gifReader.width, 2);
+assert.equal(gifReader.numFrames(), 2);
+const gifFrame = new Uint8Array(2 * 2 * 4);
+gifReader.decodeAndBlitFrameRGBA(0, gifFrame);
+assert.ok((gifFrame[0] ?? 0) > 180 && (gifFrame[1] ?? 255) < 40 && (gifFrame[2] ?? 255) < 40);
+gifReader.decodeAndBlitFrameRGBA(1, gifFrame);
+assert.ok((gifFrame[2] ?? 0) > 180 && (gifFrame[0] ?? 255) < 40);
+const clear = solidFrame(2, 1, 0, 200, 0);
+clear[7] = 0;
+const clearGif = createGifEncoder(2, 1, 1);
+clearGif.add(clear, 5);
+const clearBytes = clearGif.finish();
+assert.ok(clearBytes.includes(0x21) && clearBytes.includes(0xf9));
+
+function pdfStream(pdf: Uint8Array, token: string): Uint8Array {
+  const needle = new TextEncoder().encode(token);
+  const stream = new TextEncoder().encode("stream\n");
+  const endMark = new TextEncoder().encode("\nendstream");
+  const find = (from: number, mark: Uint8Array) => {
+    for (let index = from; index <= pdf.length - mark.length; index += 1) {
+      if (mark.every((byte, offset) => pdf[index + offset] === byte)) return index;
+    }
+    return -1;
+  };
+  const at = find(0, needle);
+  assert.ok(at >= 0);
+  const start = find(at, stream);
+  assert.ok(start >= 0);
+  const end = find(start + stream.length, endMark);
+  assert.ok(end >= 0);
+  return pdf.slice(start + stream.length, end);
+}
+const opaquePdf = await cardPdf(solidFrame(2, 1, 255, 0, 0), 2, 1);
+assert.ok(new TextDecoder().decode(opaquePdf.slice(0, 8)).startsWith("%PDF"));
+assert.ok(new TextDecoder("latin1").decode(opaquePdf).includes("/MediaBox [0 0 2 1]"));
+assert.equal(new TextDecoder("latin1").decode(opaquePdf).includes("/SMask"), false);
+assert.deepEqual([...inflateSync(pdfStream(opaquePdf, "/Filter /FlateDecode"))], [255, 0, 0, 255, 0, 0]);
+const faded = solidFrame(1, 1, 0, 0, 255, 0);
+const fadedPdf = await cardPdf(faded, 1, 1);
+assert.ok(new TextDecoder("latin1").decode(fadedPdf).includes("/SMask 6 0 R"));
 
 console.log("OK: studio preset, size, font, radius, wrap, ink, code, and route checks");

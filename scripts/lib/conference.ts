@@ -21,6 +21,9 @@ import { stableStringify } from "../../src/shared/stable-json.ts";
 import { probeWithFfprobe } from "./probe-asset.ts";
 
 export const CONFERENCE_SOURCE_DIR = "phase 2-resources";
+/** Card backgrounds come from this folder. The older `[Graphic_Resources]` set is left in place and not used. */
+const GRAPHIC_RESOURCE_DIR = "[Graphic_Resources] 2";
+const STILL_EXTENSIONS = new Set([".png", ".jpg", ".jpeg"]);
 const THUMB_WIDTH = 480;
 const THUMB_QUALITY = 80;
 const SVG_EDGE = 1080;
@@ -131,9 +134,9 @@ export async function buildConference(outRoot: string, mode: "original" | "web" 
     backgrounds.set(id, item);
     return item;
   };
-  const graphic = files.filter((path) => path.includes("[Graphic_Resources]"));
+  const graphic = files.filter((path) => path.includes(`${GRAPHIC_RESOURCE_DIR}/`));
   const videos = graphic.filter((path) => extname(path).toLowerCase() === ".mp4");
-  const images = graphic.filter((path) => extname(path).toLowerCase() === ".png");
+  const images = graphic.filter((path) => STILL_EXTENSIONS.has(extname(path).toLowerCase()));
 
   for (const path of images) {
     const id = backgroundIdFor(basename(path));
