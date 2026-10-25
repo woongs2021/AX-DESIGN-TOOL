@@ -1381,6 +1381,11 @@
       {
         "date": "2026-10-25",
         "operation": "update",
+        "title": "Conference 다섯 규격의 기본 레이아웃"
+      },
+      {
+        "date": "2026-10-25",
+        "operation": "update",
         "title": "Conference 기본 레이아웃과 원본 배경"
       },
       {
