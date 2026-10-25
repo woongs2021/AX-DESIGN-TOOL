@@ -51,9 +51,13 @@ export type ShapeLayer = {
   shadow?: ShapeShadow;
   stroke?: ShapeStroke;
   blend?: ShapeBlend;
-  /** Blur at the left edge and the right edge. The blur fades across the shape. */
+  /** 0–100. Absent means fully opaque. */
+  opacity?: number;
+  /** Blur at the left edge and the right edge. Equal values are a uniform layer blur. */
   blurFrom?: number;
   blurTo?: number;
+  /** Blur at the bottom edge. The top stays at the layer blur. Absent or 0 keeps an even blur. */
+  blurBottom?: number;
   gradient?: LinearGradient | null;
   /** Inner radius of a star, as a fraction of the outer radius. */
   inner?: number;
@@ -75,6 +79,10 @@ export type LineLayer = {
   /** Arrow on the second endpoint (x2, y2). */
   end: boolean;
   color: string;
+  /** 0–100. Share of the line that fades out at the start (왼쪽). Absent means a hard edge. */
+  fadeStart?: number;
+  /** 0–100. Share of the line that fades out at the end (오른쪽). Absent means a hard edge. */
+  fadeEnd?: number;
 };
 
 /** A cubic handle in card pixels. Absent on a corner. */
@@ -122,13 +130,18 @@ export function clampUnit(value: number, max: number): number {
   return Math.min(max, Math.max(0, Math.round(value)));
 }
 
+/** Blur radius at the bottom edge. 0 means the layer blur stays even from top to bottom. */
+export function layerBlurBottom(layer: { blurBottom?: number | null }): number {
+  return clampUnit(layer.blurBottom ?? 0, LAYER_BLUR_MAX);
+}
+
 const SHADOW_OPACITY = 55;
 
 export function emptyShadow(): ShapeShadow {
   return { size: 0, blur: 0, distance: 0, opacity: SHADOW_OPACITY };
 }
 
-export function shapeShadow(layer: ShapeLayer): ShapeShadow {
+export function shapeShadow(layer: { shadow?: ShapeShadow | null }): ShapeShadow {
   return {
     size: clampUnit(layer.shadow?.size ?? 0, SHADOW_SIZE_MAX),
     blur: clampUnit(layer.shadow?.blur ?? 0, SHADOW_BLUR_MAX),
@@ -550,6 +563,47 @@ export function lineSegment(layer: LineLayer): { x1: number; y1: number; x2: num
   };
 }
 
+export function lineFade(layer: Pick<LineLayer, "fadeStart" | "fadeEnd">): { start: number; end: number } {
+  return {
+    start: clampUnit(layer.fadeStart ?? 0, 100),
+    end: clampUnit(layer.fadeEnd ?? 0, 100),
+  };
+}
+
+export type LineFadeStop = { offset: number; alpha: number };
+
+/** Alpha stops along a line. Each end fades across its own share of the length; the two shares meet in the middle when they overlap. */
+export function lineFadeStops(start: number, end: number): LineFadeStop[] {
+  let head = Math.min(1, Math.max(0, start) / 100);
+  let tail = Math.min(1, Math.max(0, end) / 100);
+  if (head + tail > 1) {
+    const scale = 1 / (head + tail);
+    head *= scale;
+    tail *= scale;
+  }
+  const stops: LineFadeStop[] = [];
+  const push = (offset: number, alpha: number) => {
+    const at = Math.round(Math.min(1, Math.max(0, offset)) * 10000) / 10000;
+    const last = stops[stops.length - 1];
+    if (last && Math.abs(last.offset - at) < 0.0001) {
+      last.alpha = alpha;
+      return;
+    }
+    stops.push({ offset: at, alpha });
+  };
+  if (head <= 0) push(0, 1);
+  else {
+    push(0, 0);
+    push(head, 1);
+  }
+  if (tail <= 0) push(1, 1);
+  else {
+    push(1 - tail, 1);
+    push(1, 0);
+  }
+  return stops;
+}
+
 export function lineBounds(layer: LineLayer): { x: number; y: number; w: number; h: number } {
   const pad = layer.stroke / 2 + (layer.start || layer.end ? arrowLength(layer) : 0);
   const left = Math.min(layer.x, layer.x2) - pad;
@@ -675,6 +729,34 @@ function gradientDef(id: string, gradient: LinearGradient): string {
   return `<linearGradient id="${id}" x1="${0.5 - dx * 0.5}" y1="${0.5 - dy * 0.5}" x2="${0.5 + dx * 0.5}" y2="${0.5 + dy * 0.5}"><stop offset="0" stop-color="${escapeAttr(gradient.from)}" /><stop offset="1" stop-color="${escapeAttr(gradient.to)}" /></linearGradient>`;
 }
 
+function shapeGraphic(layer: ShapeLayer, fill: string, strokeAttr: string, extra: string): string {
+  if (layer.nodes && layer.nodes.length >= 2) {
+    return `<path d="${penPathData(layer.nodes, true)}" fill="${fill}"${strokeAttr}${extra} />`;
+  }
+  if (layer.shape === "ellipse") {
+    return `<ellipse cx="${layer.x + layer.width / 2}" cy="${layer.y + layer.height / 2}" rx="${layer.width / 2}" ry="${layer.height / 2}" fill="${fill}"${strokeAttr}${extra} />`;
+  }
+  if (layer.shape === "rect") {
+    const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, layer.height / 2));
+    return `<rect x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" rx="${radius}" fill="${fill}"${strokeAttr}${extra} />`;
+  }
+  const points = layer.shape === "triangle" ? trianglePoints(layer) : starPoints(layer, starInner(layer));
+  const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, layer.height / 2));
+  return `<path d="${roundedPolyPath(points, radius)}" fill="${fill}"${strokeAttr}${extra} />`;
+}
+
+/** A second copy of the shape, masked so only the bottom carries this blur. */
+function bottomBlurDef(layer: ShapeLayer): { markup: string; attr: string } | null {
+  const bottom = layerBlurBottom(layer);
+  if (bottom <= 0) return null;
+  const id = svgId("blur", layer.id);
+  const mask = svgId("bmask", layer.id);
+  const grad = svgId("bgrad", layer.id);
+  const spread = bottom;
+  const markup = `<linearGradient id="${grad}" gradientUnits="userSpaceOnUse" x1="${layer.x}" y1="${layer.y}" x2="${layer.x}" y2="${layer.y + layer.height}"><stop offset="0" stop-color="#000" /><stop offset="1" stop-color="#fff" /></linearGradient><mask id="${mask}" maskUnits="userSpaceOnUse"><rect x="${layer.x - spread}" y="${layer.y - spread}" width="${layer.width + spread * 2}" height="${layer.height + spread * 2}" fill="url(#${grad})" /></mask><filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${bottom / 2}" /></filter>`;
+  return { markup, attr: ` filter="url(#${id})" mask="url(#${mask})"` };
+}
+
 function shapeEffectDef(layer: ShapeLayer): { id: string; markup: string } | null {
   const shadow = shapeShadow(layer);
   const blur = (clampUnit(layer.blurFrom ?? 0, LAYER_BLUR_MAX) + clampUnit(layer.blurTo ?? 0, LAYER_BLUR_MAX)) / 2;
@@ -703,26 +785,17 @@ function shapeSvg(layer: ShapeLayer): string {
     ? ` stroke="${strokePaint}" stroke-width="${stroke.width}" stroke-opacity="${stroke.opacity / 100}" stroke-linejoin="round"`
     : "";
   const effect = shapeEffectDef(layer);
+  const fade = bottomBlurDef(layer);
   const defs = [
     gradient ? gradientDef(gradId, gradient) : "",
     strokeGradId && stroke.gradient ? gradientDef(strokeGradId, stroke.gradient) : "",
     effect?.markup ?? "",
+    fade?.markup ?? "",
   ].filter(Boolean).join("");
   const filter = effect ? ` filter="url(#${effect.id})"` : "";
-  let body: string;
-  if (layer.nodes && layer.nodes.length >= 2) {
-    body = `<path d="${penPathData(layer.nodes, true)}" fill="${fill}"${strokeAttr}${filter} />`;
-  } else if (layer.shape === "ellipse") {
-    body = `<ellipse cx="${layer.x + layer.width / 2}" cy="${layer.y + layer.height / 2}" rx="${layer.width / 2}" ry="${layer.height / 2}" fill="${fill}"${strokeAttr}${filter} />`;
-  } else if (layer.shape === "rect") {
-    const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, layer.height / 2));
-    body = `<rect x="${layer.x}" y="${layer.y}" width="${layer.width}" height="${layer.height}" rx="${radius}" fill="${fill}"${strokeAttr}${filter} />`;
-  } else {
-    const points = layer.shape === "triangle" ? trianglePoints(layer) : starPoints(layer, starInner(layer));
-    const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, layer.height / 2));
-    body = `<path d="${roundedPolyPath(points, radius)}" fill="${fill}"${strokeAttr}${filter} />`;
-  }
-  return `${defs ? `<defs>${defs}</defs>` : ""}${body}`;
+  const body = shapeGraphic(layer, fill, strokeAttr, filter);
+  const faded = fade ? shapeGraphic(layer, fill, strokeAttr, fade.attr) : "";
+  return `${defs ? `<defs>${defs}</defs>` : ""}${body}${faded}`;
 }
 
 /** Inner SVG for one vector layer, in card pixels. */
@@ -730,16 +803,24 @@ export function vectorSvg(layer: VectorLayer): string {
   if (layer.kind === "shape") return shapeSvg(layer);
   if (layer.kind === "line") {
     const segment = lineSegment(layer);
-    const color = escapeAttr(layer.color);
+    const fade = lineFade(layer);
+    const faded = fade.start > 0 || fade.end > 0;
+    const fadeId = svgId("line-fade", layer.id);
+    const paint = faded ? `url(#${fadeId})` : escapeAttr(layer.color);
     const arrows = [
       layer.start ? arrowPolygon({ x: layer.x, y: layer.y }, { x: layer.x2, y: layer.y2 }, arrowLength(layer)) : null,
       layer.end ? arrowPolygon({ x: layer.x2, y: layer.y2 }, { x: layer.x, y: layer.y }, arrowLength(layer)) : null,
     ];
     const heads = arrows
       .filter((points): points is Point[] => points !== null)
-      .map((points) => `<polygon points="${points.map((point) => `${point.x},${point.y}`).join(" ")}" fill="${color}" />`)
+      .map((points) => `<polygon points="${points.map((point) => `${point.x},${point.y}`).join(" ")}" fill="${paint}" />`)
       .join("");
-    return `<line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" stroke="${color}" stroke-width="${layer.stroke}" stroke-linecap="${layer.cap}" />${heads}`;
+    const defs = faded
+      ? `<defs><linearGradient id="${fadeId}" gradientUnits="userSpaceOnUse" x1="${layer.x}" y1="${layer.y}" x2="${layer.x2}" y2="${layer.y2}">${lineFadeStops(fade.start, fade.end)
+          .map((stop) => `<stop offset="${stop.offset}" stop-color="${escapeAttr(layer.color)}" stop-opacity="${stop.alpha}" />`)
+          .join("")}</linearGradient></defs>`
+      : "";
+    return `${defs}<line x1="${segment.x1}" y1="${segment.y1}" x2="${segment.x2}" y2="${segment.y2}" stroke="${paint}" stroke-width="${layer.stroke}" stroke-linecap="${layer.cap}" />${heads}`;
   }
   const fill = layer.fill ? escapeAttr(layer.fill) : "none";
   const stroke = layer.stroke ? escapeAttr(layer.stroke) : "none";
@@ -777,7 +858,7 @@ function hexOrEmpty(field: unknown, fallback: string): string {
   return /^#[0-9a-fA-F]{6}$/.test(text) ? `#${text.slice(1).toLowerCase()}` : fallback;
 }
 
-function parseShadow(raw: unknown): ShapeShadow {
+export function parseShadow(raw: unknown): ShapeShadow {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
     size: clampUnit(num(value.size) ?? 0, SHADOW_SIZE_MAX),
@@ -797,7 +878,7 @@ function parseStroke(raw: unknown, fallback: string): ShapeStroke {
   };
 }
 
-function parseBlend(raw: unknown): ShapeBlend {
+export function parseBlend(raw: unknown): ShapeBlend {
   return SHAPE_BLENDS.includes(raw as ShapeBlend) ? (raw as ShapeBlend) : "normal";
 }
 
@@ -833,8 +914,12 @@ export function parseVectorLayer(raw: unknown, ink: string): VectorLayer | null 
       shadow: parseShadow(value.shadow),
       stroke: parseStroke(value.stroke, hexOrEmpty(value.color, ink)),
       blend: parseBlend(value.blend),
+      ...(num(value.opacity) !== null && (num(value.opacity) ?? 100) < 100 ? { opacity: clampUnit(num(value.opacity) ?? 100, 100) } : {}),
       blurFrom: clampUnit(num(value.blurFrom) ?? 0, LAYER_BLUR_MAX),
       blurTo: clampUnit(num(value.blurTo) ?? 0, LAYER_BLUR_MAX),
+      ...(clampUnit(num(value.blurBottom) ?? 0, LAYER_BLUR_MAX) > 0
+        ? { blurBottom: clampUnit(num(value.blurBottom) ?? 0, LAYER_BLUR_MAX) }
+        : {}),
       gradient: parseGradient(value.gradient),
       inner: starInner({ inner: num(value.inner) ?? undefined } as ShapeLayer),
       nodes: parseAnchors(value.nodes),
@@ -853,6 +938,8 @@ export function parseVectorLayer(raw: unknown, ink: string): VectorLayer | null 
       start: value.start === true,
       end: value.end === true,
       color: hexOrEmpty(value.color, ink),
+      ...(clampUnit(num(value.fadeStart) ?? 0, 100) > 0 ? { fadeStart: clampUnit(num(value.fadeStart) ?? 0, 100) } : {}),
+      ...(clampUnit(num(value.fadeEnd) ?? 0, 100) > 0 ? { fadeEnd: clampUnit(num(value.fadeEnd) ?? 0, 100) } : {}),
     };
   }
   if (value.kind === "pen" && Array.isArray(value.points)) {

@@ -4,6 +4,7 @@
  * Without a saved snapshot, the preset falls back to its built-in layout.
  * Online Studio and Conference keep separate stores so one tab's baseline never resets the other.
  */
+import { DEFAULT_CONFERENCE_PRESET_ID } from "./shared/conference.ts";
 import { normalizeStudioState, type StudioState } from "./shared/studio.ts";
 import BUILTIN_BASELINES from "./shared/studio-defaults.json";
 
@@ -56,6 +57,19 @@ const studioBaselines = baselineStore(
 
 export const CONFERENCE_BASELINE_KEY = "ax-conference-baselines";
 
+/** The layout saved with “초기화로 세팅”, without falling back to the built-in card. */
+export function readStoredConferenceBaseline(presetId: string): StudioState | null {
+  try {
+    const raw = localStorage.getItem(CONFERENCE_BASELINE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as unknown;
+    if (!value || typeof value !== "object") return null;
+    return matching((value as Record<string, unknown>)[presetId], presetId);
+  } catch {
+    return null;
+  }
+}
+
 export function readBaseline(presetId: string): StudioState | null {
   return studioBaselines.read(presetId);
 }
@@ -66,4 +80,69 @@ export function writeBaseline(state: StudioState): void {
 
 export function clearBaseline(): void {
   studioBaselines.clear();
+}
+
+const INSTAGRAM_CARD_KEY = "ax-conference-instagram-cards";
+
+function readInstagramCardMap(): Record<string, unknown> {
+  try {
+    const raw = localStorage.getItem(INSTAGRAM_CARD_KEY);
+    if (!raw) return {};
+    const value = JSON.parse(raw) as unknown;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return value as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+/** The layout saved for one Instagram speaker card. Keyed by that card's speaker src. */
+export function readInstagramCard(src: string): StudioState | null {
+  if (!src) return null;
+  const raw = readInstagramCardMap()[src];
+  if (raw === undefined) return null;
+  const state = normalizeStudioState(structuredClone(raw));
+  return state?.presetId === DEFAULT_CONFERENCE_PRESET_ID ? state : null;
+}
+
+export function writeInstagramCard(src: string, state: StudioState): void {
+  if (!src) return;
+  try {
+    const all = readInstagramCardMap();
+    all[src] = state;
+    localStorage.setItem(INSTAGRAM_CARD_KEY, JSON.stringify(all));
+  } catch {
+    /* a full store still keeps the card for this visit */
+  }
+}
+
+export function clearInstagramCards(): void {
+  localStorage.removeItem(INSTAGRAM_CARD_KEY);
+}
+
+const INSTAGRAM_ORDER_KEY = "ax-conference-instagram-order";
+
+/** Speaker srcs in the order the Instagram cards are shown. Empty means the built-in order. */
+export function readInstagramOrder(): string[] {
+  try {
+    const raw = localStorage.getItem(INSTAGRAM_ORDER_KEY);
+    if (!raw) return [];
+    const value = JSON.parse(raw) as unknown;
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function writeInstagramOrder(srcs: readonly string[]): void {
+  try {
+    localStorage.setItem(INSTAGRAM_ORDER_KEY, JSON.stringify([...srcs]));
+  } catch {
+    /* the order still holds for this visit */
+  }
+}
+
+export function clearInstagramOrder(): void {
+  localStorage.removeItem(INSTAGRAM_ORDER_KEY);
 }
