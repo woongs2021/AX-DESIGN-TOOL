@@ -23,7 +23,7 @@
       },
       "thumbPath": "assets/conference/backgrounds/banner-x.thumb.webp",
       "video": {
-        "bytes": 31553955,
+        "bytes": 31059567,
         "durationSec": 5.041667,
         "height": 6468,
         "path": "assets/conference/backgrounds/banner-x.mp4",
@@ -41,7 +41,7 @@
       },
       "thumbPath": "assets/conference/backgrounds/instagram.thumb.webp",
       "video": {
-        "bytes": 8323510,
+        "bytes": 8576903,
         "durationSec": 5.041667,
         "height": 2160,
         "path": "assets/conference/backgrounds/instagram.mp4",
@@ -59,11 +59,11 @@
       },
       "thumbPath": "assets/conference/backgrounds/poster.thumb.webp",
       "video": {
-        "bytes": 12149181,
+        "bytes": 22981571,
         "durationSec": 5.041667,
-        "height": 2880,
+        "height": 3840,
         "path": "assets/conference/backgrounds/poster.mp4",
-        "width": 2160
+        "width": 2880
       }
     },
     {
@@ -77,7 +77,7 @@
       },
       "thumbPath": "assets/conference/backgrounds/slide.thumb.webp",
       "video": {
-        "bytes": 16712532,
+        "bytes": 16992237,
         "durationSec": 5.041667,
         "height": 2160,
         "path": "assets/conference/backgrounds/slide.mp4",
