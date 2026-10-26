@@ -2,6 +2,14 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-10-27] update | Conference 기본 레이아웃을 다시 맞춤
+
+저장해 둔 포스터, 슬라이드, X배너, L배너 레이아웃을 앱 기본값으로 다시 넣었다. 인스타그램 카드 4장과 순서는 그대로다. 저장값이 없는 화면도 이 카드로 열린다.
+
+## [2026-10-27] update | Conference 배경 동영상을 color 버전으로 교체
+
+Instagram, Poster, Slide, X배너 배경 동영상을 각 폴더의 color MP4로 바꿨다. 길이는 5.04초로 같다. 포스터 동영상은 2880 × 3840이다. L배너에는 동영상이 없다.
+
 ## [2026-10-25] update | Conference 다섯 규격의 기본 레이아웃
 
 저장해 둔 포스터, 슬라이드, X배너, L배너 레이아웃을 앱 기본값으로 넣었다. 인스타그램 연사 카드 세 장의 위치도 지금 기준으로 맞췄다. 저장값이 없는 화면도 이 카드로 열린다.
