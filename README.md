@@ -4,7 +4,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 Conference를 GitHub Pages에도 열었다. 2026-10-25에 배경을 `[Graphic_Resources] 2`로 바꾸고, 연사별 인스타그램 카드·PDF·무한 루프 GIF·그룹·색 보정을 더했다. 그 레이아웃을 앱 기본값으로 넣었고, 공개 사이트도 100MB 이하 원본 배경을 쓴다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 Conference를 GitHub Pages에도 열었다. 2026-10-25에 배경을 `[Graphic_Resources] 2`로 바꾸고, 연사별 인스타그램 카드·PDF·무한 루프 GIF·그룹·색 보정을 더했다. 2026-10-31에 포스터·슬라이드·배너 문구와 이보연 교수 카드를 최종 기본값으로 맞췄다. 공개 사이트도 100MB 이하 원본 배경을 쓴다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -123,7 +123,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
-| 2026-10-27 | 저장해 둔 포스터, 슬라이드, X배너, L배너 레이아웃을 앱 기본값으로 다시 넣었다. 인스타그램 카드와 순서는 그대로다. |
+| 2026-10-31 | 포스터, 슬라이드, X배너, L배너와 이보연 교수 인스타그램 카드를 최종 기본값으로 넣었다. 공동 주체는 성균관대학교 대학원 브랜드디자인매니지먼트전공과 런던 브루넬대학교 한국 총동문회이고, 장소는 국제관 B2층 9B 218호다. 이보연 교수 소개는 영국 런던 엑시터 대학교 경영대학 디자인혁신 조교수다. |
 | 2026-10-27 | Instagram, Poster, Slide, X배너 배경 동영상을 color MP4로 바꿨다. 포스터 동영상은 2880 × 3840이다. L배너에는 동영상이 없다. |
 | 2026-10-25 | 저장해 둔 포스터, 슬라이드, X배너, L배너 레이아웃을 앱 기본값으로 넣었다. 인스타그램 연사 카드 세 장의 위치도 지금 기준으로 맞췄다. 저장값이 없는 브라우저도 같은 카드로 열린다. |
 | 2026-10-25 | 브라우저에 저장해 둔 인스타그램 카드 4장과 포스터 레이아웃, 카드 순서를 앱 기본값으로 넣었다. 저장값이 없는 브라우저도 같은 카드로 열린다. |
