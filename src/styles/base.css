@@ -2218,6 +2218,10 @@ html[data-mode="dark"] .studio__scaler canvas[data-copy="true"] {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
+.studio__select-frame[data-locked="true"] {
+  border-style: dashed;
+}
+
 .studio__marquee {
   position: absolute;
   box-sizing: border-box;

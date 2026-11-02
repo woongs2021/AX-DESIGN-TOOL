@@ -21,11 +21,16 @@ import {
   alignOffsets,
   assignStudio,
   canGroupLayers,
+  canLockLayers,
   canUngroupLayers,
+  canUnlockLayers,
   copiedGroups,
   groupedIds,
   groupLayers,
+  isLayerLocked,
+  lockLayers,
   pruneGroups,
+  unlockLayers,
   selectionBounds,
   selectionOutlines,
   shiftAxisDelta,
@@ -1569,7 +1574,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               </div>
             </div>
           </div>
-          <div class="studio__sliders">
+          <div class="studio__sliders" id="studio-card-size">
           <div class="studio__field studio__field--span">
             <label for="studio-size">너비·높이 함께</label>
             <div class="studio__radius">
@@ -1855,9 +1860,13 @@ export function bindStudio(
   const titleHexInput = root.querySelector<HTMLInputElement>("#studio-title-hex");
   const fontScaleField = root.querySelector<HTMLElement>("#studio-font-scale-field");
   const textFields = root.querySelector<HTMLElement>("#studio-text-fields");
+  const cardSizeFields = root.querySelector<HTMLElement>("#studio-card-size");
+  const resetButton = root.querySelector<HTMLButtonElement>("#studio-reset");
   const titleFields = root.querySelector<HTMLElement>("#studio-title-fields");
   const bodyFields = root.querySelector<HTMLElement>("#studio-body-fields");
   const imageFields = root.querySelector<HTMLElement>("#studio-image-fields");
+  const sourceGrid = root.querySelector<HTMLElement>("#studio-sources");
+  const sourceFile = root.querySelector<HTMLInputElement>("#studio-theme-file");
   const fontScaleRange = root.querySelector<HTMLInputElement>("#studio-font-scale");
   const fontScaleNumber = root.querySelector<HTMLInputElement>("#studio-font-scale-number");
   const titleSizeRange = root.querySelector<HTMLInputElement>("#studio-title-size");
@@ -2009,6 +2018,10 @@ export function bindStudio(
     !titleHexInput ||
     !fontScaleField ||
     !textFields ||
+    !cardSizeFields ||
+    !resetButton ||
+    !sourceGrid ||
+    !sourceFile ||
     !titleFields ||
     !bodyFields ||
     !imageFields ||
@@ -2691,6 +2704,8 @@ export function bindStudio(
       button.setAttribute("aria-checked", selected ? "true" : "false");
       button.tabIndex = selected ? 0 : -1;
     }
+    const sizeAnchor = selectedLayers().length > 0 ? resetButton : textFields;
+    if (cardSizeFields.nextElementSibling !== sizeAnchor) sizeAnchor.before(cardSizeFields);
     const texts = selectedLayers().filter(isTextLayer);
     textFields.hidden = texts.length === 0;
     titleFields.hidden = !texts.some((layer) => layer.kind === "title");
@@ -2698,6 +2713,8 @@ export function bindStudio(
     const imageSelected = selectedLayers().some((layer) => layer.kind === "image");
     if (!imageSelected) imageAdjustOpen = false;
     imageFields.hidden = !imageSelected;
+    if (imageSelected && imageFields.nextElementSibling !== sourceGrid) sourceGrid.before(imageFields);
+    else if (!imageSelected && sourceFile.nextElementSibling !== imageFields) sourceFile.after(imageFields);
     imageAdjustFields.hidden = !imageAdjustOpen;
     fontScaleField.hidden = texts.length < 2;
     if (document.activeElement !== titleInput) titleInput.value = title.text;
@@ -4135,9 +4152,15 @@ export function bindStudio(
     duplicated: boolean;
     axis: ShiftAxis | null;
     shiftRelease: string[] | null;
+    /** A locked layer is in the selection, so nothing moves. */
+    frozen: boolean;
   } | null = null;
-  /** Drag on empty canvas with the select tool. base is the selection kept when Shift is held. */
-  let marquee: { x: number; y: number; x2: number; y2: number; sx: number; sy: number; pointerId: number; base: Set<string>; moved: boolean } | null = null;
+  /**
+   * Drag on empty canvas or a locked layer with the select tool. base is the selection kept when Shift is held.
+   * fresh drops base once the box moves, so a click still picks the locked layer.
+   */
+  let marquee: { x: number; y: number; x2: number; y2: number; sx: number; sy: number; pointerId: number; base: Set<string>; moved: boolean; fresh: boolean } | null = null;
+  let sweep: { pointerId: number } | null = null;
   let tapStart: { x: number; y: number; moved: boolean; shift: boolean } | null = null;
   let lastTap: { id: string; time: number; x: number; y: number } | null = null;
   const touches = new Map<number, { x: number; y: number }>();
@@ -4508,9 +4531,10 @@ export function bindStudio(
       placeAt(handle, x, y);
     }
   };
+  const pickedLocked = () => [...selected].some((id) => isLayerLocked(state, id));
   const singleOf = <T extends StudioLayer>(kind: T["kind"]): T | null => {
     const [onlyId] = selected.size === 1 ? [...selected] : [];
-    const layer = onlyId ? layerById(onlyId) : undefined;
+    const layer = onlyId && !isLayerLocked(state, onlyId) ? layerById(onlyId) : undefined;
     return layer?.kind === kind ? (layer as T) : null;
   };
   const singleImage = (): ImageLayer | null => singleOf<ImageLayer>("image");
@@ -4738,6 +4762,8 @@ export function bindStudio(
       placeAt(frame, outline.box.x, outline.box.y);
       frame.style.width = `${outline.box.w * viewScale}px`;
       frame.style.height = `${outline.box.h * viewScale}px`;
+      const members = outline.key.startsWith("group:") ? outline.key.slice(6).split("\0") : [outline.key];
+      frame.dataset.locked = members.every((id) => isLayerLocked(state, id)) ? "true" : "false";
     }
     for (const [id, frame] of frameEls) {
       if (live.has(id)) continue;
@@ -4751,12 +4777,19 @@ export function bindStudio(
       imageAdjustButton.hidden = !imageSelected;
       imageAdjustDivider.hidden = !imageSelected;
       imageAdjustButton.setAttribute("aria-pressed", imageAdjustOpen && imageSelected ? "true" : "false");
+      const frozen = pickedLocked();
+      for (const align of LAYER_ALIGNS) {
+        const button = alignBar.querySelector<HTMLButtonElement>(`[data-layer-align="${align}"]`);
+        if (!button) continue;
+        button.disabled = frozen;
+        button.title = frozen ? `${LAYER_ALIGN_LABELS[align]} · 잠긴 객체` : LAYER_ALIGN_LABELS[align];
+      }
       for (const align of LAYER_DISTRIBUTES) {
         const button = alignBar.querySelector<HTMLButtonElement>(`[data-layer-align="${align}"]`);
         if (!button) continue;
       const units = selectionUnits(shown);
-      button.disabled = units < 3;
-      button.title = units < 3 ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택` : LAYER_ALIGN_LABELS[align];
+      button.disabled = frozen || units < 3;
+      button.title = frozen ? `${LAYER_ALIGN_LABELS[align]} · 잠긴 객체` : units < 3 ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택` : LAYER_ALIGN_LABELS[align];
       }
     }
     const image = singleImage();
@@ -4992,6 +5025,10 @@ export function bindStudio(
   editor.addEventListener("blur", () => closeEditor(true));
 
   const registerTap = (id: string, event: PointerEvent) => {
+    if (isLayerLocked(state, id)) {
+      lastTap = null;
+      return;
+    }
     const repeat =
       lastTap &&
       lastTap.id === id &&
@@ -5373,7 +5410,7 @@ export function bindStudio(
   };
   const alignLayers = (align: LayerAlign) => {
     const selectedBoxes = hits.filter((box) => selected.has(box.id));
-    if (selectedBoxes.length === 0) return;
+    if (selectedBoxes.length === 0 || pickedLocked()) return;
     const units: { ids: string[]; box: StudioRect }[] = [];
     const seen = new Set<string>();
     for (const box of selectedBoxes) {
@@ -5446,6 +5483,7 @@ export function bindStudio(
   };
   // Each kind keeps one layer so the panel always has something to edit.
   const canDelete = (picked: StudioLayer[]) =>
+    !picked.some((layer) => isLayerLocked(state, layer.id)) &&
     (["title", "body", "image"] as const).every(
       (kind) =>
         !picked.some((layer) => layer.kind === kind) ||
@@ -5474,6 +5512,20 @@ export function bindStudio(
       ungroupLayers(state, ids);
     });
   };
+  const lockSelection = () => {
+    const ids = [...selected];
+    if (!canLockLayers(state, ids)) return;
+    commitLayers(() => {
+      lockLayers(state, ids);
+    });
+  };
+  const unlockSelection = () => {
+    const ids = [...selected];
+    if (!canUnlockLayers(state, ids)) return;
+    commitLayers(() => {
+      unlockLayers(state, ids);
+    });
+  };
 
   layerMenu?.remove();
   const shortcut = (key: string) => (IS_MAC ? `⌘${key}` : `Ctrl+${key}`);
@@ -5482,6 +5534,8 @@ export function bindStudio(
     { action: "paste", label: "붙여넣기", hint: shortcut("V") },
     { action: "group", label: "그룹", hint: shortcut("G") },
     { action: "ungroup", label: "그룹 풀기", hint: IS_MAC ? "⇧⌘G" : "Shift+Ctrl+G" },
+    { action: "lock", label: "잠금", hint: IS_MAC ? "⇧⌘L" : "Shift+Ctrl+L" },
+    { action: "unlock", label: "잠금 풀기", hint: IS_MAC ? "⇧⌘L" : "Shift+Ctrl+L" },
     { action: "front", label: "맨 위로 보내기" },
     { action: "back", label: "맨 밑으로 보내기" },
     { action: "crop", label: "크롭하기" },
@@ -5546,6 +5600,10 @@ export function bindStudio(
       ungroupButton.disabled = !canUngroupLayers(state, [...selected]);
       ungroupButton.title = ungroupButton.disabled ? "그룹을 선택한 뒤 풀 수 있습니다." : "";
     }
+    const lockButton = menuButton("lock");
+    if (lockButton) lockButton.hidden = !canLockLayers(state, [...selected]);
+    const unlockButton = menuButton("unlock");
+    if (unlockButton) unlockButton.hidden = !canUnlockLayers(state, [...selected]);
     enable("front", picked.length > 0);
     enable("back", picked.length > 0);
     const crop = menuButton("crop");
@@ -5559,7 +5617,10 @@ export function bindStudio(
     const remove = menuButton("delete");
     if (remove) {
       remove.disabled = picked.length === 0 || !canDelete(picked);
-      remove.title = picked.length > 0 && remove.disabled ? "타이틀·본문·이미지는 하나씩 남아 있어야 합니다." : "";
+      remove.title =
+        picked.length === 0 || !remove.disabled ? ""
+        : pickedLocked() ? "잠긴 객체는 삭제할 수 없습니다."
+        : "타이틀·본문·이미지는 하나씩 남아 있어야 합니다.";
     }
     menu.hidden = false;
     const margin = 8;
@@ -5581,6 +5642,8 @@ export function bindStudio(
     else if (action === "paste") pasteLayers(at);
     else if (action === "group") groupSelection();
     else if (action === "ungroup") ungroupSelection();
+    else if (action === "lock") lockSelection();
+    else if (action === "unlock") unlockSelection();
     else if (action === "front" || action === "back") restack(action === "front");
     else if (action === "delete") deleteLayers();
     else if (action === "crop") {
@@ -5634,7 +5697,7 @@ export function bindStudio(
   };
   const startPinch = () => {
     const metrics = pinchMetrics();
-    if (!metrics) return;
+    if (!metrics || isLayerLocked(state, imageAt(metrics.mid).id)) return;
     cancelLongPress();
     drag = null;
     tapStart = null;
@@ -5891,15 +5954,33 @@ export function bindStudio(
       for (const id of members) selected.add(id);
     } else if (event.shiftKey && hit) {
       if (membersOn) shiftRelease = members;
-      else for (const id of members) selected.add(id);
-    } else if (!hit) selected.clear();
-    else if (!membersOn) {
+      else {
+        for (const id of members) selected.add(id);
+        tapStart = null;
+        sweep = { pointerId: event.pointerId };
+        event.preventDefault();
+        try {
+          canvas.setPointerCapture(event.pointerId);
+        } catch {
+          /* the pointer can already be inactive */
+        }
+        paint();
+        return;
+      }
+    } else if (!hit) {
+      if (!event.shiftKey) selected.clear();
+    } else if (!membersOn) {
       selected.clear();
       for (const id of members) selected.add(id);
     }
-    if (!hit || (mouse && !selected.has(hit.id))) {
+    const lockedHit = Boolean(mouse && hit && !event.shiftKey && isLayerLocked(state, hit.id));
+    if (lockedHit) {
+      selected.clear();
+      for (const id of members) selected.add(id);
+    }
+    if (!hit || lockedHit || (mouse && !selected.has(hit.id))) {
       tapStart = null;
-      if (mouse && !hit) {
+      if (mouse && (!hit || lockedHit)) {
         marquee = {
           x: point.x,
           y: point.y,
@@ -5910,6 +5991,7 @@ export function bindStudio(
           pointerId: event.pointerId,
           base: new Set(selected),
           moved: false,
+          fresh: lockedHit,
         };
         canvas.dataset.selecting = "true";
         try {
@@ -5929,17 +6011,19 @@ export function bindStudio(
       /* the pointer can already be inactive */
     }
     beginGesture(canvas);
+    const frozen = pickedLocked();
     drag = {
       id: hit.id,
       origin: point,
       start: positionsOf(selected),
       pointerId: event.pointerId,
-      copy: mouse && event.altKey,
+      copy: mouse && event.altKey && !frozen,
       duplicated: false,
       axis: null,
       shiftRelease,
+      frozen,
     };
-    canvas.dataset.dragging = "true";
+    if (!frozen) canvas.dataset.dragging = "true";
     if (drag.copy) canvas.dataset.copy = "true";
     else delete canvas.dataset.copy;
     paint();
@@ -5985,16 +6069,24 @@ export function bindStudio(
       paint();
       return;
     }
+    if (sweep && sweep.pointerId === event.pointerId) {
+      const over = hitAt(point.x, point.y);
+      if (over && !selected.has(over.id) && !isLayerLocked(state, over.id)) {
+        for (const id of groupedIds(state, over.id)) selected.add(id);
+        paint();
+      }
+      return;
+    }
     if (marquee && marquee.pointerId === event.pointerId) {
       const moved = Math.hypot(event.clientX - marquee.sx, event.clientY - marquee.sy) > 4;
       marquee.x2 = point.x;
       marquee.y2 = point.y;
       marquee.moved = marquee.moved || moved;
-      const next = new Set(marquee.base);
+      const next = new Set(marquee.moved && marquee.fresh ? [] : marquee.base);
       if (marquee.moved) {
         const rect = selectRect(marquee.x, marquee.y, marquee.x2, marquee.y2);
         for (const box of hits) {
-          if (!rectsOverlap(rect, box)) continue;
+          if (!rectsOverlap(rect, box) || isLayerLocked(state, box.id)) continue;
           for (const id of groupedIds(state, box.id)) next.add(id);
         }
       }
@@ -6007,12 +6099,14 @@ export function bindStudio(
       return;
     }
     if (!drag || drag.pointerId !== event.pointerId) {
-      const hover = hitAt(point.x, point.y);
+      const found = hitAt(point.x, point.y);
+      const hover = found && !isLayerLocked(state, found.id) ? found : null;
       canvas.dataset.hover = hover ? "true" : "false";
       if (event.altKey && hover) canvas.dataset.copy = "true";
       else delete canvas.dataset.copy;
       return;
     }
+    if (drag.frozen) return;
     if (!drag.duplicated) {
       if (event.altKey) drag.copy = true;
       else if (!tapStart?.moved) drag.copy = false;
@@ -6063,6 +6157,11 @@ export function bindStudio(
       paint();
       return;
     }
+    if (sweep && sweep.pointerId === event.pointerId) {
+      sweep = null;
+      paint();
+      return;
+    }
     if (marquee && marquee.pointerId === event.pointerId) {
       marquee = null;
       delete canvas.dataset.selecting;
@@ -6103,9 +6202,10 @@ export function bindStudio(
       // Trackpad pinch arrives as a ctrl+wheel event in Chromium and Firefox; off the Mac, ctrl+wheel zooms the preview.
       if (!IS_MAC || !event.ctrlKey || state.code.trim() || cropping || !hasImage()) return;
       event.preventDefault();
-      beginGesture(wheelOwner);
       const point = cardPoint(event);
       const layer = imageAt(point);
+      if (isLayerLocked(state, layer.id)) return;
+      beginGesture(wheelOwner);
       applyImage(layer, scaleImageAround(imageBox(layer), layer.width * Math.exp(-event.deltaY * 0.01), point.x, point.y));
       paint();
       window.clearTimeout(wheelTimer);
@@ -6135,9 +6235,10 @@ export function bindStudio(
   canvas.addEventListener("gesturestart", (event) => {
     event.preventDefault();
     if (pinch || state.code.trim() || cropping || !hasImage()) return;
-    beginGesture(safariOwner);
     const anchor = cardPoint(event as SafariGesture);
     const layer = imageAt(anchor);
+    if (isLayerLocked(state, layer.id)) return;
+    beginGesture(safariOwner);
     safariPinch = { layerId: layer.id, image: imageBox(layer), anchor };
   });
   canvas.addEventListener("gesturechange", (event) => {
@@ -6360,7 +6461,7 @@ export function bindStudio(
     if (!mod && !cropping && !typing && (event.key === "Delete" || event.key === "Backspace") && selected.size > 0) {
       event.preventDefault();
       if (canDelete(selectedLayers())) deleteLayers();
-      else showToast("타이틀·본문·이미지는 하나씩 남아 있어야 합니다.");
+      else showToast(pickedLocked() ? "잠긴 객체는 삭제할 수 없습니다." : "타이틀·본문·이미지는 하나씩 남아 있어야 합니다.");
       return;
     }
     if (mod && !cropping) {
@@ -6369,6 +6470,12 @@ export function bindStudio(
         event.preventDefault();
         if (event.shiftKey) ungroupSelection();
         else groupSelection();
+        return;
+      }
+      if (event.code === "KeyL" && event.shiftKey) {
+        event.preventDefault();
+        if (canLockLayers(state, [...selected])) lockSelection();
+        else unlockSelection();
         return;
       }
       if (event.code === "KeyC" && selected.size > 0) {
@@ -6418,6 +6525,7 @@ export function bindStudio(
     const arrow = arrows[event.key];
     if (!arrow || event.altKey || selected.size === 0) return;
     event.preventDefault();
+    if (pickedLocked()) return;
     const step = event.shiftKey ? NUDGE_SHIFT_STEP : NUDGE_STEP;
     beginGesture(nudgeOwner);
     moveGroup(positionsOf(selected), arrow.x * step, arrow.y * step);

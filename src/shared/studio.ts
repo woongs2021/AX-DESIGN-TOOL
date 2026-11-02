@@ -115,6 +115,8 @@ export type StudioState = {
   layers: StudioLayer[];
   /** Sets of layer ids that select, move, copy, and delete together. Each set has at least two ids. */
   groups?: string[][];
+  /** Layer ids that stay put: no move, resize, align, delete, or canvas edit. */
+  locked?: string[];
 };
 
 export type Rgb = { r: number; g: number; b: number };
@@ -610,6 +612,12 @@ function parseGroups(raw: unknown, ids: Set<string>): string[][] | undefined {
   return groups.length > 0 ? groups : undefined;
 }
 
+function parseLocked(raw: unknown, ids: Set<string>): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const locked = [...new Set(raw.filter((id): id is string => typeof id === "string" && ids.has(id)))];
+  return locked.length > 0 ? locked : undefined;
+}
+
 function parseBackground(raw: unknown): StudioBackground | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -632,6 +640,7 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
         .filter((layer): layer is StudioLayer => layer !== null)
     : legacyLayers(value, ink, value.themeSlug);
   const groups = parseGroups(value.groups, new Set(layers.map((layer) => layer.id)));
+  const locked = parseLocked(value.locked, new Set(layers.map((layer) => layer.id)));
   const state: StudioState = {
     ...base,
     ...(background ? { background } : {}),
@@ -644,6 +653,7 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
     controlsWidth: num(value.controlsWidth, base.controlsWidth),
     layers,
     ...(groups ? { groups } : {}),
+    ...(locked ? { locked } : {}),
   };
   ensureLayer(state, "image");
   ensureLayer(state, "body");
@@ -651,10 +661,11 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
   return state;
 }
 
-/** Copy every field, and drop groups when the incoming card has none. */
+/** Copy every field, and drop groups and locks when the incoming card has none. */
 export function assignStudio(state: StudioState, next: StudioState): void {
   Object.assign(state, next);
   if (!next.groups?.length) delete state.groups;
+  if (!next.locked?.length) delete state.locked;
 }
 
 /** Restore the card to its starting values. The chosen theme, size preset, and panel width stay. */
@@ -1164,6 +1175,34 @@ export function pruneGroups(state: StudioState): void {
     .filter((group) => group.length >= 2);
   if (next.length === 0) delete state.groups;
   else state.groups = next;
+}
+
+export function isLayerLocked(state: StudioState, id: string): boolean {
+  return Boolean(state.locked?.includes(id));
+}
+
+export function canLockLayers(state: StudioState, ids: readonly string[]): boolean {
+  return ids.some((id) => state.layers.some((layer) => layer.id === id) && !isLayerLocked(state, id));
+}
+
+export function canUnlockLayers(state: StudioState, ids: readonly string[]): boolean {
+  return ids.some((id) => isLayerLocked(state, id));
+}
+
+export function lockLayers(state: StudioState, ids: readonly string[]): boolean {
+  if (!canLockLayers(state, ids)) return false;
+  const live = ids.filter((id) => state.layers.some((layer) => layer.id === id));
+  state.locked = [...new Set([...(state.locked ?? []), ...live])];
+  return true;
+}
+
+export function unlockLayers(state: StudioState, ids: readonly string[]): boolean {
+  if (!canUnlockLayers(state, ids)) return false;
+  const drop = new Set(ids);
+  const next = (state.locked ?? []).filter((id) => !drop.has(id));
+  if (next.length === 0) delete state.locked;
+  else state.locked = next;
+  return true;
 }
 
 /** Groups for duplicated layers. `ids` maps an original id to its copy. */

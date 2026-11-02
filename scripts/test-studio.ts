@@ -7,6 +7,11 @@ import { hrefFor, isLegacyStudioHash, parseHash } from "../src/router.ts";
 import {
   alignOffsets,
   canGroupLayers,
+  canLockLayers,
+  canUnlockLayers,
+  isLayerLocked,
+  lockLayers,
+  unlockLayers,
   canUngroupLayers,
   copiedGroups,
   groupedIds,
@@ -518,8 +523,21 @@ assert.ok(stored);
 assert.deepEqual(stored.groups, [groupIds]);
 const copies = copiedGroups(stored.groups, new Map(groupIds.map((id) => [id, `${id}-copy`])));
 assert.deepEqual(copies, [groupIds.map((id) => `${id}-copy`)]);
+const lockId = groupIds[0] ?? "";
+assert.equal(canUnlockLayers(grouped, [lockId]), false);
+assert.equal(lockLayers(grouped, groupIds), true);
+assert.equal(isLayerLocked(grouped, lockId), true);
+assert.equal(canLockLayers(grouped, groupIds), false);
+const storedLock = normalizeStudioState(JSON.parse(JSON.stringify({ ...grouped, locked: [...(grouped.locked ?? []), "missing"] })));
+assert.deepEqual(storedLock?.locked, groupIds);
+assert.equal(unlockLayers(grouped, [lockId]), true);
+assert.deepEqual(grouped.locked, [groupIds[1]]);
+assert.equal(unlockLayers(grouped, groupIds), true);
+assert.equal(grouped.locked, undefined);
+lockLayers(grouped, groupIds);
 resetStudioState(grouped, grouped.color);
 assert.equal(grouped.groups, undefined);
+assert.equal(grouped.locked, undefined);
 assert.equal(
   penContains(
     {
