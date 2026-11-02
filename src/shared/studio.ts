@@ -869,7 +869,7 @@ export function designToCode(
     const name = `layer-${index + 1}`;
     if (layer.kind === "shape" || layer.kind === "line" || layer.kind === "pen") {
       const blend = layer.kind === "shape" && shapeBlend(layer) !== "normal" ? ` mix-blend-mode: ${shapeBlend(layer)};` : "";
-      const fade = layer.kind === "shape" ? layerOpacityCss(layer) : "";
+      const fade = layer.kind === "shape" || layer.kind === "line" ? layerOpacityCss(layer) : "";
       const opacity = fade ? ` ${fade}` : "";
       items.push(
         `  <svg class="${name}" viewBox="0 0 ${state.cardWidth} ${state.cardHeight}" preserveAspectRatio="none">${vectorSvg(layer)}</svg>`,

@@ -870,6 +870,8 @@ function paintCard(
   };
   const paintLine = (layer: LineLayer): void => {
     if (layer.id !== hiddenId) {
+      ctx.save();
+      ctx.globalAlpha *= layerOpacity(layer) / 100;
       const drawLine = (target: CanvasRenderingContext2D) => {
         const segment = lineSegment(layer);
         target.beginPath();
@@ -922,6 +924,7 @@ function paintCard(
           ctx.drawImage(buffer, left, top);
         }
       }
+      ctx.restore();
     }
     const box = lineBounds(layer);
     hits.push({ id: layer.id, kind: "line", x: box.x, y: box.y, w: box.w, h: box.h });
@@ -1506,6 +1509,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
           </div>
           <div id="studio-line-fields" hidden>
             <div class="studio__sliders">
+            ${shadowRow("studio-line-opacity", "선 투명도", 100, 100).replace('class="studio__field"', 'class="studio__field studio__field--span"')}
             <div class="studio__field">
               <label for="studio-line-width">선 두께</label>
               <div class="studio__radius">
@@ -1938,6 +1942,8 @@ export function bindStudio(
   const lineFields = root.querySelector<HTMLElement>("#studio-line-fields");
   const lineWidthRange = root.querySelector<HTMLInputElement>("#studio-line-width");
   const lineWidthNumber = root.querySelector<HTMLInputElement>("#studio-line-width-number");
+  const lineOpacityRange = root.querySelector<HTMLInputElement>("#studio-line-opacity");
+  const lineOpacityNumber = root.querySelector<HTMLInputElement>("#studio-line-opacity-number");
   const lineColorInput = root.querySelector<HTMLInputElement>("#studio-line-color");
   const lineHexInput = root.querySelector<HTMLInputElement>("#studio-line-hex");
   const lineFadeRange = root.querySelector<HTMLInputElement>("#studio-line-fade");
@@ -2080,6 +2086,8 @@ export function bindStudio(
     !lineFields ||
     !lineWidthRange ||
     !lineWidthNumber ||
+    !lineOpacityRange ||
+    !lineOpacityNumber ||
     !lineColorInput ||
     !lineHexInput ||
     !lineFadeRange ||
@@ -2574,6 +2582,7 @@ export function bindStudio(
     if (line) {
       const fade = lineFade(line);
       writeControl(lineWidthRange, lineWidthNumber, line.stroke);
+      writeControl(lineOpacityRange, lineOpacityNumber, layerOpacity(line));
       writeControl(lineFadeRange, lineFadeNumber, fade.start === fade.end ? fade.start : Math.round((fade.start + fade.end) / 2));
       writeControl(lineFadeStartRange, lineFadeStartNumber, fade.start);
       writeControl(lineFadeEndRange, lineFadeEndNumber, fade.end);
@@ -3076,6 +3085,13 @@ export function bindStudio(
     const layer = panelLine();
     if (layer) layer.stroke = Math.min(LINE_WIDTH_MAX, Math.max(LINE_WIDTH_MIN, Math.round(value)));
   }, () => panelLine()?.stroke ?? LINE_WIDTH_DEFAULT);
+  bindPair(lineOpacityRange, lineOpacityNumber, (value) => {
+    const layer = panelLine();
+    if (!layer) return;
+    const opacity = clampUnit(value, 100);
+    if (opacity >= 100) delete layer.opacity;
+    else layer.opacity = opacity;
+  }, () => layerOpacity(panelLine() ?? { opacity: 100 }));
   const setLineFade = (layer: LineLayer, key: "fadeStart" | "fadeEnd", value: number) => {
     const amount = clampUnit(value, 100);
     if (amount <= 0) delete layer[key];

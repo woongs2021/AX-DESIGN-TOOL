@@ -458,7 +458,18 @@ const plainLine = parseVectorLayer(
   "#000000",
 );
 assert.equal(plainLine?.kind === "line" ? plainLine.fadeStart : 1, undefined);
+assert.equal(plainLine?.kind === "line" ? plainLine.opacity : 1, undefined);
 assert.doesNotMatch(plainLine ? vectorSvg(plainLine) : "", /linearGradient/);
+const translucentLine = parseVectorLayer(
+  { id: "soft", kind: "line", x: 0, y: 0, x2: 10, y2: 0, stroke: 4, color: "#000000", opacity: 40 },
+  "#000000",
+);
+const solidLine = parseVectorLayer(
+  { id: "solid", kind: "line", x: 0, y: 0, x2: 10, y2: 0, stroke: 4, color: "#000000", opacity: 100 },
+  "#000000",
+);
+assert.equal(translucentLine?.kind === "line" ? translucentLine.opacity : 0, 40);
+assert.equal(solidLine?.kind === "line" ? solidLine.opacity : 0, undefined);
 
 const across = shiftAxisDelta(12, 3, true, null);
 assert.deepEqual(across, { dx: 12, dy: 0, axis: "x" });
