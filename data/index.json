@@ -1381,6 +1381,11 @@
       {
         "date": "2026-11-02",
         "operation": "update",
+        "title": "객체 잠금과 Shift 드래그 선택"
+      },
+      {
+        "date": "2026-11-02",
+        "operation": "update",
         "title": "선 투명도"
       },
       {
