@@ -79,6 +79,8 @@ export type LineLayer = {
   /** Arrow on the second endpoint (x2, y2). */
   end: boolean;
   color: string;
+  /** 0–100. Absent means fully opaque. */
+  opacity?: number;
   /** 0–100. Share of the line that fades out at the start (왼쪽). Absent means a hard edge. */
   fadeStart?: number;
   /** 0–100. Share of the line that fades out at the end (오른쪽). Absent means a hard edge. */
@@ -938,6 +940,7 @@ export function parseVectorLayer(raw: unknown, ink: string): VectorLayer | null 
       start: value.start === true,
       end: value.end === true,
       color: hexOrEmpty(value.color, ink),
+      ...(num(value.opacity) !== null && (num(value.opacity) ?? 100) < 100 ? { opacity: clampUnit(num(value.opacity) ?? 100, 100) } : {}),
       ...(clampUnit(num(value.fadeStart) ?? 0, 100) > 0 ? { fadeStart: clampUnit(num(value.fadeStart) ?? 0, 100) } : {}),
       ...(clampUnit(num(value.fadeEnd) ?? 0, 100) > 0 ? { fadeEnd: clampUnit(num(value.fadeEnd) ?? 0, 100) } : {}),
     };
