@@ -3821,6 +3821,7 @@ export function bindStudio(
       });
       const chunks: Blob[] = [];
       let frame = 0;
+      let shown = -1;
       const finish = () => {
         cancelAnimationFrame(frame);
         source.pause();
@@ -3851,7 +3852,10 @@ export function bindStudio(
         "canplay",
         () => {
           const loop = () => {
-            draw();
+            if (source.currentTime !== shown) {
+              shown = source.currentTime;
+              draw();
+            }
             const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 1;
             exportProgress(`동영상 ${size.width} × ${size.height}px 녹화 중 · 녹화가 끝날 때까지 편집이 잠깁니다.`, (source.currentTime / duration) * 100);
             frame = requestAnimationFrame(loop);
@@ -3867,6 +3871,73 @@ export function bindStudio(
         { once: true },
       );
     });
+
+  const seekVideo = (source: HTMLVideoElement, time: number, duration: number) =>
+    new Promise<void>((resolve) => {
+      const target = Math.min(Math.max(0, time), Math.max(0, duration - 0.04));
+      if (Math.abs(source.currentTime - target) < 0.02 && source.readyState >= 2) {
+        resolve();
+        return;
+      }
+      const done = () => {
+        source.removeEventListener("seeked", done);
+        window.clearTimeout(timer);
+        resolve();
+      };
+      source.addEventListener("seeked", done);
+      const timer = window.setTimeout(done, 700);
+      source.currentTime = target;
+    });
+  /**
+   * One loop of the background, seeked and painted frame by frame, then encoded with exact timestamps.
+   * Real-time recording drops frames when the card is slow to paint, and the MP4 comes out short.
+   */
+  const encodeLoop = async (url: string, size: { width: number; height: number }, cancel: { on: boolean }) => {
+    const { BufferTarget, CanvasSource, Mp4OutputFormat, Output, QUALITY_HIGH } = await import("mediabunny");
+    const fps = 30;
+    const out = document.createElement("canvas");
+    out.width = size.width;
+    out.height = size.height;
+    const ctx = out.getContext("2d");
+    if (!ctx) throw new Error("canvas");
+    const source = document.createElement("video");
+    source.muted = true;
+    source.playsInline = true;
+    source.preload = "auto";
+    const output = new Output({ format: new Mp4OutputFormat({ fastStart: "in-memory" }), target: new BufferTarget() });
+    try {
+      source.src = url;
+      await new Promise<void>((resolve, reject) => {
+        source.addEventListener("loadeddata", () => resolve(), { once: true });
+        source.addEventListener("error", () => reject(new Error("video")), { once: true });
+      });
+      const duration = Number.isFinite(source.duration) && source.duration > 0 ? source.duration : 5;
+      const frames = Math.max(1, Math.round(duration * fps));
+      const track = new CanvasSource(out, { codec: "avc", quality: QUALITY_HIGH });
+      output.addVideoTrack(track, { frameRate: fps });
+      await output.start();
+      const scale = size.width / state.cardWidth;
+      for (let index = 0; index < frames; index += 1) {
+        if (cancel.on) break;
+        await seekVideo(source, index / fps, duration);
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        paintCard(ctx, state, imageOf, undefined, { source, width: source.videoWidth, height: source.videoHeight });
+        await track.add(index / fps, 1 / fps);
+        exportProgress(`동영상 ${size.width} × ${size.height}px 만드는 중 · 끝날 때까지 편집이 잠깁니다.`, ((index + 1) / frames) * 100);
+      }
+      if (cancel.on) {
+        await output.cancel();
+        throw new Error("cancelled");
+      }
+      await output.finalize();
+      const buffer = output.target.buffer;
+      if (!buffer) throw new Error("empty");
+      return new Blob([buffer], { type: "video/mp4" });
+    } finally {
+      source.removeAttribute("src");
+      source.load();
+    }
+  };
 
   const runVideo = async (button: HTMLButtonElement) => {
     const url = backgroundVideoUrl();
@@ -3888,7 +3959,10 @@ export function bindStudio(
         if (cancel.on) break;
         used = size;
         try {
-          blob = await recordLoop(url, size, mimeType, cancel);
+          blob =
+            typeof VideoEncoder === "undefined"
+              ? await recordLoop(url, size, mimeType, cancel)
+              : await encodeLoop(url, size, cancel);
           break;
         } catch {
           blob = null;
@@ -3997,25 +4071,9 @@ export function bindStudio(
         const ready = source.readyState >= 2 && source.videoWidth > 0;
         paintCard(ctx, state, imageOf, undefined, ready ? { source, width: source.videoWidth, height: source.videoHeight } : null);
       };
-      const seek = (time: number) =>
-        new Promise<void>((resolve) => {
-          const target = Math.min(Math.max(0, time), Math.max(0, duration - 0.04));
-          if (Math.abs(source.currentTime - target) < 0.02 && source.readyState >= 2) {
-            resolve();
-            return;
-          }
-          const done = () => {
-            source.removeEventListener("seeked", done);
-            window.clearTimeout(timer);
-            resolve();
-          };
-          source.addEventListener("seeked", done);
-          const timer = window.setTimeout(done, 700);
-          source.currentTime = target;
-        });
       for (let index = 0; index < times.length; index += 1) {
         if (cancel.on) return;
-        await seek(times[index] ?? 0);
+        await seekVideo(source, times[index] ?? 0, duration);
         if (cancel.on) return;
         draw();
         encoder.add(ctx.getImageData(0, 0, size.width, size.height).data, delays[index] ?? 10);
