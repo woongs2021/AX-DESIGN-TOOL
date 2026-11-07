@@ -164,7 +164,7 @@ import {
   type ShapeLayer,
   type ShapeName,
 } from "../shared/studio-shapes.ts";
-import { confirmProceed, showToast } from "../feedback.ts";
+import { confirmProceed, openFigmaMcpDialog, showToast } from "../feedback.ts";
 import thumbIgFeedSquare from "../styles/presets/ig-feed-square.webp";
 import thumbIgFeedPortrait from "../styles/presets/ig-feed-portrait.webp";
 import thumbIgStory from "../styles/presets/ig-story.webp";
@@ -1813,6 +1813,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               <button type="button" class="studio__zoom-btn" id="studio-zoom-in" aria-label="확대">+</button>
               <button type="button" class="studio__zoom-btn studio__zoom-btn--text" id="studio-zoom-fit" aria-label="프리뷰에 맞춤">Fit</button>
             </div>
+            <button type="button" class="button button--secondary" id="studio-mcp" title="카드를 Figma 페이지에 넣습니다.">MCP 연결</button>
             ${conferenceActions}
             <button type="button" class="button button--secondary" id="studio-pdf" title="카드 이미지를 PDF로 받습니다.">PDF 다운로드</button>
             <button type="button" class="button" id="studio-download">PNG 다운로드</button>
@@ -3580,6 +3581,7 @@ export function bindStudio(
   const videoButton = root.querySelector<HTMLButtonElement>("#studio-video");
   const gifButton = root.querySelector<HTMLButtonElement>("#studio-gif");
   const pdfButton = root.querySelector<HTMLButtonElement>("#studio-pdf");
+  root.querySelector<HTMLButtonElement>("#studio-mcp")?.addEventListener("click", openFigmaMcpDialog);
   const exportNote = root.querySelector<HTMLElement>("#studio-export-note");
   const tintField = root.querySelector<HTMLElement>("#studio-tint-field");
   const tintOriginal = root.querySelector<HTMLButtonElement>("#studio-tint-original");

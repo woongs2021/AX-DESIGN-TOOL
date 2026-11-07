@@ -301,6 +301,28 @@ html[data-mode="dark"] .confirm-dialog {
   margin-top: 20px;
 }
 
+.mcp-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.mcp-dialog__title {
+  margin: 0;
+  color: var(--fg);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.mcp-dialog__field {
+  display: grid;
+  gap: 8px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
 .toast {
   position: fixed;
   left: 50%;
@@ -2368,6 +2390,10 @@ html[data-mode="dark"] .studio__scaler canvas[data-copy="true"] {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.studio__bar-actions .button {
+  white-space: nowrap;
 }
 
 .studio__history,
