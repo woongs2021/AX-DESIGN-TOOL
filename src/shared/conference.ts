@@ -31,6 +31,7 @@ export const CONFERENCE_PRESETS: readonly ConferencePreset[] = [
   { id: "conf-instagram", name: "Instagram", width: 2160, height: 2160, background: "instagram", print: null, videoFallbackEdge: 1920 },
   { id: "conf-poster", name: "Poster", width: 2880, height: 3840, background: "poster", print: null, videoFallbackEdge: 2880 },
   { id: "conf-slide", name: "Slide", width: 3840, height: 2160, background: "slide", print: null, videoFallbackEdge: 1920 },
+  { id: "conf-slide-front", name: "Slide Front", width: 2400, height: 2400, background: "instagram", print: null, videoFallbackEdge: 1920 },
   {
     id: "conf-banner-x",
     name: "X배너",
@@ -44,9 +45,9 @@ export const CONFERENCE_PRESETS: readonly ConferencePreset[] = [
     id: "conf-banner-l",
     name: "L배너",
     width: 3840,
-    height: 640,
+    height: 1024,
     background: "banner-l",
-    print: { width: 21260, height: 3543, dpi: 100 },
+    print: { width: 17717, height: 4724, dpi: 100 },
     videoFallbackEdge: 1920,
   },
 ];

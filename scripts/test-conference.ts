@@ -42,7 +42,7 @@ const index: ConferenceIndex = {
 // Presets and names
 assert.deepEqual(
   CONFERENCE_PRESETS.map((preset) => `${preset.width}x${preset.height}`),
-  ["2160x2160", "2880x3840", "3840x2160", "1280x3840", "3840x640"],
+  ["2160x2160", "2880x3840", "3840x2160", "2400x2400", "1280x3840", "3840x1024"],
 );
 assert.ok(CONFERENCE_PRESETS.every((preset) => preset.width <= 4000 && preset.height <= 4000));
 assert.equal(conferencePresetById("nope").id, "conf-instagram");
@@ -64,6 +64,7 @@ assert.equal(conferenceSrc({ id: "speaker-001" }), "conf:speaker-001");
 assert.deepEqual(presetBackground(index, "conf-banner-x", { id: "instagram", mode: "video" }), { id: "banner-x", mode: "video" });
 assert.deepEqual(presetBackground(index, "conf-banner-l", { id: "instagram", mode: "video" }), { id: "banner-l", mode: "image" });
 assert.deepEqual(presetBackground(index, "conf-instagram", null), { id: "instagram", mode: "image" });
+assert.deepEqual(presetBackground(index, "conf-slide-front", null), { id: "instagram", mode: "image" });
 
 // Video sizes: card size first, then the fallback edge on the same ratio, both even
 assert.deepEqual(videoExportSizes("conf-instagram", 2160, 2160), [{ width: 2160, height: 2160 }, { width: 1920, height: 1920 }]);
@@ -74,7 +75,7 @@ assert.ok(videoExportSizes("conf-slide", 1001, 563).every((size) => size.width %
 // Print sizes match the original backgrounds
 assert.deepEqual(printSize("conf-banner-x", 1280, 3840), { width: 3543, height: 10630, dpi: 150 });
 assert.deepEqual(printSize("conf-banner-x", 1280, 2560), { width: 3543, height: 7086, dpi: 150 });
-assert.deepEqual(printSize("conf-banner-l", 3840, 640), { width: 21260, height: 3543, dpi: 100 });
+assert.deepEqual(printSize("conf-banner-l", 3840, 1024), { width: 17717, height: 4724, dpi: 100 });
 assert.equal(printSize("conf-instagram", 2160, 2160), null);
 const strips = printStrips(21260, 3543);
 assert.equal(strips.reduce((sum, strip) => sum + strip.h, 0), 3543);
