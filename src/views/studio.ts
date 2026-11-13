@@ -107,6 +107,7 @@ import {
 } from "../shared/conference.ts";
 import { readInstagramCard, readInstagramOrder, readStoredConferenceBaseline, writeInstagramCard, writeInstagramOrder } from "../studio-baseline.ts";
 import { cardPdf } from "../shared/card-pdf.ts";
+import type { SceneColor, SceneGeometry, SceneItem, ScenePathCmd, SlideScene } from "../shared/slides-pptx.ts";
 import { GIF_LONG_EDGE, createGifEncoder, gifFrameDelays, gifSize } from "../shared/card-gif.ts";
 import { createPngEncoder, printStrips } from "../shared/print-png.ts";
 import {
@@ -164,7 +165,8 @@ import {
   type ShapeLayer,
   type ShapeName,
 } from "../shared/studio-shapes.ts";
-import { confirmProceed, openFigmaMcpDialog, showToast } from "../feedback.ts";
+import { confirmProceed, FIGMA_PAGE_URL_KEY, openFigmaMcpDialog, showToast } from "../feedback.ts";
+import { FIGMA_IMAGE_MAX, FIGMA_NOT_CONNECTED, figmaBridgeReady, parseFigmaPageUrl, sendCardToFigma } from "../shared/figma-bridge.ts";
 import thumbIgFeedSquare from "../styles/presets/ig-feed-square.webp";
 import thumbIgFeedPortrait from "../styles/presets/ig-feed-portrait.webp";
 import thumbIgStory from "../styles/presets/ig-story.webp";
@@ -255,7 +257,16 @@ const DEVICES: { id: Device; label: string; icon: string }[] = [
 ];
 const TABLET_QUERY = "(min-width: 768px)";
 const DESKTOP_QUERY = "(min-width: 1025px)";
+const PRESENTATION_CONTROLS_KEY = "ax-presentation-controls";
 let studioDevice: Device | null = null;
+
+function presentationControlsOpen(): boolean {
+  try {
+    return localStorage.getItem(PRESENTATION_CONTROLS_KEY) !== "closed";
+  } catch {
+    return true;
+  }
+}
 let stopDeviceWatch: (() => void) | null = null;
 let stopHistoryShortcut: (() => void) | null = null;
 let stopStudioKeys: (() => void) | null = null;
@@ -296,20 +307,32 @@ function sameStudio(a: StudioState, b: StudioState): boolean {
 }
 
 const imageCache = new Map<string, HTMLImageElement>();
+const imageWaiters = new Map<string, Promise<HTMLImageElement>>();
 const dataUrlCache = new Map<string, Promise<string>>();
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   const cached = imageCache.get(url);
   if (cached?.complete && cached.naturalWidth > 0) return Promise.resolve(cached);
-  return new Promise((resolve, reject) => {
+  const pending = imageWaiters.get(url);
+  if (pending) return pending;
+  const promise = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = cached ?? new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Image failed: ${url}`));
+    const finish = () => {
+      imageWaiters.delete(url);
+      if (image.naturalWidth > 0) resolve(image);
+      else reject(new Error(`Image failed: ${url}`));
+    };
+    image.onload = finish;
+    image.onerror = finish;
     if (!cached) {
       imageCache.set(url, image);
       image.src = url;
+    } else if (image.complete) {
+      finish();
     }
   });
+  imageWaiters.set(url, promise);
+  return promise;
 }
 
 function themeDataUrl(url: string): Promise<string> {
@@ -525,12 +548,292 @@ function drawCard(
   imageOf: (layer: ImageLayer) => HTMLImageElement | null,
   hiddenId?: string,
   background: BackgroundPaint | null = null,
+  scale = 1,
 ): HitBox[] {
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
-  canvas.width = state.cardWidth;
-  canvas.height = state.cardHeight;
+  canvas.width = Math.max(1, Math.round(state.cardWidth * scale));
+  canvas.height = Math.max(1, Math.round(state.cardHeight * scale));
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
   return paintCard(ctx, state, imageOf, hiddenId, background);
+}
+
+function studioSources(state: StudioState, config: StudioConfig): { srcUrl: (src: string) => string; still: string; videoUrl: string } {
+  const sources = config.groups.flatMap((group) => group.items);
+  const srcUrl = (src: string): string => {
+    const upload = uploadBySrc(src);
+    if (upload) return upload.url;
+    const source =
+      sources.find((item) => item.src === src) ?? sources.find((item) => item.src === state.themeSlug) ?? sources[0];
+    return source?.url ?? "";
+  };
+  const record =
+    (state.background && config.conference?.backgrounds.find((item) => item.id === state.background?.id)) || null;
+  const still = record?.image?.path ? assetUrl(record.image.path) : "";
+  const videoUrl = state.background?.mode === "video" && record?.video?.path ? assetUrl(record.video.path) : "";
+  return { srcUrl, still, videoUrl };
+}
+
+function studioImageUrls(state: StudioState, config: StudioConfig): string[] {
+  const { srcUrl, still } = studioSources(state, config);
+  return [
+    ...new Set(
+      state.layers.flatMap((layer) => (layer.kind === "image" ? [srcUrl(layer.src)] : [])).concat(still).filter(Boolean),
+    ),
+  ];
+}
+
+/** True once the photos this card paints are in the same cache the editor uses. */
+export function studioImagesReady(state: StudioState, config: StudioConfig): boolean {
+  return studioImageUrls(state, config).every((url) => {
+    const image = imageCache.get(url);
+    return Boolean(image?.complete && image.naturalWidth > 0);
+  });
+}
+
+/** Paints a page the way the editor canvas does, then returns a preview image. */
+export async function renderStudioStill(state: StudioState, config: StudioConfig): Promise<string> {
+  const canvas = await paintStill(state, config, 960);
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+/** Design-system tokens offered beside every color field. bg and fg differ between light and dark mode. */
+const DESIGN_COLORS: readonly { token: string; label: string }[] = [
+  { token: "bg", label: "배경 (bg)" },
+  { token: "fg", label: "텍스트 (fg)" },
+  { token: "primary", label: "Primary" },
+  { token: "soft", label: "Soft" },
+  { token: "mid", label: "Mid" },
+  { token: "deep", label: "Deep" },
+  { token: "tint", label: "Tint" },
+  { token: "accent", label: "Accent" },
+  { token: "mute", label: "Mute" },
+  { token: "warning", label: "Warning" },
+];
+
+const hasShadow = (shadow: { size: number; blur: number; distance: number; opacity: number }) =>
+  shadow.opacity > 0 && (shadow.size > 0 || shadow.blur > 0 || shadow.distance > 0);
+
+/**
+ * The page as editable parts. Text, shapes, lines, and pen paths become native items.
+ * Images, and any layer whose effect has no native equivalent (blur, blend, shadow, fade, gradient text), become cut-out pictures.
+ */
+export async function renderStudioScene(state: StudioState, config: StudioConfig): Promise<SlideScene> {
+  const { imageOf, background } = await prepareStill(state, config);
+  const width = state.cardWidth;
+  const height = state.cardHeight;
+  const canvas = document.createElement("canvas");
+  const encode = async (source: HTMLCanvasElement, type: string): Promise<Uint8Array> => {
+    const blob = await new Promise<Blob | null>((resolve) => source.toBlob(resolve, type, 0.92));
+    if (!blob) throw new Error(type);
+    return new Uint8Array(await blob.arrayBuffer());
+  };
+  drawCard(canvas, { ...state, layers: [] }, imageOf, undefined, background, 1);
+  const backgroundJpeg = await encode(canvas, "image/jpeg");
+  const probe = document.createElement("canvas").getContext("2d");
+  if (!probe) throw new Error("canvas");
+  const color = (value: string, alpha = 1): SceneColor => {
+    probe.fillStyle = "black";
+    probe.fillStyle = value;
+    const parsed = String(probe.fillStyle);
+    if (parsed.startsWith("#")) return { hex: parsed.slice(1, 7).toUpperCase(), alpha };
+    const match = parsed.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+))?/);
+    const r = Number(match?.[1] ?? 0);
+    const g = Number(match?.[2] ?? 0);
+    const b = Number(match?.[3] ?? 0);
+    return { hex: rgbToHex(r, g, b).slice(1).toUpperCase(), alpha: alpha * Number(match?.[4] ?? 1) };
+  };
+  const extras = extraFonts();
+  const fonts = fontChoices();
+  const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
+  const record = (trace: (path: DrawPath) => void): SceneGeometry => {
+    const commands: ScenePathCmd[] = [];
+    let primitive: SceneGeometry | null = null;
+    trace({
+      moveTo: (x, y) => commands.push({ op: "M", x, y }),
+      lineTo: (x, y) => commands.push({ op: "L", x, y }),
+      quadraticCurveTo: (cx, cy, x, y) => commands.push({ op: "Q", cx, cy, x, y }),
+      bezierCurveTo: (c1x, c1y, c2x, c2y, x, y) => commands.push({ op: "C", c1x, c1y, c2x, c2y, x, y }),
+      closePath: () => commands.push({ op: "Z" }),
+      ellipse: () => {
+        primitive = { type: "ellipse" };
+      },
+      rect: (_x, _y, _w, _h, radius) => {
+        primitive = { type: "rect", radius };
+      },
+    });
+    return primitive ?? { type: "path", commands };
+  };
+  const native = (layer: StudioLayer): SceneItem | null | "skip" => {
+    if (isTextLayer(layer)) {
+      if (!layer.text.trim()) return "skip";
+      if (layer.gradient || textBlend(layer) !== "normal" || hasShadow(shapeShadow(layer))) return null;
+      probe.font = textFont(layer, layer.size, extras);
+      probe.textBaseline = "top";
+      const lines = wrapText(layer.text.trim(), maxText, (value) => probe.measureText(value).width);
+      const lineHeight = Math.round(layer.size * 1.25);
+      const widths = lines.map((line) => probe.measureText(line).width);
+      const widest = Math.max(0, ...widths);
+      const xs = lines.map((line, index) => {
+        const lineWidth = widths[index] ?? 0;
+        const left = layer.align === "center" ? (widest - lineWidth) / 2 : layer.align === "right" ? widest - lineWidth : 0;
+        const points = Array.from(line);
+        return [...points.map((_, at) => left + probe.measureText(points.slice(0, at).join("")).width), left + lineWidth];
+      });
+      const baseline = -(probe.measureText(lines[0] ?? "").alphabeticBaseline ?? -layer.size * 0.8);
+      return {
+        kind: "text",
+        name: layer.id,
+        x: layer.x,
+        y: layer.y,
+        w: Math.max(widest, layer.size),
+        h: Math.max(lines.length, 1) * lineHeight,
+        lines,
+        size: layer.size,
+        lineHeight,
+        baseline,
+        xs,
+        font: fonts.find((font) => font.id === layer.fontId)?.label ?? BUILTIN_FONTS[0].label,
+        weight: layer.weight,
+        bold: layer.weight >= BOLD_WEIGHT,
+        italic: layer.italic,
+        underline: layer.underline,
+        align: layer.align,
+        color: color(layer.color),
+      };
+    }
+    if (layer.kind === "shape") {
+      const stroke = shapeStroke(layer);
+      const blurred = (layer.blurFrom ?? 0) > 0 || (layer.blurTo ?? 0) > 0 || layerBlurBottom(layer) > 0;
+      if (shapeBlend(layer) !== "normal" || hasShadow(shapeShadow(layer)) || blurred || stroke.gradient) return null;
+      const geometry = record((path) => traceShape(path, layer));
+      if (geometry.type === "path" && geometry.commands.length === 0) return "skip";
+      const opacity = layerOpacity(layer) / 100;
+      return {
+        kind: "shape",
+        name: layer.id,
+        x: layer.x,
+        y: layer.y,
+        w: layer.width,
+        h: layer.height,
+        geometry,
+        fill: layer.gradient
+          ? { kind: "gradient", angle: layer.gradient.angle, from: color(layer.gradient.from, opacity), to: color(layer.gradient.to, opacity) }
+          : { kind: "solid", color: color(layer.color, opacity) },
+        stroke: stroke.width > 0 && stroke.opacity > 0 ? { width: stroke.width, color: color(stroke.color, (stroke.opacity / 100) * opacity) } : null,
+      };
+    }
+    if (layer.kind === "line") {
+      const fade = lineFade(layer);
+      if (fade.start > 0 || fade.end > 0) return null;
+      return {
+        kind: "line",
+        name: layer.id,
+        x1: layer.x,
+        y1: layer.y,
+        x2: layer.x2,
+        y2: layer.y2,
+        width: layer.stroke,
+        color: color(layer.color, layerOpacity(layer) / 100),
+        round: layer.cap === "round",
+        start: layer.start,
+        end: layer.end,
+        segment: lineSegment(layer),
+        heads: [
+          layer.start ? arrowPolygon({ x: layer.x, y: layer.y }, { x: layer.x2, y: layer.y2 }, arrowLength(layer)) : null,
+          layer.end ? arrowPolygon({ x: layer.x2, y: layer.y2 }, { x: layer.x, y: layer.y }, arrowLength(layer)) : null,
+        ].filter((head): head is { x: number; y: number }[] => head !== null),
+      };
+    }
+    if (layer.kind === "pen") {
+      if (layer.points.length < 2) return "skip";
+      const geometry = record((path) => tracePen(path, layer.points, layer.closed));
+      const box = penBounds(layer);
+      return {
+        kind: "shape",
+        name: layer.id,
+        x: box.x,
+        y: box.y,
+        w: box.w,
+        h: box.h,
+        geometry,
+        fill: layer.fill ? { kind: "solid", color: color(layer.fill) } : null,
+        stroke: layer.stroke && layer.strokeWidth > 0 ? { width: layer.strokeWidth, color: color(layer.stroke) } : null,
+      };
+    }
+    return null;
+  };
+  const cutout = async (layer: StudioLayer): Promise<SceneItem | null> => {
+    drawCard(canvas, { ...state, color: "transparent", layers: [layer] }, imageOf, undefined, null, 1);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    const pixels = ctx.getImageData(0, 0, width, height).data;
+    let left = width;
+    let top = height;
+    let right = -1;
+    let bottom = -1;
+    for (let y = 0; y < height; y += 1) {
+      const row = y * width * 4;
+      for (let x = 0; x < width; x += 1) {
+        if ((pixels[row + x * 4 + 3] ?? 0) === 0) continue;
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        bottom = y;
+      }
+    }
+    if (right < left || bottom < top) return null;
+    const piece = document.createElement("canvas");
+    piece.width = right - left + 1;
+    piece.height = bottom - top + 1;
+    piece.getContext("2d")?.drawImage(canvas, left, top, piece.width, piece.height, 0, 0, piece.width, piece.height);
+    return { kind: "picture", name: layer.id, x: left, y: top, w: piece.width, h: piece.height, png: await encode(piece, "image/png") };
+  };
+  const items: SceneItem[] = [];
+  for (const layer of state.layers) {
+    const item = native(layer);
+    if (item === "skip") continue;
+    const placed = item ?? (await cutout(layer));
+    if (placed) items.push(placed);
+  }
+  const { videoUrl } = studioSources(state, config);
+  return { width, height, background: backgroundJpeg, ...(videoUrl ? { video: videoUrl } : {}), items };
+}
+
+async function prepareStill(
+  state: StudioState,
+  config: StudioConfig,
+): Promise<{ imageOf: (layer: ImageLayer) => HTMLImageElement | null; background: BackgroundPaint | null }> {
+  const { srcUrl, still, videoUrl } = studioSources(state, config);
+  const loadFace = (layer: TextLayer) => {
+    const family = fontStack(layer.fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
+    if (!family) return Promise.resolve();
+    return document.fonts.load(`${layer.italic ? "italic " : ""}${layer.weight} ${layer.size}px "${family}"`);
+  };
+  await Promise.all(state.layers.filter(isTextLayer).map((layer) => loadFace(layer).catch(() => undefined)));
+  await Promise.all(studioImageUrls(state, config).map((url) => loadImage(url).catch(() => null)));
+  const imageOf = (layer: ImageLayer): HTMLImageElement | null => {
+    const image = imageCache.get(srcUrl(layer.src));
+    return image?.complete && image.naturalWidth > 0 ? image : null;
+  };
+  const video = videoUrl ? videoCache.get(videoUrl) : null;
+  const stillImage = still ? imageCache.get(still) : undefined;
+  const background =
+    video && video.readyState >= 2 && video.videoWidth > 0
+      ? { source: video, width: video.videoWidth, height: video.videoHeight }
+      : stillImage?.complete && stillImage.naturalWidth > 0
+        ? { source: stillImage, width: stillImage.naturalWidth, height: stillImage.naturalHeight }
+        : null;
+  return { imageOf, background };
+}
+
+async function paintStill(state: StudioState, config: StudioConfig, maxEdge: number): Promise<HTMLCanvasElement> {
+  const { imageOf, background } = await prepareStill(state, config);
+  const edge = Math.max(state.cardWidth, state.cardHeight);
+  const scale = edge > maxEdge ? maxEdge / edge : 1;
+  const canvas = document.createElement("canvas");
+  drawCard(canvas, state, imageOf, undefined, background, scale);
+  return canvas;
 }
 
 /** Paints in card coordinates. A transform on ctx scales the whole card (print PNG, video export). */
@@ -987,6 +1290,22 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string): void {
   }, "image/png");
 }
 
+function pngWithin(canvas: HTMLCanvasElement, maxEdge: number): Promise<Blob> {
+  const longest = Math.max(canvas.width, canvas.height);
+  const source = longest <= maxEdge ? canvas : scaleCanvas(canvas, maxEdge / longest);
+  return new Promise((resolve, reject) => {
+    source.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("png"))), "image/png");
+  });
+}
+
+function scaleCanvas(canvas: HTMLCanvasElement, scale: number): HTMLCanvasElement {
+  const scaled = document.createElement("canvas");
+  scaled.width = Math.max(1, Math.round(canvas.width * scale));
+  scaled.height = Math.max(1, Math.round(canvas.height * scale));
+  scaled.getContext("2d")?.drawImage(canvas, 0, 0, scaled.width, scaled.height);
+  return scaled;
+}
+
 async function paintForeignObject(
   canvas: HTMLCanvasElement,
   srcdoc: string,
@@ -1164,7 +1483,9 @@ export type StudioSource = { src: string; url: string; thumb: string; label: str
 export type StudioSourceGroup = { id: string; label: string; items: StudioSource[] };
 /** What differs between Online Studio and Conference. The editor itself is shared. */
 export type StudioConfig = {
-  id: "studio" | "conference";
+  id: "studio" | "conference" | "presentation";
+  /** Undo stack id. Presentation uses one stack per page. */
+  historyKey?: string;
   presets: readonly StudioPreset[];
   presetThumbs: Record<string, string>;
   groups: StudioSourceGroup[];
@@ -1426,18 +1747,41 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
   const undoIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
   const redoIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>`;
 
-  const device = activeDevice();
+  const presentation = config.id === "presentation";
+  const device = presentation ? "desktop" : activeDevice();
   const deviceButtons = DEVICES.map(
     (item) =>
       `<button type="button" class="studio__zoom-btn studio-devices__btn" data-device="${item.id}" aria-label="${item.label}" title="${item.label}" aria-pressed="${item.id === device ? "true" : "false"}">${item.icon}</button>`,
   ).join("");
+  const controlsOpen = !presentation || presentationControlsOpen();
+  const drawButtons = DRAW_TOOLS.map(
+    (tool) =>
+      `<button type="button" class="studio__draw-btn" data-draw="${tool.id}" aria-label="${tool.label}" title="${tool.label}"${tool.id === "select" ? ' aria-pressed="true"' : tool.id === "pen" ? ' aria-pressed="false"' : ""}>${drawIcon(tool.path)}</button>`,
+  ).join("");
+  const alignBar = `
+        <div class="studio__align" id="studio-align" role="toolbar" aria-label="도형과 정렬"${presentation ? "" : " hidden"}>
+          ${presentation ? `<div class="studio__draw" role="group" aria-label="도형">${drawButtons}</div><span class="studio__align-divider" aria-hidden="true"></span>` : ""}
+          ${LAYER_ALIGNS.map(layerAlignButton).join("")}
+          <span class="studio__align-divider" aria-hidden="true"></span>
+          ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
+          <span class="studio__align-divider" id="studio-image-adjust-divider" hidden></span>
+          <button type="button" class="studio__zoom-btn" id="studio-image-adjust-btn" aria-label="이미지 수정" title="이미지 수정" aria-pressed="false" hidden><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg></button>
+          ${presentation ? `<span class="studio__align-divider" aria-hidden="true"></span><button type="button" class="studio__zoom-btn" id="studio-deck-export" aria-label="전체 다운로드" title="전체 다운로드"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg></button>` : ""}
+        </div>`;
+  const panelToggle = presentation
+    ? `<button type="button" class="studio__panel-toggle" id="studio-panel-toggle" aria-expanded="${controlsOpen ? "true" : "false"}" aria-controls="studio-controls" aria-label="${controlsOpen ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기"}" title="${controlsOpen ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기"}"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg></button>`
+    : "";
 
   return `
     <div class="studio-view">
-    <div class="studio-devices" role="group" aria-label="디바이스 뷰">${deviceButtons}</div>
+    ${
+      presentation
+        ? `<div class="studio-devices studio-devices--tools">${alignBar}</div>`
+        : `<div class="studio-devices" role="group" aria-label="디바이스 뷰">${deviceButtons}</div>`
+    }
     <div class="studio-device-frame">
-    <div class="studio-device" id="studio-device" data-device="${device}" data-framed="${device === largestDevice() ? "false" : "true"}">
-    <section class="studio" style="--studio-controls-width:${state.controlsWidth}px">
+    <div class="studio-device" id="studio-device" data-device="${device}" data-framed="${presentation || device === largestDevice() ? "false" : "true"}">
+    <section class="studio"${presentation ? ` data-controls="${controlsOpen ? "open" : "closed"}"` : ""} style="--studio-controls-width:${state.controlsWidth}px">
       <div class="studio__controls-wrap">
       <form class="studio__controls" id="studio-controls">
         <div class="studio__tabs" role="tablist" aria-label="컨트롤 패널">
@@ -1447,20 +1791,23 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
         <div class="studio__panel-host">
         <div class="studio__panel-scroll" id="studio-panel-scroll">
         <div id="studio-panel-design" role="tabpanel" aria-labelledby="studio-tab-design"${designSelected ? "" : " hidden"}>
-          <div class="studio__field">
+          ${
+            config.presets.length > 1
+              ? `<div class="studio__field">
             <span id="studio-preset-label">카드 크기 프리셋</span>
             <div class="studio__presets" role="radiogroup" aria-labelledby="studio-preset-label">${presets}</div>
-          </div>${backgroundField}
-          <div class="studio__field">
+          </div>`
+              : ""
+          }${backgroundField}
+          ${
+            presentation
+              ? ""
+              : `<div class="studio__field">
             <span id="studio-draw-label">도형</span>
-            <div class="studio__draw" role="group" aria-labelledby="studio-draw-label">
-              ${DRAW_TOOLS.map(
-                (tool) =>
-                  `<button type="button" class="studio__draw-btn" data-draw="${tool.id}" aria-label="${tool.label}" title="${tool.label}"${tool.id === "select" ? ' aria-pressed="true"' : tool.id === "pen" ? ' aria-pressed="false"' : ""}>${drawIcon(tool.path)}</button>`,
-              ).join("")}
-            </div>
+            <div class="studio__draw" role="group" aria-labelledby="studio-draw-label">${drawButtons}</div>
             <p class="studio__hint">원, 사각형, 삼각형, 별, 선, 펜, 텍스트로 카드에 형태를 더합니다.</p>
-          </div>
+          </div>`
+          }
           <div class="studio__field" id="studio-shape-size-field" hidden>
             <label for="studio-shape-size">도형 크기</label>
             <div class="studio__radius">
@@ -1729,7 +2076,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
           <div class="studio__field">
             <label for="studio-color">카드 컬러</label>
             <div class="studio__color">
-              <input id="studio-color" class="studio__color-picker" type="color" value="${escapeHtml(state.color)}" aria-label="카드 컬러 피커" />
+              <input id="studio-color" class="studio__color-picker studio__color-picker--text" type="color" value="${escapeHtml(state.color)}" aria-label="카드 컬러 피커" />
               <input id="studio-hex" class="studio__control" type="text" value="${escapeHtml(state.color)}" spellcheck="false" aria-label="카드 컬러 hex" />
             </div>
           </div>
@@ -1741,9 +2088,12 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
               <input id="studio-radius-number" class="studio__control studio__control--number" type="number" min="${RADIUS_MIN}" max="${RADIUS_MAX}" step="1" value="${state.radius}" aria-label="카드 radius 수치" />
             </div>
           </div>
-          <button type="button" class="button button--secondary studio__reset" id="studio-reset">초기화</button>
+          ${presentation
+            ? `<button type="button" class="button button--secondary studio__reset" id="studio-set-page-default">단일 페이지 현상태 기본값으로 세팅</button>
+          <button type="button" class="button button--secondary studio__reset" id="studio-set-deck-default">전체 페이지 현상태 기본값으로 세팅</button>`
+            : `<button type="button" class="button button--secondary studio__reset" id="studio-reset">초기화</button>
           <button type="button" class="button button--secondary studio__reset" id="studio-set-baseline">초기화로 세팅</button>
-          <button type="button" class="button button--secondary studio__reset" id="studio-save-library">그래픽 라이브러리에 추가</button>
+          <button type="button" class="button button--secondary studio__reset" id="studio-save-library">그래픽 라이브러리에 추가</button>`}
         </div>
 
         <div id="studio-panel-code" role="tabpanel" aria-labelledby="studio-tab-code"${designSelected ? " hidden" : ""}>
@@ -1759,16 +2109,10 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
         </div>
       </form>
       </div>
-      <div class="studio__splitter" id="studio-splitter" role="separator" aria-orientation="vertical" aria-label="컨트롤 패널과 프리뷰 너비" aria-valuemin="${CONTROLS_MIN}" aria-valuenow="${state.controlsWidth}" tabindex="0"></div>
+      <div class="studio__splitter" id="studio-splitter" role="separator" aria-orientation="vertical" aria-label="컨트롤 패널과 프리뷰 너비" aria-valuemin="${CONTROLS_MIN}" aria-valuenow="${state.controlsWidth}" tabindex="0">${panelToggle}</div>
 
       <div class="studio__preview">
-        <div class="studio__align" id="studio-align" role="toolbar" aria-label="선택한 객체 정렬" hidden>
-          ${LAYER_ALIGNS.map(layerAlignButton).join("")}
-          <span class="studio__align-divider" aria-hidden="true"></span>
-          ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
-          <span class="studio__align-divider" id="studio-image-adjust-divider" hidden></span>
-          <button type="button" class="studio__zoom-btn" id="studio-image-adjust-btn" aria-label="이미지 수정" title="이미지 수정" aria-pressed="false" hidden><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg></button>
-        </div>
+        ${presentation ? "" : alignBar}
         <div class="studio__stage" id="studio-stage">
           <p class="studio__loading" id="studio-loading" role="status" hidden>이미지를 로딩중입니다...</p>
           <div class="studio__stage-frame">
@@ -1834,11 +2178,15 @@ export function bindStudio(
   state: StudioState,
   config: StudioConfig,
   actions: {
-    onReset: () => void;
-    onSetBaseline: () => void;
+    /** Studio and Conference only, like onSetBaseline and onAddToLibrary. */
+    onReset?: () => void;
+    onSetBaseline?: () => void;
     /** Loads the preset's saved baseline and re-renders. False when it has none. */
     onLoadPreset: (presetId: string) => boolean;
-    onAddToLibrary: (thumbnail: string) => Promise<boolean>;
+    onAddToLibrary?: (thumbnail: string) => Promise<boolean>;
+    /** Presentation only. Each resolves false when the defaults file could not be written. */
+    onSetPageDefault?: () => Promise<boolean>;
+    onSetDeckDefault?: () => Promise<boolean>;
   },
 ): void {
   stopVideoLoop?.();
@@ -1846,7 +2194,7 @@ export function bindStudio(
   commitOpenGesture?.();
   commitOpenGesture = null;
   if (!hasSources(config)) return;
-  useHistory(config.id);
+  useHistory(config.historyKey ?? config.id);
   const sources = config.groups.flatMap((group) => group.items);
   const presetOf = (id: string) => config.presets.find((item) => item.id === id) ?? config.presets[0]!;
   const presetButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-preset-id]")];
@@ -1862,7 +2210,7 @@ export function bindStudio(
   const fontScaleField = root.querySelector<HTMLElement>("#studio-font-scale-field");
   const textFields = root.querySelector<HTMLElement>("#studio-text-fields");
   const cardSizeFields = root.querySelector<HTMLElement>("#studio-card-size");
-  const resetButton = root.querySelector<HTMLButtonElement>("#studio-reset");
+  const resetButton = root.querySelector<HTMLButtonElement>(".studio__reset");
   const titleFields = root.querySelector<HTMLElement>("#studio-title-fields");
   const bodyFields = root.querySelector<HTMLElement>("#studio-body-fields");
   const imageFields = root.querySelector<HTMLElement>("#studio-image-fields");
@@ -2142,9 +2490,7 @@ export function bindStudio(
     !controlsWrap ||
     !exportCode ||
     !splitter ||
-    !studio ||
-    !root.querySelector("#studio-set-baseline") ||
-    !root.querySelector("#studio-save-library")
+    !studio
   ) {
     return;
   }
@@ -3242,16 +3588,26 @@ export function bindStudio(
         writeInstagramCard(src, card);
         speakerDeck.slides[speakerDeck.index] = card;
       } else {
-        actions.onSetBaseline();
+        actions.onSetBaseline?.();
       }
       showToast(perCard ? "이 카드를 초기화 기준으로 세팅하였습니다." : "초기화로 세팅하였습니다.");
     })();
   });
+  const bindDefault = (id: string, question: string, done: string, run: (() => Promise<boolean>) | undefined) => {
+    root.querySelector(id)?.addEventListener("click", () => {
+      void (async () => {
+        if (!run || !(await confirmProceed(question))) return;
+        showToast((await run()) ? done : "기본값을 저장하지 못했습니다. 로컬 개발 서버에서만 세팅할 수 있습니다.");
+      })();
+    });
+  };
+  bindDefault("#studio-set-page-default", "이 페이지만 지금 상태로 기본값에 세팅하고 진행하시겠습니까?", "이 페이지를 기본값으로 세팅하였습니다.", actions.onSetPageDefault);
+  bindDefault("#studio-set-deck-default", "전체 페이지를 지금 상태로 기본값에 세팅하고 진행하시겠습니까?", "전체 페이지를 기본값으로 세팅하였습니다.", actions.onSetDeckDefault);
   root.querySelector("#studio-save-library")?.addEventListener("click", () => {
     void (async () => {
       const ok = await confirmProceed("현재 카드를 그래픽 라이브러리에 추가하고 진행하시겠습니까?");
       if (!ok) return;
-      const saved = await actions.onAddToLibrary(await snapshotCard());
+      const saved = (await actions.onAddToLibrary?.(await snapshotCard())) ?? false;
       showToast(saved ? "그래픽 라이브러리에 추가하였습니다." : "그래픽 라이브러리에 추가하지 못했습니다.");
     })();
   });
@@ -3272,7 +3628,7 @@ export function bindStudio(
     }
     recordChange(() => {
       if (perCard) speakerDeckMode = "reset";
-      actions.onReset();
+      actions.onReset?.();
       return true;
     });
   });
@@ -3295,6 +3651,27 @@ export function bindStudio(
     apply: (hex: string) => void,
     read: () => string,
   ) => {
+    const palette = document.createElement("div");
+    palette.className = "studio__palette";
+    palette.setAttribute("role", "group");
+    palette.setAttribute("aria-label", `${(picker.getAttribute("aria-label") ?? "").replace(/ 피커$/, "")} 디자인 시스템 색`);
+    palette.innerHTML = DESIGN_COLORS.map(
+      ({ token, label }) =>
+        `<button type="button" class="studio__palette-swatch" data-token="${token}" style="background: var(--${token})" aria-label="${label}" title="${label}"></button>`,
+    ).join("");
+    picker.parentElement?.after(palette);
+    palette.addEventListener("click", (event) => {
+      const token = (event.target as HTMLElement).closest<HTMLElement>("[data-token]")?.dataset.token;
+      // Read at click time: bg and fg follow the app's light or dark mode.
+      const hex = token ? normalizeHex(getComputedStyle(document.documentElement).getPropertyValue(`--${token}`).trim()) : null;
+      if (!hex) return;
+      beginGesture(palette);
+      apply(hex);
+      picker.value = hex;
+      hexField.value = hex;
+      void redraw();
+      finishGesture(palette);
+    });
     picker.addEventListener("pointerdown", () => beginGesture(picker));
     picker.addEventListener("change", () => finishGesture(picker));
     picker.addEventListener("input", () => {
@@ -3581,7 +3958,6 @@ export function bindStudio(
   const videoButton = root.querySelector<HTMLButtonElement>("#studio-video");
   const gifButton = root.querySelector<HTMLButtonElement>("#studio-gif");
   const pdfButton = root.querySelector<HTMLButtonElement>("#studio-pdf");
-  root.querySelector<HTMLButtonElement>("#studio-mcp")?.addEventListener("click", openFigmaMcpDialog);
   const exportNote = root.querySelector<HTMLElement>("#studio-export-note");
   const tintField = root.querySelector<HTMLElement>("#studio-tint-field");
   const tintOriginal = root.querySelector<HTMLButtonElement>("#studio-tint-original");
@@ -3999,7 +4375,48 @@ export function bindStudio(
     return offscreen;
   };
   const cardFileName = (suffix: string) =>
-    config.conference ? exportName(suffix) : `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}${suffix}`;
+    config.id === "conference"
+      ? exportName(suffix)
+      : config.id === "presentation"
+        ? `ax-presentation-${state.cardWidth}x${state.cardHeight}${suffix}`
+        : `ax-studio-${state.cardWidth}x${state.cardHeight}-${state.themeSlug || "theme"}${suffix}`;
+
+  const sendCardToPage = async (pageUrl: string): Promise<boolean> => {
+    const page = parseFigmaPageUrl(pageUrl);
+    if (!page) {
+      showToast("Figma 페이지 주소를 확인해 주세요.");
+      return false;
+    }
+    try {
+      localStorage.setItem(FIGMA_PAGE_URL_KEY, pageUrl);
+    } catch {
+      /* The address still works for this attempt. */
+    }
+    if (!(await figmaBridgeReady())) {
+      showToast(FIGMA_NOT_CONNECTED);
+      return false;
+    }
+    try {
+      const card = await renderedCard();
+      const png = await pngWithin(card, FIGMA_IMAGE_MAX);
+      const result = await sendCardToFigma({
+        page,
+        name: cardFileName(""),
+        width: state.cardWidth,
+        height: state.cardHeight,
+        radius: state.radius,
+        png,
+      });
+      showToast(result.ok ? "Figma 페이지에 카드를 넣었습니다." : result.message);
+      return result.ok;
+    } catch {
+      showToast("카드를 Figma에 넣지 못했습니다.");
+      return false;
+    }
+  };
+  root.querySelector<HTMLButtonElement>("#studio-mcp")?.addEventListener("click", () => {
+    openFigmaMcpDialog(sendCardToPage);
+  });
 
   const runPdf = async (button: HTMLButtonElement) => {
     let cancelled = false;
@@ -4831,7 +5248,8 @@ export function bindStudio(
       frameEls.delete(id);
     }
     if (alignBar) {
-      alignBar.hidden = shown.size < 1;
+      const idle = shown.size < 1;
+      alignBar.hidden = config.id === "presentation" ? false : idle;
       const imageSelected = [...shown].some((id) => layerById(id)?.kind === "image");
       if (!imageSelected) imageAdjustOpen = false;
       imageAdjustButton.hidden = !imageSelected;
@@ -4841,15 +5259,21 @@ export function bindStudio(
       for (const align of LAYER_ALIGNS) {
         const button = alignBar.querySelector<HTMLButtonElement>(`[data-layer-align="${align}"]`);
         if (!button) continue;
-        button.disabled = frozen;
-        button.title = frozen ? `${LAYER_ALIGN_LABELS[align]} · 잠긴 객체` : LAYER_ALIGN_LABELS[align];
+        button.disabled = idle || frozen;
+        button.title = idle ? "객체를 선택하세요" : frozen ? `${LAYER_ALIGN_LABELS[align]} · 잠긴 객체` : LAYER_ALIGN_LABELS[align];
       }
       for (const align of LAYER_DISTRIBUTES) {
         const button = alignBar.querySelector<HTMLButtonElement>(`[data-layer-align="${align}"]`);
         if (!button) continue;
       const units = selectionUnits(shown);
-      button.disabled = frozen || units < 3;
-      button.title = frozen ? `${LAYER_ALIGN_LABELS[align]} · 잠긴 객체` : units < 3 ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택` : LAYER_ALIGN_LABELS[align];
+      button.disabled = idle || frozen || units < 3;
+      button.title = idle
+        ? "객체를 선택하세요"
+        : frozen
+          ? `${LAYER_ALIGN_LABELS[align]} · 잠긴 객체`
+          : units < 3
+            ? `${LAYER_ALIGN_LABELS[align]} · 세 개 이상 선택`
+            : LAYER_ALIGN_LABELS[align];
       }
     }
     const image = singleImage();
@@ -6393,9 +6817,9 @@ export function bindStudio(
     deviceBox && deviceThumb && deviceFrame ? overlayScrollbar(deviceBox, deviceThumb, deviceFrame) : null;
   const syncDevice = () => {
     if (!deviceBox) return;
-    const device = activeDevice();
+    const device = config.id === "presentation" ? "desktop" : activeDevice();
     deviceBox.dataset.device = device;
-    deviceBox.dataset.framed = device === largestDevice() ? "false" : "true";
+    deviceBox.dataset.framed = config.id === "presentation" || device === largestDevice() ? "false" : "true";
     for (const button of deviceButtons) {
       button.setAttribute("aria-pressed", button.dataset.device === device ? "true" : "false");
     }
@@ -6680,7 +7104,27 @@ export function bindStudio(
     document.removeEventListener("click", onDropperClick, true);
   };
 
+  const panelToggle = root.querySelector<HTMLButtonElement>("#studio-panel-toggle");
+  const syncPanelToggle = (open: boolean) => {
+    if (!panelToggle || config.id !== "presentation") return;
+    studio.dataset.controls = open ? "open" : "closed";
+    panelToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    const label = open ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기";
+    panelToggle.setAttribute("aria-label", label);
+    panelToggle.title = label;
+    try {
+      localStorage.setItem(PRESENTATION_CONTROLS_KEY, open ? "open" : "closed");
+    } catch {
+      /* The panel still toggles for this view. */
+    }
+    applyControlsWidth(state.controlsWidth);
+  };
+  panelToggle?.addEventListener("click", () => {
+    syncPanelToggle(studio.dataset.controls === "closed");
+  });
+
   splitter.addEventListener("pointerdown", (event) => {
+    if (event.target instanceof Element && event.target.closest("#studio-panel-toggle")) return;
     if (studio.getBoundingClientRect().width < 768) return;
     try {
       splitter.setPointerCapture(event.pointerId);

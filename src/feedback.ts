@@ -44,8 +44,11 @@ export function confirmProceed(message: string): Promise<boolean> {
   });
 }
 
-/** The web app has no Figma MCP bridge yet, so 생성 always reports a missing connection. */
-export function openFigmaMcpDialog(): void {
+export const FIGMA_PAGE_URL_KEY = "ax-figma-page-url";
+
+/** `onGenerate` resolves true when the card was placed and the dialog should close. */
+export function openFigmaMcpDialog(onGenerate: (pageUrl: string) => Promise<boolean>): void {
+  if (document.querySelector(".mcp-dialog")) return;
   const backdrop = document.createElement("div");
   backdrop.className = "confirm-backdrop";
   backdrop.innerHTML = `
@@ -58,6 +61,7 @@ export function openFigmaMcpDialog(): void {
           <span>Figma 페이지</span>
           <input class="studio__control" type="url" name="figma-url" placeholder="https://www.figma.com/design/..." spellcheck="false" autocomplete="off" />
         </label>
+        <p class="mcp-dialog__hint">Figma 데스크톱에서 AX Design Tool 플러그인을 실행해 두면, 이 카드를 그 페이지에 넣습니다.</p>
         <div class="confirm-dialog__actions">
           <button type="submit" class="button">생성</button>
         </div>
@@ -66,7 +70,17 @@ export function openFigmaMcpDialog(): void {
   const form = backdrop.querySelector<HTMLFormElement>("form");
   const input = backdrop.querySelector<HTMLInputElement>("input");
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  if (input) {
+    try {
+      input.value = localStorage.getItem(FIGMA_PAGE_URL_KEY) ?? "";
+    } catch {
+      input.value = "";
+    }
+  }
+  let closed = false;
   const close = () => {
+    if (closed) return;
+    closed = true;
     document.removeEventListener("keydown", onKey);
     backdrop.remove();
     previous?.focus();
@@ -81,14 +95,35 @@ export function openFigmaMcpDialog(): void {
     if (event.target === backdrop) close();
   });
   backdrop.querySelector("[data-mcp='close']")?.addEventListener("click", close);
+  let pending = false;
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
-    if (!input?.value.trim()) {
+    if (pending) return;
+    const pageUrl = input?.value.trim() ?? "";
+    if (!pageUrl) {
       showToast("Figma 페이지 주소를 넣어 주세요.");
       input?.focus();
       return;
     }
-    showToast("피그마 MCP 연동이 되어 있지 않습니다. 다시 연결한 뒤 생성해 주세요.");
+    const submit = form.querySelector<HTMLButtonElement>("button[type='submit']");
+    pending = true;
+    if (submit) {
+      submit.disabled = true;
+      submit.textContent = "생성하는 중";
+    }
+    void onGenerate(pageUrl)
+      .then((done) => {
+        if (done) close();
+      })
+      .catch(() => {
+        showToast("카드를 Figma에 넣지 못했습니다.");
+      })
+      .finally(() => {
+        pending = false;
+        if (!submit?.isConnected) return;
+        submit.disabled = false;
+        submit.textContent = "생성";
+      });
   });
   document.addEventListener("keydown", onKey);
   document.body.append(backdrop);

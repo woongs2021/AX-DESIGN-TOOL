@@ -51,6 +51,16 @@ import {
   renderStudio,
   type StudioConfig,
 } from "./views/studio.ts";
+import { bindPresentation, renderPresentation } from "./views/presentation.ts";
+import {
+  clearPresentationDeck,
+  defaultsWithPage,
+  loadPresentationDeck,
+  savePresentationDeck,
+  syncPresentationMode,
+  writePresentationDefaults,
+  type PresentationDeck,
+} from "./shared/presentation.ts";
 
 const MODE_KEY = "ax-design-studio-mode";
 const DATA_URL = "./data/index.json";
@@ -72,6 +82,7 @@ let appliedCard: string | null = null;
 let conferenceState: StudioState | null = null;
 let appliedConferenceCard: string | null = null;
 let conferenceBaselines: BaselineStore | null = null;
+let presentationDeck: PresentationDeck | null = null;
 let route: Route = parseHash();
 
 function readStoredMode(): Mode {
@@ -176,6 +187,11 @@ function conferenceStore(index: ConferenceIndex): BaselineStore {
   return conferenceBaselines;
 }
 
+function ensurePresentation(index: ConferenceIndex): PresentationDeck {
+  presentationDeck ??= loadPresentationDeck(index);
+  return presentationDeck;
+}
+
 function ensureConference(cardId: string | null, index: ConferenceIndex): StudioState {
   if (cardId && cardId !== appliedConferenceCard) {
     const saved = getSavedCards().find((card) => card.id === cardId);
@@ -195,9 +211,13 @@ function ensureConference(cardId: string | null, index: ConferenceIndex): Studio
 function shell(mainHtml: string): string {
   const mode = readStoredMode();
   const nextModeLabel = mode === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환";
-  const studio = route.name === "studio" || route.name === "conference";
-  const conference = loadState.status === "ready" && loadState.conference
+  const studio = route.name === "studio" || route.name === "conference" || route.name === "presentation";
+  const showConference = loadState.status === "ready" && loadState.conference;
+  const conference = showConference
     ? navLink("Conference", hrefFor({ name: "conference", card: null }), route.name === "conference")
+    : "";
+  const presentation = showConference
+    ? navLink("Presentation", hrefFor({ name: "presentation" }), route.name === "presentation")
     : "";
   return `
     <header class="top-nav">
@@ -206,6 +226,7 @@ function shell(mainHtml: string): string {
         ${navLink("Graphic Library", hrefFor({ name: "archive" }), route.name === "archive" || route.name === "capture")}
         ${navLink("Online Studio", hrefFor({ name: "studio", theme: null, card: null }), route.name === "studio")}
         ${conference}
+        ${presentation}
         ${navLink("History", hrefFor({ name: "history" }), route.name === "history")}
       </nav>
       <div class="nav-actions">
@@ -258,6 +279,12 @@ function renderMain(): string {
       return loadState.conference
         ? renderStudio(ensureConference(route.card, loadState.conference), conferenceStudioConfig(loadState.conference))
         : renderNotFound("/conference");
+    case "presentation": {
+      if (!loadState.conference) return renderNotFound("/presentation");
+      const deck = ensurePresentation(loadState.conference);
+      syncPresentationMode(deck, readStoredMode());
+      return renderPresentation(deck, loadState.conference);
+    }
     case "history":
       return renderHistory(index);
     case "notfound":
@@ -270,8 +297,8 @@ function render(): void {
   if (!app) throw new Error("#app not found");
   applyMode(readStoredMode());
   pinnedSlugs = readPins();
-  if (route.name === "conference" && loadState.status === "ready" && !loadState.conference) {
-    route = { name: "studio", theme: null, card: route.card };
+  if ((route.name === "conference" || route.name === "presentation") && loadState.status === "ready" && !loadState.conference) {
+    route = { name: "studio", theme: null, card: route.name === "conference" ? route.card : null };
     history.replaceState(null, "", hrefFor(route));
   }
   app.innerHTML = shell(renderMain());
@@ -318,6 +345,17 @@ function render(): void {
   if (route.name === "conference" && conference && conferenceState) {
     bindEditor(app, conferenceState, conferenceStudioConfig(conference), conferenceStore(conference), (state, previous) => {
       state.background = presetBackground(conference, state.presetId, previous);
+    });
+  }
+  if (route.name === "presentation" && conference && presentationDeck) {
+    const deck = presentationDeck;
+    bindPresentation(app, deck, conference, {
+      onLoadPreset: () => false,
+      onSetPageDefault: () => writePresentationDefaults(defaultsWithPage(deck, deck.selected, conference)),
+      onSetDeckDefault: () => writePresentationDefaults(deck.pages),
+    }, () => {
+      savePresentationDeck(deck);
+      render();
     });
   }
 }
@@ -392,6 +430,8 @@ function bindSettingsMenu(app: HTMLElement): void {
       clearInstagramCards();
       clearInstagramOrder();
       clearSpeakerDeck();
+      clearPresentationDeck();
+      presentationDeck = null;
       appliedCard = null;
       appliedConferenceCard = null;
       const conference = loadState.status === "ready" ? loadState.conference : null;
