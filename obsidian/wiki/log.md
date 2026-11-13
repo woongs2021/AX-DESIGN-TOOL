@@ -2,6 +2,10 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-11-14] update | Phase 3 Presentation
+
+Presentation 탭(`#/presentation`)을 열었다. Conference와 같은 스튜디오로 3840 × 2160 슬라이드 덱을 편집한다. 유형 1·2·3, Shift 범위 선택과 블록 드래그·잘라내기/붙여넣기, 단일·전체 페이지를 `presentation-defaults.json`에 세팅하는 버튼, 디자인 시스템 색 스와치, 전체 내보내기(벡터 PDF·편집 가능 PPTX/Keynote·배경 영상 HTML)를 넣었다. 기본 덱 14장은 Slide Front 표지와 Instagram 연사 카드 네 장(김규영 멘토·이주원 감독·이보연 교수·박형걸 PM)을 앞에 두고, 이어서 기존 예시 페이지다. 레일을 스크롤한 뒤 프리뷰를 눌러도 스크롤이 움직이지 않게 고쳤다. 자세한 단계는 [docs/phase-3-presentation.md](../../docs/phase-3-presentation.md)에 있다.
+
 ## [2026-11-07] update | 동영상 내보내기 길이 수정
 
 MP4가 원본 배경 동영상(5.04초)보다 짧게 나오던 문제를 고쳤다. Instagram은 약 3초, Slide Front는 약 4초였다. 실시간 녹화가 무거운 카드를 다 그리지 못해 프레임을 놓쳤기 때문이다. 이제 배경을 1/30초씩 옮겨 가며 카드를 한 장씩 그리고, 정확한 시각을 붙여 MP4로 묶는다(Mediabunny). 모든 프리셋이 5.03초, 151프레임으로 나온다. 대신 내보내기는 Instagram 약 15초, Slide 약 26초가 걸린다.

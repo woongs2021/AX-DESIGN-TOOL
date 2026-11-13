@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "figma-bridge": "tsx scripts/figma-bridge.ts",
     "build": "tsx scripts/build-index.ts",
     "build:ui": "tsc --noEmit && vite build",
     "preview": "vite preview",

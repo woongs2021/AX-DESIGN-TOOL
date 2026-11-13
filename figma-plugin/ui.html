@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 16px;
+        font: 13px/1.45 sans-serif;
+      }
+      p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="status">브리지에 연결하는 중…</p>
+    <script>
+      const BRIDGE = "http://127.0.0.1:47321";
+      const status = document.getElementById("status");
+      let busy = false;
+
+      async function poll() {
+        if (busy) return;
+        try {
+          const res = await fetch(BRIDGE + "/jobs/next");
+          if (!res.ok) throw new Error("bridge");
+          const body = await res.json();
+          status.textContent = "연결됨. 앱에서 생성을 누르면 이 페이지에 넣습니다.";
+          if (!body.job) return;
+          busy = true;
+          status.textContent = "카드를 넣는 중…";
+          parent.postMessage({ pluginMessage: { type: "place", job: body.job } }, "*");
+        } catch {
+          status.textContent = "로컬 브리지가 꺼져 있습니다. npm run dev 를 실행해 주세요.";
+        }
+      }
+
+      window.onmessage = async (event) => {
+        const msg = event.data.pluginMessage;
+        if (!msg || msg.type !== "done") return;
+        try {
+          await fetch(BRIDGE + "/jobs/" + encodeURIComponent(msg.id) + "/result", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ok: msg.ok === true, error: msg.error || "" }),
+          });
+        } catch {
+          /* The studio times out if this post fails. */
+        }
+        status.textContent = msg.ok ? "넣었습니다. 다음 카드를 기다리는 중." : msg.error || "넣지 못했습니다.";
+        busy = false;
+      };
+
+      setInterval(() => {
+        void poll();
+      }, 800);
+      void poll();
+    </script>
+  </body>
+</html>

@@ -1,10 +1,10 @@
 # AX Design Studio
 
-Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.io/AX-DESIGN-TOOL/) — [Graphic Library](https://woongs2021.github.io/AX-DESIGN-TOOL/#/) · [Online Studio](https://woongs2021.github.io/AX-DESIGN-TOOL/#/studio) · [Conference](https://woongs2021.github.io/AX-DESIGN-TOOL/#/conference) · [History](https://woongs2021.github.io/AX-DESIGN-TOOL/#/history)
+Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.io/AX-DESIGN-TOOL/) — [Graphic Library](https://woongs2021.github.io/AX-DESIGN-TOOL/#/) · [Online Studio](https://woongs2021.github.io/AX-DESIGN-TOOL/#/studio) · [Conference](https://woongs2021.github.io/AX-DESIGN-TOOL/#/conference) · [Presentation](https://woongs2021.github.io/AX-DESIGN-TOOL/#/presentation) · [History](https://woongs2021.github.io/AX-DESIGN-TOOL/#/history)
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 2 Conference 구현**. 네비는 **Graphic Library / Online Studio / Conference / History**다. 2026-10-20에 연사 사진과 로고 공개를 허락하고 Conference를 GitHub Pages에도 열었다. 2026-10-25에 배경을 `[Graphic_Resources] 2`로 바꾸고, 연사별 인스타그램 카드·PDF·무한 루프 GIF·그룹·색 보정을 더했다. 2026-10-31에 포스터·슬라이드·배너 문구와 이보연 교수 카드를 최종 기본값으로 맞췄다. 2026-11-02에 선 투명도 조절바, 객체 잠금, Shift 드래그 선택을 더했다. 2026-11-07에 Slide Front 프리셋을 더하고 L배너를 4500 × 1200mm 비율로 바꿨으며, MP4가 원본 길이로 나오게 고쳤다. 공개 사이트도 100MB 이하 원본 배경을 쓴다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 3 Presentation 구현**. 네비는 **Graphic Library / Online Studio / Conference / Presentation / History**다. 2026-11-14에 Presentation 탭을 열고, 3840 × 2160 슬라이드 덱·유형 1·2·3·다중 선택·앱 기본값 세팅·PDF·PPTX·Keynote·HTML(배경 영상) 내보내기를 넣었다. 기본 덱은 Slide Front 표지와 연사 4장을 포함한 14장이다. Phase 2 Conference는 2026-10-20에 Pages에 열었고, 2026-11-07에 Slide Front·L배너·MP4 길이 수정을 마쳤다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -13,6 +13,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 | 0 Archive Foundation | vault 스키마, 결정적 빌드, internal/public 이중 번들, Archive·상세 UI, 접근성 감사, 로컬 ingest·design-system CLI. 예전 Phase 0~8을 하나로 통합했다. | 완료 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) |
 | 1 Online Studio | 35개 아카이브 작업물을 테마로 SNS 규격 마케팅 카드를 만들고 PNG로 다운로드하는 툴 | 구현됨 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) |
 | 2 Conference | 컨퍼런스 행사물(Instagram, Poster, Slide, X배너, L배너)을 같은 편집기로 만든다. 배경 이미지·동영상, PNG, PDF, 인쇄용 PNG, MP4, 무한 루프 GIF, 연사·로고. 로컬과 Pages 모두 100MB 이하 원본 | 구현됨 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) |
+| 3 Presentation | Conference Slide(3840 × 2160) 덱을 페이지 단위로 편집하고 PDF·PPTX·Keynote·HTML로 내보낸다. 유형 1·2·3, 다중 선택, 앱 기본값, 배경 영상 HTML | 구현됨 | [docs/phase-3-presentation.md](docs/phase-3-presentation.md) |
 
 ## Phase 0 — Archive Foundation
 
@@ -123,6 +124,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-11-14 | **Phase 3 Presentation**을 열었다. `#/presentation`에서 3840 × 2160 슬라이드 덱을 편집한다. 유형 1·2·3, Shift 범위 선택·블록 이동·잘라내기/붙여넣기, 단일·전체 페이지 앱 기본값 세팅(`presentation-defaults.json`), 디자인 시스템 색 스와치, 전체 내보내기(벡터 PDF·편집 가능 PPTX/Keynote·배경 영상 HTML)를 넣었다. 기본 덱 14장은 Slide Front 표지와 Instagram 연사 4장(김규영·이주원·이보연·박형걸)을 포함한다. 상세는 [Phase 3 문서](docs/phase-3-presentation.md). |
 | 2026-11-07 | Conference MP4가 원본 배경 동영상과 같은 5.03초, 151프레임으로 나온다. 실시간 녹화 대신 프레임마다 카드를 그려 정확한 시각으로 인코딩한다(Mediabunny). 무거운 카드에서 영상이 짧아지던 문제가 없어졌다. 내보내기는 Instagram 약 15초, Slide 약 26초가 걸린다. |
 | 2026-11-07 | 발표장 좌우 화면용 `Slide Front` 프리셋(2400 × 2400, Instagram 배경)을 더했다. L배너는 4500 × 1200mm 비율로 편집 3840 × 1024, 인쇄 17717 × 4724(100dpi)이고 다시 배치했다. 인스타그램 카드 4장의 상단 타이틀·학교 로고를 같은 위치로 맞췄고, 박형걸 PM 이력의 CDO·선행디자인을 고쳤다. 지금 레이아웃이 기본값이다. |
 | 2026-11-02 | Shift+Cmd+L(Windows는 Shift+Ctrl+L)이나 오른쪽 클릭 메뉴로 객체와 그룹을 잠그고 푼다. 잠긴 객체는 선택만 되고, 이동·크기 조절·정렬·삭제·더블클릭 편집은 막힌다. 잠긴 객체 위에서 끌면 선택 사각형이 된다. Shift를 누른 채 선택하지 않은 객체에서 끌면 지나가는 객체가 하나씩 선택에 더해진다. 객체를 선택하면 그 조절바가 위로 오고, 카드 크기 조절바는 맨 아래로 간다. 이미지 조절바는 이미지 그리드 위에 나온다. |
@@ -157,7 +159,7 @@ History 탭은 같은 내용을 `obsidian/wiki/log.md`의 `update` 항목으로 
 3. UI 색 hex는 `src/shared/tokens.css` 하나다. 바닥은 `#FCFCFF` / `#010102`, 시그니처 액션은 `#4065F8`, 카드 기본 radius는 28px, 네비는 80px이다.
 4. 크롬 서체는 Pretendard다. Samsung Sharp Sans는 라이선스 확인 전까지 공개 번들에 넣지 않는다. 카드 글자는 Pretendard, Roboto, Montserrat 중에서 고른다.
 5. Markdown이 진실이고, 웹은 빌드된 JSON만 읽는다. 공개 번들은 내부 데이터를 빼놓고 만들며, 큰 원본은 로컬에 두고 공개 사이트에는 편집용 사본을 넣는다.
-6. 편집기는 하나다. Online Studio와 Conference는 프리셋·배경·내보내기 설정만 다르다.
+6. 편집기는 하나다. Online Studio와 Conference·Presentation은 프리셋·배경·내보내기·페이지 레일 설정만 다르다.
 
 ## 개발 구조
 
@@ -173,7 +175,7 @@ flowchart TB
   public --> pages["GitHub Pages"]
 ```
 
-화면은 `#/` Graphic Library, `#/studio` Online Studio, `#/conference` Conference, `#/history` History다. 인쇄용 PNG는 `CompressionStream`으로 띠를 나눠 만들고, 동영상 내보내기는 브라우저 `MediaRecorder`다. 카드 합성은 서버 없이 브라우저 안에서만 한다.
+화면은 `#/` Graphic Library, `#/studio` Online Studio, `#/conference` Conference, `#/presentation` Presentation, `#/history` History다. 인쇄용 PNG는 `CompressionStream`으로 띠를 나눠 만들고, Conference 동영상은 프레임 단위 `VideoEncoder`(없으면 `MediaRecorder`)다. Presentation 전체 내보내기는 벡터 PDF·PPTX·영상 포함 HTML이다. 카드 합성은 서버 없이 브라우저 안에서만 한다.
 
 ## 핵심 원칙
 
@@ -194,6 +196,7 @@ flowchart TB
 | [docs/phase-0-foundation.md](docs/phase-0-foundation.md) | 예전 Phase 0~8을 통합한 아카이브 기반 요약. |
 | [docs/phase-1-online-marketing-studio.md](docs/phase-1-online-marketing-studio.md) | Online Studio 계획서. |
 | [docs/phase-2-conference-studio.md](docs/phase-2-conference-studio.md) | Conference 계획서. 로컬과 Pages 모두 100MB 이하 원본. |
+| [docs/phase-3-presentation.md](docs/phase-3-presentation.md) | Presentation 계획·구현. 덱 편집과 PDF·PPTX·HTML 내보내기. |
 | [docs/llm-wiki-model.md](docs/llm-wiki-model.md) | LLM Wiki 계층과 operation 규칙. |
 | [docs/authoring-guide.md](docs/authoring-guide.md) | 캡처 1건 작성 기준. |
 | [docs/deploy.md](docs/deploy.md) | 수동 배포 절차. |
