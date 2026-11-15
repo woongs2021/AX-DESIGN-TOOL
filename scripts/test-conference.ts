@@ -181,16 +181,16 @@ const titleSize = (at: number) => {
 assert.equal(titleSize(0), 128);
 assert.equal(titleSize(1), 400);
 assert.equal(titleSize(4), 200);
-const photoColor = deck.pages[3]?.state.color;
 syncPresentationMode(deck, "light");
 assert.equal(deck.pages[3]?.tone, null);
-assert.equal(deck.pages[3]?.state.color, photoColor);
+assert.equal(deck.pages[3]?.state.color, bareCardColor("light"));
 assert.ok(deck.pages.filter((page) => page.type !== 1).every((page) => page.tone === "light"));
 const lightTitle = deck.pages[0]?.state.layers.find((layer) => layer.kind === "title");
 assert.equal(lightTitle?.kind === "title" ? lightTitle.color : "", rgbToHex(0, 28, 51));
 syncPresentationMode(deck, "dark");
 assert.ok(deck.pages.filter((page) => page.type !== 1).every((page) => page.tone === "dark"));
 assert.equal(deck.pages[3]?.tone, null);
+assert.equal(deck.pages[3]?.state.color, bareCardColor("dark"));
 assert.equal(reorderPresentationPage(deck, 0, 0), false);
 assert.equal(reorderPresentationPage(deck, 0, 1), false);
 assert.equal(reorderPresentationPage(deck, 0, 3), true);

@@ -1698,36 +1698,57 @@ export function conferenceStudioConfig(index: ConferenceIndex): StudioConfig {
   };
 }
 
-/** True when the logo is ink on transparency, with no light or colored pixels. Those marks vanish on the dark code ground. */
-function monoDarkLogo(img: HTMLImageElement): boolean {
-  if (!img.naturalWidth) return false;
+type ThemeInk = "dark" | "light" | "mixed";
+
+/** Ink of a logo thumbnail. Dark and light marks follow the UI mode; mixed art stays in its own colors on a middle plate. */
+function themeInk(img: HTMLImageElement): ThemeInk | null {
+  if (!img.naturalWidth) return null;
   const size = 48;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return false;
-  ctx.drawImage(img, 0, 0, size, size);
-  const data = ctx.getImageData(0, 0, size, size).data;
+  if (!ctx) return null;
+  let data: Uint8ClampedArray;
+  try {
+    ctx.drawImage(img, 0, 0, size, size);
+    data = ctx.getImageData(0, 0, size, size).data;
+  } catch {
+    return null;
+  }
   let dark = 0;
   let light = 0;
   let chromatic = 0;
   for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3] < 16) continue;
+    if ((data[i + 3] ?? 0) < 16) continue;
     const r = data[i] ?? 0;
     const g = data[i + 1] ?? 0;
     const b = data[i + 2] ?? 0;
-    if (Math.max(r, g, b) - Math.min(r, g, b) > 24) chromatic += 1;
-    else if ((r + g + b) / 3 < 96) dark += 1;
-    else light += 1;
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 28) {
+      chromatic += 1;
+      continue;
+    }
+    const lum = (r + g + b) / 3;
+    if (lum < 80) dark += 1;
+    else if (lum > 190) light += 1;
   }
   const opaque = dark + light + chromatic;
-  return opaque > 30 && chromatic / opaque < 0.08 && dark > light * 3;
+  if (opaque < 20) return null;
+  if (chromatic / opaque > 0.12) return "mixed";
+  if (dark > light * 3 && dark > opaque * 0.55) return "dark";
+  if (light > dark * 3 && light > opaque * 0.55) return "light";
+  return "mixed";
 }
 
-function markMonoLogos(root: ParentNode): void {
-  for (const img of root.querySelectorAll<HTMLImageElement>(".studio__theme--logo img")) {
-    const apply = () => img.parentElement?.classList.toggle("is-mono", monoDarkLogo(img));
+function markThemeInk(root: ParentNode): void {
+  for (const img of root.querySelectorAll<HTMLImageElement>(".studio__theme--logo img, .studio__theme--mark img")) {
+    const apply = () => {
+      const button = img.parentElement;
+      if (!button) return;
+      button.classList.remove("is-ink-dark", "is-ink-light", "is-ink-mixed");
+      const ink = themeInk(img);
+      if (ink) button.classList.add(`is-ink-${ink}`);
+    };
     if (img.complete && img.naturalWidth) apply();
     else img.addEventListener("load", apply, { once: true });
   }
@@ -1736,13 +1757,15 @@ function markMonoLogos(root: ParentNode): void {
 function themeOptions(config: StudioConfig, activeSrc: string): string {
   const option = (src: string, image: string, label: string, kind: StudioSource["kind"] = "theme") => {
     const selected = src === activeSrc;
+    const svg = /\.svg(?:$|[?#])/i.test(src) || /\.svg(?:$|[?#])/i.test(image) || /\.svg(?:$|[?#])/i.test(label);
+    const variant = kind === "theme" ? (svg ? "mark" : "") : kind;
     const media = kind === "video"
       ? `<video src="${escapeHtml(image)}" muted playsinline preload="metadata" draggable="false"></video>`
       : `<img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" draggable="false" />`;
     return `
       <button
         type="button"
-        class="studio__theme${kind === "theme" ? "" : ` studio__theme--${kind}`}"
+        class="studio__theme${variant ? ` studio__theme--${variant}` : ""}"
         role="radio"
         data-theme-slug="${escapeHtml(src)}"
         aria-checked="${selected ? "true" : "false"}"
@@ -1863,6 +1886,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
             <div class="studio__text-style" role="group" aria-labelledby="studio-background-label">
               <button type="button" class="studio__style-btn studio__style-btn--wide" data-background-mode="image" aria-pressed="true">이미지</button>
               <button type="button" class="studio__style-btn studio__style-btn--wide" data-background-mode="video" aria-pressed="false">동영상</button>
+              <button type="button" class="studio__style-btn studio__style-btn--wide" id="studio-background-clear" hidden>삭제</button>
             </div>
           </div>`
     : "";
@@ -4130,9 +4154,9 @@ export function bindStudio(
   const themeButtons = () => [...root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")];
   const renderThemes = () => {
     if (themeGrid) themeGrid.innerHTML = themeOptions(config, panelImage().src);
-    markMonoLogos(root);
+    markThemeInk(root);
   };
-  markMonoLogos(root);
+  markThemeInk(root);
   const pickTheme = (button: HTMLButtonElement, focus: boolean) => {
     const src = button.dataset.themeSlug;
     if (!src) return;
@@ -4245,6 +4269,7 @@ export function bindStudio(
   });
 
   const backgroundButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-background-mode]")];
+  const backgroundClear = root.querySelector<HTMLButtonElement>("#studio-background-clear");
   const videoToggle = root.querySelector<HTMLButtonElement>("#studio-video-toggle");
   const printButton = root.querySelector<HTMLButtonElement>("#studio-print");
   const videoButton = root.querySelector<HTMLButtonElement>("#studio-video");
@@ -4271,10 +4296,12 @@ export function bindStudio(
     const hasVideo = Boolean(offered?.video) || Boolean(state.background?.file);
     const video = state.background?.mode === "video" && hasVideo;
     const backgroundField = root.querySelector<HTMLElement>("#studio-background-field");
-    if (backgroundField) backgroundField.hidden = !hasVideo;
+    if (backgroundField) backgroundField.hidden = !hasVideo && !state.background;
     for (const button of backgroundButtons) {
+      button.hidden = !hasVideo;
       button.setAttribute("aria-pressed", state.background?.mode === button.dataset.backgroundMode ? "true" : "false");
     }
+    if (backgroundClear) backgroundClear.hidden = !state.background;
     if (videoToggle) {
       videoToggle.hidden = !video || codeMode;
       const label = videoPaused ? "재생" : "일시정지";
@@ -4358,6 +4385,15 @@ export function bindStudio(
       void redraw();
     });
   }
+  backgroundClear?.addEventListener("click", () => {
+    if (!state.background) return;
+    recordChange(() => {
+      delete state.background;
+      backgroundOn = false;
+      return true;
+    });
+    void redraw();
+  });
   videoToggle?.addEventListener("click", () => {
     videoPaused = !videoPaused;
     syncConference();
