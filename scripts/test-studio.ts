@@ -245,9 +245,9 @@ assert.equal(firstLayer(legacy, "image")?.width, 900);
 assert.equal(normalizeStudioState({ color: "#ffffff" }), null);
 const partial = normalizeStudioState({ themeSlug: "x", color: "#ffffff", layers: [{ id: "t2", kind: "title", text: "a", x: 1, y: 2, size: 30, fontId: "pretendard", color: "#000000" }, { kind: "bogus" }] });
 assert.ok(partial);
-assert.deepEqual(partial.layers.map((layer) => layer.kind), ["image", "title", "body"]);
+assert.deepEqual(partial.layers.map((layer) => layer.kind), ["title"]);
 assert.equal(firstLayer(partial, "title")?.id, "t2");
-assert.equal(firstLayer(partial, "image")?.src, "x");
+assert.equal(firstLayer(partial, "image"), undefined);
 
 // Text style: the title starts SemiBold, the body Regular, everything else off and left-aligned.
 assert.deepEqual(
@@ -269,6 +269,52 @@ assert.deepEqual(
 );
 assert.equal(firstLayer(styled, "title")?.weight, 400);
 assert.equal(firstLayer(styled, "title")?.align, "left");
+const entered = normalizeStudioState({
+  themeSlug: "x",
+  color: "#ffffff",
+  layers: [
+    { id: "t", kind: "title", text: "a", x: 0, y: 0, size: 20, fontId: "pretendard", color: "#000000", enter: "once" },
+    { id: "i", kind: "image", src: "x", x: 0, y: 0, width: 200, enter: "nope" },
+    { id: "s", kind: "shape", shape: "rect", x: 0, y: 0, width: 40, height: 40, color: "#000000", enter: "loop" },
+    { id: "b", kind: "shape", shape: "rect", x: 0, y: 0, width: 40, height: 40, color: "#000000", enter: "blur" },
+  ],
+});
+assert.equal(entered?.layers.find((layer) => layer.id === "t")?.enter, "once");
+assert.equal(entered?.layers.find((layer) => layer.id === "i")?.enter, undefined);
+assert.equal(entered?.layers.find((layer) => layer.id === "s")?.enter, "loop");
+assert.equal(entered?.layers.find((layer) => layer.id === "b")?.enter, "once");
+const played = normalizeStudioState({
+  themeSlug: "x",
+  color: "#ffffff",
+  background: { id: "slide", mode: "video", play: "once" },
+  layers: [
+    { id: "g", kind: "image", src: "clip.gif", x: 0, y: 0, width: 200, play: "once" },
+    { id: "m", kind: "image", src: "clip.mp4", x: 0, y: 0, width: 200, play: "loop" },
+    { id: "p", kind: "image", src: "clip.png", x: 0, y: 0, width: 200, play: "once" },
+    { id: "v", kind: "image", src: "clip.webm", x: 0, y: 0, width: 200, play: "nope" },
+  ],
+});
+const playOf = (id: string) => {
+  const layer = played?.layers.find((item) => item.id === id);
+  return layer?.kind === "image" ? layer.play : undefined;
+};
+assert.equal(played?.background?.play, "once");
+assert.equal(playOf("g"), "once");
+assert.equal(playOf("m"), "loop");
+assert.equal(playOf("p"), undefined);
+assert.equal(playOf("v"), undefined);
+const playedCode = designToCode(played ?? createStudioState("x", "#ffffff"));
+assert.match(playedCode, /autoplay muted playsinline><\/video>/);
+assert.doesNotMatch(playedCode, /muted loop playsinline/);
+const looped = normalizeStudioState({
+  themeSlug: "x",
+  color: "#ffffff",
+  background: { id: "slide", mode: "video", file: "pres:nope/clip.mp4" },
+  layers: [{ id: "m", kind: "image", src: "clip.mp4", x: 0, y: 0, width: 120, play: "once" }],
+});
+assert.equal(looped?.background?.play, undefined);
+assert.match(designToCode(looped ?? createStudioState("x", "#ffffff")), /muted loop autoplay playsinline|muted loop playsinline/);
+assert.match(designToCode(looped ?? createStudioState("x", "#ffffff")), /<video class="layer-1" src="\{\{image:clip\.mp4\}\}" muted autoplay playsinline><\/video>/);
 const styledCode = designToCode(styled);
 assert.match(styledCode, /font-weight: 700; font-style: italic; text-decoration: underline; text-align: center;/);
 assert.match(styledCode, /font-weight: 400;/);
@@ -828,6 +874,13 @@ const netscapeAt = gifBytes.findIndex((_, index) => netscape.every((byte, offset
 assert.ok(netscapeAt > 0);
 assert.equal(gifBytes[netscapeAt + 13], 0);
 assert.equal(gifBytes[netscapeAt + 14], 0);
+const onceGif = createGifEncoder(2, 2, 1, null);
+onceGif.add(solidFrame(2, 2, 10, 20, 30), 10);
+const onceGifBytes = onceGif.finish();
+assert.equal(
+  onceGifBytes.findIndex((_, index) => netscape.every((byte, offset) => onceGifBytes[index + offset] === byte)),
+  -1,
+);
 const gifReader = new GifReader(gifBytes);
 assert.equal(gifReader.width, 2);
 assert.equal(gifReader.numFrames(), 2);

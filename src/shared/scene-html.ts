@@ -3,6 +3,7 @@
  * background videos play behind them. Fonts, pictures, and videos are embedded, so the file works offline.
  */
 
+import blurSource from "../../presentation/progressive-blur.js?raw";
 import { faceCovers, loadFace, subsetTrueType, type LoadedFace } from "./font-files.ts";
 import type { SceneColor, SceneFill, SceneItem, SlideScene } from "./slides-pptx.ts";
 
@@ -26,6 +27,31 @@ function base64Parts(bytes: Uint8Array): string[] {
 
 const dataUrl = (type: string, bytes: Uint8Array) => `data:${type};base64,${base64Parts(bytes).join("")}`;
 const family = (face: LoadedFace) => `ax-${face.label}`;
+
+function enterMark(item: SceneItem, kind: "text" | "object"): string {
+  if (item.enter !== "once" && item.enter !== "loop") return "";
+  const group = item.enterGroup ? ` data-enter-group="${escapeXml(item.enterGroup)}"` : "";
+  const name = kind === "text" ? "data-enter-text" : "data-enter-object";
+  return ` ${name}="" data-enter-mode="${item.enter}"${group}`;
+}
+
+function enterTextHtml(item: Extract<SceneItem, { kind: "text" }>, primary: string, fallback: string): string {
+  const lines = item.lines.map((line) => escapeXml(line)).join("<br>");
+  const fade = item.color.alpha < 1 ? ` style="opacity:${num(item.color.alpha)}"` : "";
+  const style = [
+    "white-space:pre",
+    `font-family:&quot;${escapeXml(primary)}&quot;,&quot;${escapeXml(fallback)}&quot;`,
+    `font-size:${num(item.size)}px`,
+    `line-height:${num(item.lineHeight)}px`,
+    `text-align:${item.align}`,
+    `color:${paint(item.color)}`,
+    item.italic ? "font-style:italic" : "",
+    item.underline ? "text-decoration:underline" : "",
+  ]
+    .filter(Boolean)
+    .join(";");
+  return `<div style="position:absolute;left:${num(item.x)}px;top:${num(item.y)}px;width:${num(item.w)}px"${fade}><div${enterMark(item, "text")} style="${style}">${lines}</div></div>`;
+}
 
 function fillAttrs(fill: SceneFill | null, defs: string[], id: string, box: { x: number; y: number; w: number; h: number }): string {
   if (!fill) return ' fill="none"';
@@ -75,6 +101,8 @@ body { display: grid; place-items: center; font-family: system-ui, sans-serif; }
 .slide video, .slide svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .slide video { object-fit: cover; }
 .slide text { white-space: pre; }
+.enter-stage { position: absolute; left: 0; top: 0; z-index: 2; transform-origin: top left; pointer-events: none; }
+[data-enter-text], [data-enter-object] { opacity: 0; }
 .count { position: fixed; right: 16px; bottom: 12px; color: white; opacity: 0; font-size: 13px; transition: opacity 0.3s; pointer-events: none; text-shadow: 0 1px 2px black; }
 body.is-moving .count { opacity: 0.7; }
 body.is-moving { cursor: default; }
@@ -100,6 +128,64 @@ const prepare = (slide) => {
   const video = slide?.querySelector("video[data-video]");
   if (video && !video.src) video.src = videoUrl(video.dataset.video);
 };
+const fitStage = (stage) => {
+  const slide = stage.closest(".slide");
+  const width = Number(stage.dataset.w) || 1;
+  const fit = Math.max(slide?.clientWidth || 0, 1) / width;
+  stage.style.transform = "scale(" + fit + ")";
+  return fit;
+};
+const playBlur = (slide) => {
+  if (!slide || typeof ProgressiveBlur === "undefined") return;
+  const stage = slide.querySelector(".enter-stage");
+  const fit = stage ? fitStage(stage) : 1;
+  const writing = { blur: ProgressiveBlur.WRITE.blur / fit, rise: ProgressiveBlur.WRITE.rise / fit, autoplay: true };
+  const together = Object.assign({}, writing, { delay: 0, step: 0 });
+  const token = String(Number(slide.dataset.enterRun || 0) + 1);
+  slide.dataset.enterRun = token;
+  const nodes = [...slide.querySelectorAll("[data-enter-text], [data-enter-object]")];
+  const grouped = new Map();
+  const solos = [];
+  nodes.forEach((el) => {
+    const group = el.getAttribute("data-enter-group");
+    if (!group) solos.push(el);
+    else {
+      const list = grouped.get(group) || [];
+      list.push(el);
+      grouped.set(group, list);
+    }
+  });
+  const run = (list, options, asRows) => {
+    if (!list.length || slide.dataset.enterRun !== token || !slide.classList.contains("is-current")) return;
+    const texts = asRows ? [] : list.filter((el) => el.hasAttribute("data-enter-text"));
+    const rows = asRows ? list : list.filter((el) => el.hasAttribute("data-enter-object"));
+    const plays = texts.map((el) => ProgressiveBlur.writeText(el, options));
+    if (rows.length) plays.push(ProgressiveBlur.writeContent({ rows }, options));
+    Promise.all(plays.map((play) => play.finished)).then(() => {
+      if (slide.dataset.enterRun !== token || !slide.classList.contains("is-current")) return;
+      const keep = list.filter((el) => el.getAttribute("data-enter-mode") === "loop" && el.isConnected);
+      list.forEach((el) => {
+        if (keep.includes(el)) return;
+        el.removeAttribute("data-enter-text");
+        el.removeAttribute("data-enter-object");
+      });
+      if (keep.length) run(keep, options, asRows);
+    });
+  };
+  [false, true].forEach((loop) => {
+    const batch = solos.filter((el) => (el.getAttribute("data-enter-mode") === "loop") === loop);
+    batch.filter((el) => el.hasAttribute("data-enter-text")).forEach((el) => run([el], writing, false));
+    const rows = batch.filter((el) => el.hasAttribute("data-enter-object"));
+    if (rows.length) run(rows, writing, false);
+  });
+  grouped.forEach((list) => {
+    [false, true].forEach((loop) => {
+      const batch = list.filter((el) => (el.getAttribute("data-enter-mode") === "loop") === loop);
+      if (batch.length) run(batch, together, true);
+    });
+  });
+};
+window.addEventListener("resize", () => document.querySelectorAll(".enter-stage").forEach(fitStage));
 let current = -1;
 const show = (next) => {
   next = Math.max(0, Math.min(slides.length - 1, next));
@@ -117,7 +203,8 @@ const show = (next) => {
     video.play().catch(() => {});
   }
   count.textContent = (next + 1) + " / " + slides.length;
-  history.replaceState(null, "", "#" + (next + 1));
+  playBlur(slides[next]);
+  try { history.replaceState(null, "", "#" + (next + 1)); } catch (e) {}
   setTimeout(() => prepare(slides[next + 1]), 300);
 };
 document.addEventListener("keydown", (event) => {
@@ -163,20 +250,34 @@ export async function scenesHtml(scenes: readonly SlideScene[], title: string): 
   for (const scene of scenes) {
     const defs: string[] = [];
     const body: string[] = [];
+    const enterTexts: string[] = [];
+    const entered = (item: SceneItem) => enterMark(item, "object");
     for (const item of scene.items) {
       if (item.kind === "picture") {
-        body.push(`<image href="${dataUrl("image/png", item.png)}" x="${num(item.x)}" y="${num(item.y)}" width="${num(item.w)}" height="${num(item.h)}" preserveAspectRatio="none"/>`);
+        body.push(`<image${entered(item)} href="${dataUrl("image/png", item.png)}" x="${num(item.x)}" y="${num(item.y)}" width="${num(item.w)}" height="${num(item.h)}" preserveAspectRatio="none"/>`);
       } else if (item.kind === "line") {
         const { segment, color } = item;
         const opacity = color.alpha < 1 ? ` opacity="${num(color.alpha)}"` : "";
         body.push(
-          `<g${opacity}><line x1="${num(segment.x1)}" y1="${num(segment.y1)}" x2="${num(segment.x2)}" y2="${num(segment.y2)}" stroke="${paint(color)}" stroke-width="${num(item.width)}" stroke-linecap="${item.round ? "round" : "butt"}"/>${item.heads
+          `<g${opacity}${entered(item)}><line x1="${num(segment.x1)}" y1="${num(segment.y1)}" x2="${num(segment.x2)}" y2="${num(segment.y2)}" stroke="${paint(color)}" stroke-width="${num(item.width)}" stroke-linecap="${item.round ? "round" : "butt"}"/>${item.heads
             .map((head) => `<polygon points="${head.map((point) => `${num(point.x)},${num(point.y)}`).join(" ")}" fill="${paint(color)}"/>`)
             .join("")}</g>`,
         );
       } else if (item.kind === "shape") {
         gradient += 1;
-        body.push(shapeSvg(item, defs, `g${gradient}`));
+        const shape = shapeSvg(item, defs, `g${gradient}`);
+        const mark = enterMark(item, "object");
+        body.push(mark ? `<g${mark}>${shape}</g>` : shape);
+      } else if (item.enter) {
+        const primary = await loadFace(item.font, item.weight, item.italic);
+        const fallback = await loadFace("Pretendard", item.weight, item.italic);
+        for (const line of item.lines) {
+          for (const point of Array.from(line)) {
+            const codePoint = point.codePointAt(0) ?? 32;
+            use(faceCovers(primary.font, codePoint) ? primary : fallback, codePoint);
+          }
+        }
+        enterTexts.push(enterTextHtml(item, family(primary), family(fallback)));
       } else {
         const primary = await loadFace(item.font, item.weight, item.italic);
         const fallback = await loadFace("Pretendard", item.weight, item.italic);
@@ -216,11 +317,16 @@ export async function scenesHtml(scenes: readonly SlideScene[], title: string): 
         id = `video-${videos.size + 1}`;
         videos.set(scene.video, id);
       }
-      video = `<video data-video="${id}" poster="${poster}" muted loop playsinline preload="auto"></video>`;
+      const loop = scene.videoPlay === "once" ? "" : " loop";
+      video = `<video data-video="${id}" poster="${poster}" muted${loop} playsinline preload="auto"></video>`;
     }
     const backdrop = video ? "" : `<image href="${poster}" width="${scene.width}" height="${scene.height}" preserveAspectRatio="none"/>`;
+    const stage =
+      enterTexts.length > 0
+        ? `<div class="enter-stage" data-w="${scene.width}" data-h="${scene.height}" style="width:${scene.width}px;height:${scene.height}px">${enterTexts.join("")}</div>`
+        : "";
     slides.push(
-      `<section class="slide">${video}<svg viewBox="0 0 ${scene.width} ${scene.height}" xmlns="http://www.w3.org/2000/svg">${defs.length > 0 ? `<defs>${defs.join("")}</defs>` : ""}${backdrop}${body.join("")}</svg></section>`,
+      `<section class="slide">${video}<svg viewBox="0 0 ${scene.width} ${scene.height}" xmlns="http://www.w3.org/2000/svg">${defs.length > 0 ? `<defs>${defs.join("")}</defs>` : ""}${backdrop}${body.join("")}</svg>${stage}</section>`,
     );
   }
 
@@ -252,6 +358,7 @@ ${slides.join("\n")}
     parts.push(...base64Parts(new Uint8Array(await blob.arrayBuffer())));
     parts.push("</script>\n");
   }
-  parts.push(`<script>${PLAYER_JS}</script>\n</body>\n</html>\n`);
+  const inline = blurSource.replace(/<\/(script)/gi, "<\\/$1");
+  parts.push(`<script>${inline}</script>\n<script>${PLAYER_JS}</script>\n</body>\n</html>\n`);
   return new Blob(parts, { type: "text/html" });
 }

@@ -1,4 +1,4 @@
-/** One loop of a card video, written as a GIF that repeats forever. */
+/** One pass of a card video, written as a GIF. `loop: 0` repeats forever; `null` plays once. */
 import { GifWriter } from "omggif";
 
 /** Longest side of a GIF. Full card frames of a photo loop are too large to encode in the browser. */
@@ -112,13 +112,13 @@ function indexFrame(pixels: Uint8ClampedArray, width: number, height: number): {
   return { indexed, palette, transparent: transparent ? 0 : null };
 }
 
-/** Encodes frames one at a time. `loop: 0` is the Netscape repeat-forever extension. */
-export function createGifEncoder(width: number, height: number, frameCount: number): {
+/** Encodes frames one at a time. `loop: 0` repeats forever. `null` leaves the GIF as a single pass. */
+export function createGifEncoder(width: number, height: number, frameCount: number, loop: number | null = 0): {
   add(pixels: Uint8ClampedArray, delay: number): void;
   finish(): Uint8Array;
 } {
   const buffer = new Uint8Array(width * height * Math.max(1, frameCount) * 2 + frameCount * 1024 + 4096);
-  const writer = new GifWriter(buffer, width, height, { loop: 0 });
+  const writer = new GifWriter(buffer, width, height, loop === null ? {} : { loop });
   return {
     add(pixels, delay) {
       const frame = indexFrame(pixels, width, height);

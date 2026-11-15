@@ -5,6 +5,8 @@ import {
   applyStudioBaseline,
   createStudioState,
   DEFAULT_THEME_SLUG,
+  bareCardColor,
+  cardIsBare,
   normalizeHex,
   normalizeStudioState,
   setStudioTheme,
@@ -51,11 +53,12 @@ import {
   renderStudio,
   type StudioConfig,
 } from "./views/studio.ts";
-import { bindPresentation, renderPresentation } from "./views/presentation.ts";
+import { bindPresentation, releasePresentationMenu, renderPresentation } from "./views/presentation.ts";
 import {
   clearPresentationDeck,
   defaultsWithPage,
   loadPresentationDeck,
+  recolorBarePages,
   savePresentationDeck,
   syncPresentationMode,
   writePresentationDefaults,
@@ -293,6 +296,7 @@ function renderMain(): string {
 }
 
 function render(): void {
+  releasePresentationMenu();
   const app = document.querySelector<HTMLDivElement>("#app");
   if (!app) throw new Error("#app not found");
   applyMode(readStoredMode());
@@ -308,7 +312,14 @@ function render(): void {
   });
 
   app.querySelector("#mode-toggle")?.addEventListener("click", () => {
-    applyMode(readStoredMode() === "dark" ? "light" : "dark");
+    const next = readStoredMode() === "dark" ? "light" : "dark";
+    applyMode(next);
+    if (studioState && cardIsBare(studioState)) studioState.color = bareCardColor(next);
+    if (conferenceState && cardIsBare(conferenceState)) conferenceState.color = bareCardColor(next);
+    if (loadState.status === "ready" && loadState.conference) {
+      const deck = ensurePresentation(loadState.conference);
+      if (recolorBarePages(deck, next)) savePresentationDeck(deck);
+    }
     render();
   });
   bindSettingsMenu(app);

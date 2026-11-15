@@ -19,6 +19,8 @@ export const LAYER_BLUR_MAX = 80;
 export const PEN_CLOSE = 16;
 export const SHAPE_BLENDS = ["normal", "multiply", "screen", "overlay", "darken", "lighten", "soft-light", "difference"] as const;
 export type ShapeBlend = (typeof SHAPE_BLENDS)[number];
+/** once plays a single pass when the page opens. loop repeats while that page stays open. */
+export type LayerEnter = "once" | "loop";
 export const BLEND_LABELS: Record<ShapeBlend, string> = {
   normal: "보통",
   multiply: "곱하기",
@@ -63,6 +65,8 @@ export type ShapeLayer = {
   inner?: number;
   /** Editable anchors. When set, the shape is drawn from these instead of its primitive. */
   nodes?: PenAnchor[] | null;
+  /** Progressive-blur entrance. once plays one pass. loop repeats while the page stays open. */
+  enter?: LayerEnter;
 };
 
 export type LineLayer = {
@@ -85,6 +89,8 @@ export type LineLayer = {
   fadeStart?: number;
   /** 0–100. Share of the line that fades out at the end (오른쪽). Absent means a hard edge. */
   fadeEnd?: number;
+  /** Progressive-blur entrance. once plays one pass. loop repeats while the page stays open. */
+  enter?: LayerEnter;
 };
 
 /** A cubic handle in card pixels. Absent on a corner. */
@@ -107,6 +113,8 @@ export type PenLayer = {
   /** Empty when the path has no stroke. */
   stroke: string;
   strokeWidth: number;
+  /** Progressive-blur entrance. once plays one pass. loop repeats while the page stays open. */
+  enter?: LayerEnter;
 };
 
 export type VectorLayer = ShapeLayer | LineLayer | PenLayer;
@@ -880,6 +888,14 @@ function parseStroke(raw: unknown, fallback: string): ShapeStroke {
   };
 }
 
+export function parseLayerEnter(raw: unknown): { enter?: LayerEnter } {
+  if (!raw || typeof raw !== "object") return {};
+  const enter = (raw as { enter?: unknown }).enter;
+  if (enter === "loop") return { enter: "loop" };
+  if (enter === "once" || enter === "blur") return { enter: "once" };
+  return {};
+}
+
 export function parseBlend(raw: unknown): ShapeBlend {
   return SHAPE_BLENDS.includes(raw as ShapeBlend) ? (raw as ShapeBlend) : "normal";
 }
@@ -925,6 +941,7 @@ export function parseVectorLayer(raw: unknown, ink: string): VectorLayer | null 
       gradient: parseGradient(value.gradient),
       inner: starInner({ inner: num(value.inner) ?? undefined } as ShapeLayer),
       nodes: parseAnchors(value.nodes),
+      ...parseLayerEnter(value),
     };
   }
   if (value.kind === "line") {
@@ -943,6 +960,7 @@ export function parseVectorLayer(raw: unknown, ink: string): VectorLayer | null 
       ...(num(value.opacity) !== null && (num(value.opacity) ?? 100) < 100 ? { opacity: clampUnit(num(value.opacity) ?? 100, 100) } : {}),
       ...(clampUnit(num(value.fadeStart) ?? 0, 100) > 0 ? { fadeStart: clampUnit(num(value.fadeStart) ?? 0, 100) } : {}),
       ...(clampUnit(num(value.fadeEnd) ?? 0, 100) > 0 ? { fadeEnd: clampUnit(num(value.fadeEnd) ?? 0, 100) } : {}),
+      ...parseLayerEnter(value),
     };
   }
   if (value.kind === "pen" && Array.isArray(value.points)) {
@@ -956,6 +974,7 @@ export function parseVectorLayer(raw: unknown, ink: string): VectorLayer | null 
       fill: hexOrEmpty(value.fill, ""),
       stroke: hexOrEmpty(value.stroke, ink),
       strokeWidth: Math.max(0, Math.min(LINE_WIDTH_MAX, Math.round(num(value.strokeWidth) ?? LINE_WIDTH_DEFAULT))),
+      ...parseLayerEnter(value),
     };
   }
   return null;

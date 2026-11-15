@@ -1,4 +1,6 @@
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
+import { PAGE_ENTER_EVENT, PAGE_FILES_EVENT, presentationFileUrl } from "../shared/presentation-files.ts";
+import { isPageMedia, uploadPageFiles, type PageFileSource } from "./presentation-project.ts";
 import type { CaptureRecord } from "../shared/index-types.ts";
 import {
   BUILTIN_FONTS,
@@ -14,9 +16,16 @@ import {
   CONTROLS_MIN,
   coverRect,
   cropFromBox,
+  bareCardColor,
+  cardIsBare,
   designToCode,
   ensureLayer,
+  firstLayer,
+  placeholderLayer,
+  isMotionSrc,
   isUploadSrc,
+  isVideoSrc,
+  mediaPlayOf,
   TEXT_ALIGNS,
   alignOffsets,
   assignStudio,
@@ -82,6 +91,7 @@ import {
   wrapText,
   type ImageLayer,
   type LayerKind,
+  type MediaPlay,
   type ShiftAxis,
   type StudioDocumentInput,
   type StudioLayer,
@@ -156,6 +166,7 @@ import {
   traceShape,
   transformNodes,
   type DrawPath,
+  type LayerEnter,
   type LineLayer,
   type LinearGradient,
   type PenAnchor,
@@ -222,19 +233,133 @@ function useHistory(owner: string): void {
 const videoCache = new Map<string, HTMLVideoElement>();
 let videoPaused = false;
 let stopVideoLoop: (() => void) | null = null;
+let stopPageFiles: (() => void) | null = null;
+let stopPageEnter: (() => void) | null = null;
+const enterSkip = new Set<string>();
+let enterRun = 0;
+let enterHost: HTMLElement | null = null;
 
-/** One muted looping element per URL, kept across renders so the file loads once. */
+function stopEnter(): void {
+  enterRun += 1;
+  enterHost?.remove();
+  enterHost = null;
+  enterSkip.clear();
+}
+
+const blurUrl = new URL("../../presentation/progressive-blur.js", import.meta.url).href;
+let blurApi: ProgressiveBlurApi | null = null;
+
+function loadBlur(): Promise<ProgressiveBlurApi> {
+  if (blurApi) return Promise.resolve(blurApi);
+  if (window.ProgressiveBlur) {
+    blurApi = window.ProgressiveBlur;
+    return Promise.resolve(blurApi);
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = blurUrl;
+    script.onload = () => {
+      if (!window.ProgressiveBlur) {
+        reject(new Error("blur"));
+        return;
+      }
+      blurApi = window.ProgressiveBlur;
+      resolve(blurApi);
+    };
+    script.onerror = () => reject(new Error("blur"));
+    document.head.append(script);
+  });
+}
+
+/** One muted element per URL, kept across renders so the file loads once. Looping follows the page. */
 function backgroundVideo(url: string): HTMLVideoElement {
   const cached = videoCache.get(url);
   if (cached) return cached;
   const video = document.createElement("video");
   video.muted = true;
-  video.loop = true;
   video.playsInline = true;
   video.preload = "auto";
   video.src = url;
   videoCache.set(url, video);
   return video;
+}
+
+type GifImage = CanvasImageSource & {
+  displayWidth?: number;
+  codedWidth?: number;
+  displayHeight?: number;
+  codedHeight?: number;
+  duration?: number;
+  close?: () => void;
+};
+type GifDecoder = {
+  tracks: { ready: Promise<void>; selectedTrack: { frameCount: number } | null };
+  decode(options: { frameIndex: number }): Promise<{ image: GifImage }>;
+  close?: () => void;
+};
+type GifClip = { frames: HTMLCanvasElement[]; times: number[] };
+type MotionPlayer = {
+  id: string;
+  url: string;
+  once: boolean;
+  el: HTMLCanvasElement | HTMLVideoElement;
+  stop: () => void;
+  restart: () => void;
+  setOnce: (once: boolean) => void;
+};
+
+const gifClips = new Map<string, Promise<GifClip | null>>();
+const motionPlayers = new Map<string, MotionPlayer>();
+const motionSkip = new Set<string>();
+let motionHost: HTMLDivElement | null = null;
+let motionEpoch = 1;
+let videoEpoch = 0;
+let overlayEpoch = 0;
+
+function gifClip(url: string): Promise<GifClip | null> {
+  let pending = gifClips.get(url);
+  if (!pending) {
+    pending = decodeGif(url).catch(() => null);
+    gifClips.set(url, pending);
+  }
+  return pending;
+}
+
+async function decodeGif(url: string): Promise<GifClip | null> {
+  const Decoder = (globalThis as unknown as { ImageDecoder?: new (init: { data: BufferSource; type: string }) => GifDecoder }).ImageDecoder;
+  if (!Decoder) return null;
+  const response = await fetch(url);
+  if (!response.ok) return null;
+  const decoder = new Decoder({ data: await response.arrayBuffer(), type: "image/gif" });
+  await decoder.tracks.ready;
+  const count = decoder.tracks.selectedTrack?.frameCount ?? 0;
+  if (count < 2) {
+    decoder.close?.();
+    return null;
+  }
+  const frames: HTMLCanvasElement[] = [];
+  const times: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const { image } = await decoder.decode({ frameIndex: index });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, image.displayWidth || image.codedWidth || 1);
+    canvas.height = Math.max(1, image.displayHeight || image.codedHeight || 1);
+    canvas.getContext("2d")?.drawImage(image, 0, 0);
+    frames.push(canvas);
+    times.push(Math.max(20, (image.duration ?? 100_000) / 1000));
+    image.close?.();
+  }
+  decoder.close?.();
+  return frames.length > 1 ? { frames, times } : null;
+}
+
+function stopMotion(): void {
+  motionEpoch += 1;
+  motionHost?.remove();
+  motionHost = null;
+  for (const player of motionPlayers.values()) player.stop();
+  motionPlayers.clear();
+  motionSkip.clear();
 }
 
 type Device = "mobile" | "tablet" | "desktop";
@@ -272,7 +397,18 @@ let stopHistoryShortcut: (() => void) | null = null;
 let stopStudioKeys: (() => void) | null = null;
 let layerClipboard: StudioLayer[] = [];
 let clipboardGroups: string[][] = [];
+let layerClipboardOwner: StudioState | null = null;
+/** Which copy happened last, so a page paste does not swallow an object paste. */
+let clipKind: "page" | "layer" | null = null;
 let layerMenu: HTMLElement | null = null;
+
+export function notePageClip(): void {
+  clipKind = "page";
+}
+
+export function pageClipIsCurrent(): boolean {
+  return clipKind === "page";
+}
 const LONG_PRESS_MS = 500;
 const PASTE_OFFSET = 20;
 
@@ -422,9 +558,9 @@ function documentInput(
   images: Record<string, string>,
   aspect: (layer: ImageLayer) => number,
 ): StudioDocumentInput {
-  const title = ensureLayer(state, "title");
-  const body = ensureLayer(state, "body");
-  const image = ensureLayer(state, "image");
+  const title = firstLayer(state, "title") ?? { ...placeholderLayer(state, "title"), text: "" };
+  const body = firstLayer(state, "body") ?? { ...placeholderLayer(state, "body"), text: "" };
+  const image = firstLayer(state, "image") ?? { ...placeholderLayer(state, "image"), src: "" };
   const extras = extraFonts();
   return {
     title: title.text,
@@ -549,13 +685,14 @@ function drawCard(
   hiddenId?: string,
   background: BackgroundPaint | null = null,
   scale = 1,
+  skip?: ReadonlySet<string>,
 ): HitBox[] {
   const ctx = canvas.getContext("2d");
   if (!ctx) return [];
   canvas.width = Math.max(1, Math.round(state.cardWidth * scale));
   canvas.height = Math.max(1, Math.round(state.cardHeight * scale));
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  return paintCard(ctx, state, imageOf, hiddenId, background);
+  return paintCard(ctx, state, imageOf, hiddenId, background, skip);
 }
 
 function studioSources(state: StudioState, config: StudioConfig): { srcUrl: (src: string) => string; still: string; videoUrl: string } {
@@ -563,14 +700,17 @@ function studioSources(state: StudioState, config: StudioConfig): { srcUrl: (src
   const srcUrl = (src: string): string => {
     const upload = uploadBySrc(src);
     if (upload) return upload.url;
+    const media = presentationFileUrl(src);
+    if (media) return media;
     const source =
       sources.find((item) => item.src === src) ?? sources.find((item) => item.src === state.themeSlug) ?? sources[0];
     return source?.url ?? "";
   };
   const record =
     (state.background && config.conference?.backgrounds.find((item) => item.id === state.background?.id)) || null;
-  const still = record?.image?.path ? assetUrl(record.image.path) : "";
-  const videoUrl = state.background?.mode === "video" && record?.video?.path ? assetUrl(record.video.path) : "";
+  const fileUrl = state.background?.file ? presentationFileUrl(state.background.file) : null;
+  const still = fileUrl && state.background?.mode !== "video" ? fileUrl : record?.image?.path ? assetUrl(record.image.path) : "";
+  const videoUrl = state.background?.mode === "video" ? fileUrl || (record?.video?.path ? assetUrl(record.video.path) : "") : "";
   return { srcUrl, still, videoUrl };
 }
 
@@ -618,6 +758,13 @@ const hasShadow = (shadow: { size: number; blur: number; distance: number; opaci
  * The page as editable parts. Text, shapes, lines, and pen paths become native items.
  * Images, and any layer whose effect has no native equivalent (blur, blend, shadow, fade, gradient text), become cut-out pictures.
  */
+function enterGroupKey(state: StudioState, id: string): string | null {
+  const members = groupedIds(state, id);
+  if (members.length < 2) return null;
+  const index = state.groups?.findIndex((group) => group.includes(id)) ?? -1;
+  return index >= 0 ? `g${index}` : null;
+}
+
 export async function renderStudioScene(state: StudioState, config: StudioConfig): Promise<SlideScene> {
   const { imageOf, background } = await prepareStill(state, config);
   const width = state.cardWidth;
@@ -794,10 +941,18 @@ export async function renderStudioScene(state: StudioState, config: StudioConfig
     const item = native(layer);
     if (item === "skip") continue;
     const placed = item ?? (await cutout(layer));
-    if (placed) items.push(placed);
+    if (!placed) continue;
+    const mode = layer.enter === "once" || layer.enter === "loop" ? layer.enter : null;
+    if (!mode) {
+      items.push(placed);
+      continue;
+    }
+    const enterGroup = enterGroupKey(state, layer.id);
+    items.push(enterGroup ? { ...placed, enter: mode, enterGroup } : { ...placed, enter: mode });
   }
   const { videoUrl } = studioSources(state, config);
-  return { width, height, background: backgroundJpeg, ...(videoUrl ? { video: videoUrl } : {}), items };
+  const videoPlay = videoUrl && state.background?.play === "once" ? "once" : undefined;
+  return { width, height, background: backgroundJpeg, ...(videoUrl ? { video: videoUrl, ...(videoPlay ? { videoPlay } : {}) } : {}), items };
 }
 
 async function prepareStill(
@@ -843,6 +998,7 @@ function paintCard(
   imageOf: (layer: ImageLayer) => HTMLImageElement | null,
   hiddenId: string | undefined,
   background: BackgroundPaint | null,
+  skip?: ReadonlySet<string>,
 ): HitBox[] {
   const width = state.cardWidth;
   const height = state.cardHeight;
@@ -859,6 +1015,7 @@ function paintCard(
   }
 
   const hits: HitBox[] = [];
+  const visible = (id: string) => id !== hiddenId && !enterSkip.has(id) && !skip?.has(id);
   const maxText = Math.max(1, width - FONT_SIDE_MARGIN * 2);
   ctx.textBaseline = "top";
   const extras = extraFonts();
@@ -866,7 +1023,7 @@ function paintCard(
     const source = imageOf(layer);
     if (!source) return;
     const height = imageLayerHeight(layer, source.naturalHeight / source.naturalWidth);
-    if (layer.id !== hiddenId) {
+    if (visible(layer.id)) {
       const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2));
       const shadow = shapeShadow(layer);
       const blur = imageBlur(layer);
@@ -987,7 +1144,7 @@ function paintCard(
         if (layer.underline) target.fillRect(x - spread, y + layer.size * 0.98 - spread, lineWidth + spread * 2, underline + spread * 2);
       });
     };
-    if (layer.id !== hiddenId) {
+    if (visible(layer.id)) {
       const shadow = shapeShadow(layer);
       if (shadow.opacity > 0 && (shadow.size > 0 || shadow.blur > 0 || shadow.distance > 0)) {
         const offset = shadowOffset(shadow.distance);
@@ -1029,7 +1186,7 @@ function paintCard(
     rect: (x, y, w, h, radius) => target.roundRect(x, y, w, h, radius),
   });
   const paintShape = (layer: ShapeLayer): void => {
-    if (layer.id !== hiddenId) {
+    if (visible(layer.id)) {
       ctx.save();
       ctx.globalAlpha *= layerOpacity(layer) / 100;
       const shadow = shapeShadow(layer);
@@ -1177,7 +1334,7 @@ function paintCard(
     hits.push({ id: layer.id, kind: "shape", x: layer.x, y: layer.y, w: layer.width, h: layer.height });
   };
   const paintLine = (layer: LineLayer): void => {
-    if (layer.id !== hiddenId) {
+    if (visible(layer.id)) {
       ctx.save();
       ctx.globalAlpha *= layerOpacity(layer) / 100;
       const drawLine = (target: CanvasRenderingContext2D) => {
@@ -1238,7 +1395,7 @@ function paintCard(
     hits.push({ id: layer.id, kind: "line", x: box.x, y: box.y, w: box.w, h: box.h });
   };
   const paintPen = (layer: PenLayer): void => {
-    if (layer.id !== hiddenId && layer.points.length > 0) {
+    if (visible(layer.id) && layer.points.length > 0) {
       ctx.beginPath();
       tracePen(pathOf(ctx), layer.points, layer.closed);
       if (layer.fill) {
@@ -1479,13 +1636,15 @@ function textStyleControls(kind: TextKind, name: string, layer: TextLayer): stri
           </div>`;
 }
 
-export type StudioSource = { src: string; url: string; thumb: string; label: string; kind: "theme" | "speaker" | "logo" };
-export type StudioSourceGroup = { id: string; label: string; items: StudioSource[] };
+export type StudioSource = { src: string; url: string; thumb: string; label: string; kind: "theme" | "speaker" | "logo" | "video" };
+export type StudioSourceGroup = { id: string; label: string; items: StudioSource[]; hidden?: boolean };
 /** What differs between Online Studio and Conference. The editor itself is shared. */
 export type StudioConfig = {
   id: "studio" | "conference" | "presentation";
   /** Undo stack id. Presentation uses one stack per page. */
   historyKey?: string;
+  /** Presentation page whose folder fills the control panel. */
+  pageId?: string;
   presets: readonly StudioPreset[];
   presetThumbs: Record<string, string>;
   groups: StudioSourceGroup[];
@@ -1577,6 +1736,9 @@ function markMonoLogos(root: ParentNode): void {
 function themeOptions(config: StudioConfig, activeSrc: string): string {
   const option = (src: string, image: string, label: string, kind: StudioSource["kind"] = "theme") => {
     const selected = src === activeSrc;
+    const media = kind === "video"
+      ? `<video src="${escapeHtml(image)}" muted playsinline preload="metadata" draggable="false"></video>`
+      : `<img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" draggable="false" />`;
     return `
       <button
         type="button"
@@ -1585,13 +1747,14 @@ function themeOptions(config: StudioConfig, activeSrc: string): string {
         data-theme-slug="${escapeHtml(src)}"
         aria-checked="${selected ? "true" : "false"}"
         tabindex="${selected ? "0" : "-1"}"
+        title="${escapeHtml(label)}"
         draggable="true"
       >
-        <img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" draggable="false" />
+        ${media}
       </button>
     `;
   };
-  const uploads = getUploads().map(
+  const uploads = config.id === "presentation" ? [] : getUploads().map(
     (upload) => `
       <div class="studio__theme-item">
         ${option(uploadSrc(upload), upload.url, upload.name)}
@@ -1600,9 +1763,10 @@ function themeOptions(config: StudioConfig, activeSrc: string): string {
     `,
   );
   const add = `<button type="button" class="studio__theme studio__theme--add" id="studio-theme-add" aria-label="이미지 추가" title="이미지 추가">+</button>`;
-  return config.groups
+  const visible = config.groups.filter((group) => !group.hidden);
+  return visible
     .map((group, index) => {
-      const last = index === config.groups.length - 1;
+      const last = index === visible.length - 1;
       const labelId = index === 0 ? "studio-theme-label" : `studio-theme-label-${group.id}`;
       const items = group.items.map((item) => option(item.src, item.thumb, item.label, item.kind));
       return `
@@ -1618,6 +1782,7 @@ const pauseIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="tr
 const playIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>`;
 
 function hasSources(config: StudioConfig): boolean {
+  if (config.id === "presentation") return true;
   return config.groups.some((group) => group.items.length > 0);
 }
 
@@ -1670,9 +1835,9 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
                 <input id="${id}-number" class="studio__control studio__control--number" type="number" min="${min}" max="${max}" step="1" value="0" aria-label="${label} 수치" />
               </div>
             </div>`;
-  const title = ensureLayer(state, "title");
-  const body = ensureLayer(state, "body");
-  const image = ensureLayer(state, "image");
+  const title = firstLayer(state, "title") ?? placeholderLayer(state, "title");
+  const body = firstLayer(state, "body") ?? placeholderLayer(state, "body");
+  const image = firstLayer(state, "image") ?? placeholderLayer(state, "image");
   const preset = config.presets.find((item) => item.id === state.presetId) ?? config.presets[0]!;
   const presets = config.presets.map((item) => {
     const selected = item.id === preset.id;
@@ -1717,7 +1882,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
             <button type="button" class="studio__zoom-btn" id="studio-video-toggle" aria-label="일시정지" title="일시정지" hidden>${pauseIcon}</button>
             <button type="button" class="button button--secondary" id="studio-print" hidden>인쇄용 PNG</button>
             <button type="button" class="button button--secondary" id="studio-video" hidden>동영상</button>
-            <button type="button" class="button button--secondary" id="studio-gif" hidden title="동영상 한 바퀴를 무한 반복 GIF로 받습니다. 긴 변은 ${GIF_LONG_EDGE}px까지입니다.">GIF 다운로드</button>`
+            <button type="button" class="button button--secondary" id="studio-gif" hidden title="동영상 한 바퀴를 GIF로 받습니다. 재생이 반복이면 GIF도 반복되고, 1회면 한 번만 재생됩니다. 긴 변은 ${GIF_LONG_EDGE}px까지입니다.">GIF 다운로드</button>`
     : "";
   const showSpeakerNav =
     config.id === "conference" && state.presetId === DEFAULT_CONFERENCE_PRESET_ID && (config.conference?.speakers.length ?? 0) > 1;
@@ -1766,7 +1931,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
           ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
           <span class="studio__align-divider" id="studio-image-adjust-divider" hidden></span>
           <button type="button" class="studio__zoom-btn" id="studio-image-adjust-btn" aria-label="이미지 수정" title="이미지 수정" aria-pressed="false" hidden><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg></button>
-          ${presentation ? `<span class="studio__align-divider" aria-hidden="true"></span><button type="button" class="studio__zoom-btn" id="studio-deck-export" aria-label="전체 다운로드" title="전체 다운로드"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg></button>` : ""}
+          ${presentation ? `<span class="studio__align-divider" aria-hidden="true"></span><button type="button" class="studio__zoom-btn" id="studio-add-page" aria-label="페이지 추가" title="페이지 추가"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button><button type="button" class="studio__zoom-btn" id="studio-deck-export" aria-label="전체 다운로드" title="전체 다운로드"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg></button>` : ""}
         </div>`;
   const panelToggle = presentation
     ? `<button type="button" class="studio__panel-toggle" id="studio-panel-toggle" aria-expanded="${controlsOpen ? "true" : "false"}" aria-controls="studio-controls" aria-label="${controlsOpen ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기"}" title="${controlsOpen ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기"}"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg></button>`
@@ -1791,6 +1956,24 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
         <div class="studio__panel-host">
         <div class="studio__panel-scroll" id="studio-panel-scroll">
         <div id="studio-panel-design" role="tabpanel" aria-labelledby="studio-tab-design"${designSelected ? "" : " hidden"}>
+          ${
+            presentation
+              ? `<div class="studio__field" id="studio-enter-field" hidden>
+            <span id="studio-enter-label">블러로 나타나기</span>
+            <div class="studio__text-style" role="group" aria-labelledby="studio-enter-label">
+              <button type="button" class="studio__style-btn studio__style-btn--wide" id="studio-enter-once" aria-pressed="false">1회</button>
+              <button type="button" class="studio__style-btn studio__style-btn--wide" id="studio-enter-loop" aria-pressed="false">반복</button>
+            </div>
+          </div>
+          <div class="studio__field" id="studio-motion-field" hidden>
+            <span id="studio-motion-label">재생</span>
+            <div class="studio__text-style" role="group" aria-labelledby="studio-motion-label">
+              <button type="button" class="studio__style-btn studio__style-btn--wide" id="studio-motion-once" aria-pressed="false">1회</button>
+              <button type="button" class="studio__style-btn studio__style-btn--wide" id="studio-motion-loop" aria-pressed="false">반복</button>
+            </div>
+          </div>`
+              : ""
+          }
           ${
             config.presets.length > 1
               ? `<div class="studio__field">
@@ -2191,11 +2374,17 @@ export function bindStudio(
 ): void {
   stopVideoLoop?.();
   stopVideoLoop = null;
+  stopPageFiles?.();
+  stopPageFiles = null;
+  stopPageEnter?.();
+  stopPageEnter = null;
+  stopEnter();
+  stopMotion();
   commitOpenGesture?.();
   commitOpenGesture = null;
   if (!hasSources(config)) return;
   useHistory(config.historyKey ?? config.id);
-  const sources = config.groups.flatMap((group) => group.items);
+  let sources = config.groups.flatMap((group) => group.items);
   const presetOf = (id: string) => config.presets.find((item) => item.id === id) ?? config.presets[0]!;
   const presetButtons = [...root.querySelectorAll<HTMLButtonElement>("[data-preset-id]")];
   const sizeRange = root.querySelector<HTMLInputElement>("#studio-size");
@@ -2209,6 +2398,13 @@ export function bindStudio(
   const titleHexInput = root.querySelector<HTMLInputElement>("#studio-title-hex");
   const fontScaleField = root.querySelector<HTMLElement>("#studio-font-scale-field");
   const textFields = root.querySelector<HTMLElement>("#studio-text-fields");
+  const enterField = root.querySelector<HTMLElement>("#studio-enter-field");
+  const enterOnce = root.querySelector<HTMLButtonElement>("#studio-enter-once");
+  const enterLoop = root.querySelector<HTMLButtonElement>("#studio-enter-loop");
+  const motionField = root.querySelector<HTMLElement>("#studio-motion-field");
+  const motionLabel = root.querySelector<HTMLElement>("#studio-motion-label");
+  const motionOnce = root.querySelector<HTMLButtonElement>("#studio-motion-once");
+  const motionLoop = root.querySelector<HTMLButtonElement>("#studio-motion-loop");
   const cardSizeFields = root.querySelector<HTMLElement>("#studio-card-size");
   const resetButton = root.querySelector<HTMLButtonElement>(".studio__reset");
   const titleFields = root.querySelector<HTMLElement>("#studio-title-fields");
@@ -2621,21 +2817,35 @@ export function bindStudio(
   const srcUrl = (src: string): string => {
     const upload = uploadBySrc(src);
     if (upload) return upload.url;
+    const media = presentationFileUrl(src);
+    if (media) return media;
     const source =
       sources.find((item) => item.src === src) ?? sources.find((item) => item.src === state.themeSlug) ?? sources[0];
     return source?.url ?? "";
   };
   const sourceOf = (src: string) => sources.find((item) => item.src === src);
 
+  /** The preset's background id, used to put a deleted background back. */
+  const presetBackgroundId = (): string | null => {
+    const preset = config.presets.find((item) => item.id === state.presetId);
+    if (!preset || !("background" in preset)) return null;
+    const id = (preset as { background?: unknown }).background;
+    return typeof id === "string" && id ? id : null;
+  };
   /** The preset's background record; the still image doubles as the video poster. */
   const backgroundRecord = (): ConferenceBackground | null =>
     (state.background && config.conference?.backgrounds.find((item) => item.id === state.background?.id)) || null;
   const backgroundStill = () => {
+    const file = state.background?.file && state.background.mode !== "video" ? presentationFileUrl(state.background.file) : null;
+    if (file) return file;
     const path = backgroundRecord()?.image?.path;
     return path ? assetUrl(path) : "";
   };
   const backgroundVideoUrl = () => {
-    const path = state.background?.mode === "video" ? backgroundRecord()?.video?.path : null;
+    if (state.background?.mode !== "video") return "";
+    const file = state.background.file ? presentationFileUrl(state.background.file) : null;
+    if (file) return file;
+    const path = backgroundRecord()?.video?.path;
     return path ? assetUrl(path) : "";
   };
   const stillPaint = (): BackgroundPaint | null => {
@@ -2684,6 +2894,7 @@ export function bindStudio(
   let drawToken = 0;
   let viewScale = 1;
   const selected = new Set<string>();
+  let backgroundOn = false;
   let editing: { id: string; original: string } | null = null;
   let cropping: { id: string; full: StudioRect; box: StudioRect } | null = null;
   let paint = () => {};
@@ -2699,14 +2910,14 @@ export function bindStudio(
       const layer = state.layers[index];
       if (layer && layer.kind === kind && selected.has(layer.id)) return layer;
     }
-    return ensureLayer(state, kind);
+    return firstLayer(state, kind) ?? placeholderLayer(state, kind);
   };
   const panelImage = (): ImageLayer => {
     for (let index = state.layers.length - 1; index >= 0; index -= 1) {
       const layer = state.layers[index];
       if (layer && layer.kind === "image" && selected.has(layer.id)) return layer;
     }
-    return ensureLayer(state, "image");
+    return firstLayer(state, "image") ?? placeholderLayer(state, "image");
   };
   const topSelected = <T extends StudioLayer>(kind: T["kind"]): T | null => {
     for (let index = state.layers.length - 1; index >= 0; index -= 1) {
@@ -2968,7 +3179,21 @@ export function bindStudio(
     }
   };
   /** A theme goes on the selected images, or on the bottom image when none is selected. */
+  const usePageVideo = (src: string) => {
+    recordChange(() => {
+      const play = state.background?.play;
+      state.background = { id: state.background?.id || "slide", mode: "video", file: src, ...(play ? { play } : {}) };
+      backgroundOn = false;
+      return true;
+    });
+    void redraw();
+  };
   const selectTheme = (src: string, focus: boolean) => {
+    if (sourceOf(src)?.kind === "video") {
+      usePageVideo(src);
+      markTheme(src, focus);
+      return;
+    }
     const picked = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image");
     if (config.conference && picked.length === 0) {
       markTheme(src, focus);
@@ -3043,6 +3268,20 @@ export function bindStudio(
     paint();
   };
 
+  const enterTargets = (): StudioLayer[] => {
+    const ids = new Set<string>();
+    for (const layer of selectedLayers()) for (const id of groupedIds(state, layer.id)) ids.add(id);
+    return state.layers.filter((layer) => ids.has(layer.id));
+  };
+  const motionLayers = (): ImageLayer[] => {
+    const ids = new Set<string>();
+    for (const layer of selectedLayers()) {
+      if (layer.kind !== "image" || !isMotionSrc(layer.src)) continue;
+      for (const id of groupedIds(state, layer.id)) ids.add(id);
+    }
+    return state.layers.filter((layer): layer is ImageLayer => layer.kind === "image" && ids.has(layer.id) && isMotionSrc(layer.src));
+  };
+
   const syncForm = () => {
     const title = panelText("title");
     const body = panelText("body");
@@ -3054,6 +3293,24 @@ export function bindStudio(
     const sizeAnchor = selectedLayers().length > 0 ? resetButton : textFields;
     if (cardSizeFields.nextElementSibling !== sizeAnchor) sizeAnchor.before(cardSizeFields);
     const texts = selectedLayers().filter(isTextLayer);
+    if (enterField && enterOnce && enterLoop) {
+      const picked = enterTargets();
+      enterField.hidden = selectedLayers().length === 0;
+      const pressed = (mode: LayerEnter) => picked.length > 0 && picked.every((layer) => layer.enter === mode);
+      enterOnce.setAttribute("aria-pressed", pressed("once") ? "true" : "false");
+      enterLoop.setAttribute("aria-pressed", pressed("loop") ? "true" : "false");
+    }
+    if (motionField && motionLabel && motionOnce && motionLoop) {
+      const clips = motionLayers();
+      const background = clips.length === 0 && state.background?.mode === "video" && (backgroundOn || selectedLayers().length === 0) ? state.background : null;
+      motionField.hidden = clips.length === 0 && !background;
+      motionLabel.textContent = clips.length > 0 ? "재생" : "동영상 재생";
+      const sources = clips.length > 0 ? clips : background ? [background] : [];
+      const onceOn = sources.length > 0 && sources.every((item) => mediaPlayOf(item) === "once");
+      const loopOn = sources.length > 0 && sources.every((item) => mediaPlayOf(item) === "loop");
+      motionOnce.setAttribute("aria-pressed", onceOn ? "true" : "false");
+      motionLoop.setAttribute("aria-pressed", loopOn ? "true" : "false");
+    }
     textFields.hidden = texts.length === 0;
     titleFields.hidden = !texts.some((layer) => layer.kind === "title");
     bodyFields.hidden = !texts.some((layer) => layer.kind === "body");
@@ -3146,6 +3403,7 @@ export function bindStudio(
     markTheme(panelImage().src);
   };
 
+  let enterOnShow = config.id === "presentation";
   const redraw = async (): Promise<void> => {
     const token = ++drawToken;
     clampLayout();
@@ -3191,9 +3449,17 @@ export function bindStudio(
     if (token !== drawToken) return;
     clampLayout();
     exportCode.textContent = designToCode(state, aspectOf, extraFonts());
+    if (enterOnShow) {
+      enterSkip.clear();
+      for (const layer of state.layers) if (layer.enter === "once" || layer.enter === "loop") enterSkip.add(layer.id);
+    }
     paint();
     setImageLoading(false);
     syncVideoLoop();
+    if (enterOnShow) {
+      enterOnShow = false;
+      void playEnter();
+    }
   };
 
   /** Shift+click steps by STEP_SHIFT. Each click is one undo step. */
@@ -3909,9 +4175,23 @@ export function bindStudio(
     const next = themes[(index + delta + themes.length) % themes.length];
     if (next) pickTheme(next, true);
   });
+  if (config.id === "presentation" && themeFile) {
+    themeFile.accept = "image/*,video/mp4,video/webm,video/quicktime,.svg,.mov";
+  }
   themeFile?.addEventListener("change", () => {
-    const files = [...(themeFile.files ?? [])].filter((file) => file.type.startsWith("image/"));
+    const picked = [...(themeFile.files ?? [])];
     themeFile.value = "";
+    const pageId = config.pageId;
+    if (config.id === "presentation" && pageId) {
+      const files = picked.filter(isPageMedia);
+      if (files.length === 0) return;
+      void uploadPageFiles(pageId, files).then((saved) => {
+        if (saved.length < files.length) showToast("파일을 페이지 폴더에 넣지 못했습니다.");
+        root.querySelector<HTMLButtonElement>("#studio-theme-add")?.focus();
+      });
+      return;
+    }
+    const files = picked.filter((file) => file.type.startsWith("image/"));
     if (files.length === 0) return;
     void (async () => {
       const added = (await Promise.all(files.map((file) => addUpload(file)))).filter((item) => item !== null);
@@ -3921,6 +4201,18 @@ export function bindStudio(
       root.querySelector<HTMLButtonElement>("#studio-theme-add")?.focus();
     })();
   });
+  if (config.id === "presentation") {
+    const onPageFiles = (event: Event) => {
+      const detail = (event as CustomEvent<PageFileSource[]>).detail;
+      const group = config.groups.find((item) => item.id === "page");
+      if (!group || !Array.isArray(detail)) return;
+      group.items.splice(0, group.items.length, ...detail);
+      sources = config.groups.flatMap((item) => item.items);
+      renderThemes();
+    };
+    document.addEventListener(PAGE_FILES_EVENT, onPageFiles);
+    stopPageFiles = () => document.removeEventListener(PAGE_FILES_EVENT, onPageFiles);
+  }
   themeGrid?.addEventListener("dragstart", (event) => {
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-theme-slug]") : null;
     const src = button?.dataset.themeSlug;
@@ -3970,12 +4262,13 @@ export function bindStudio(
       : (["video/mp4;codecs=avc1", "video/mp4"].find((type) => MediaRecorder.isTypeSupported(type)) ?? "");
 
   syncConference = () => {
-    const liveVideo = Boolean(config.conference && state.background?.mode === "video" && backgroundRecord()?.video && !state.code.trim());
+    const liveVideo = Boolean(config.conference && state.background?.mode === "video" && (state.background.file || backgroundRecord()?.video) && !state.code.trim());
     if (pdfButton && exporting?.button !== pdfButton) pdfButton.hidden = liveVideo;
     if (!config.conference) return;
-    const record = backgroundRecord();
     const codeMode = Boolean(state.code.trim());
-    const hasVideo = Boolean(record?.video);
+    const offeredId = state.background?.id ?? presetBackgroundId();
+    const offered = config.conference?.backgrounds.find((item) => item.id === offeredId) ?? null;
+    const hasVideo = Boolean(offered?.video) || Boolean(state.background?.file);
     const video = state.background?.mode === "video" && hasVideo;
     const backgroundField = root.querySelector<HTMLElement>("#studio-background-field");
     if (backgroundField) backgroundField.hidden = !hasVideo;
@@ -4018,8 +4311,19 @@ export function bindStudio(
       return;
     }
     const video = backgroundVideo(url);
+    const once = mediaPlayOf(state.background) === "once";
+    const restart = videoEpoch !== motionEpoch;
+    if (restart) videoEpoch = motionEpoch;
+    video.loop = !once;
+    if (restart && once) {
+      try {
+        video.currentTime = 0;
+      } catch {
+        /* the file can still be loading */
+      }
+    }
     if (videoPaused) video.pause();
-    else void video.play().catch(() => {});
+    else if (restart || !once || !video.ended) void video.play().catch(() => {});
     if (stopVideoLoop) return;
     let frame = 0;
     let shown = -1;
@@ -4043,10 +4347,12 @@ export function bindStudio(
   for (const button of backgroundButtons) {
     button.addEventListener("click", () => {
       const mode = button.dataset.backgroundMode === "video" ? "video" : "image";
-      const current = state.background;
-      if (!current || current.mode === mode) return;
+      const id = state.background?.id ?? presetBackgroundId();
+      if (!id || state.background?.mode === mode) return;
+      if (mode === "video" && !config.conference?.backgrounds.find((item) => item.id === id)?.video) return;
       recordChange(() => {
-        state.background = { ...current, mode };
+        state.background = { id, mode };
+        backgroundOn = false;
         return true;
       });
       void redraw();
@@ -4483,7 +4789,7 @@ export function bindStudio(
         elapsed += delay / 100;
         return at;
       });
-      const encoder = createGifEncoder(size.width, size.height, delays.length);
+      const encoder = createGifEncoder(size.width, size.height, delays.length, mediaPlayOf(state.background) === "once" ? null : 0);
       const scale = size.width / state.cardWidth;
       const draw = () => {
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -4497,7 +4803,7 @@ export function bindStudio(
         draw();
         encoder.add(ctx.getImageData(0, 0, size.width, size.height).data, delays[index] ?? 10);
         exportProgress(
-          `GIF ${size.width} × ${size.height}px · 무한 반복으로 만드는 중`,
+          `GIF ${size.width} × ${size.height}px · ${mediaPlayOf(state.background) === "once" ? "1회" : "반복"}으로 만드는 중`,
           ((index + 1) / times.length) * 100,
         );
         await new Promise((resolve) => window.setTimeout(resolve));
@@ -4577,6 +4883,8 @@ export function bindStudio(
     w: Math.abs(x1 - x0),
     h: Math.abs(y1 - y0),
   });
+  const coversCard = (rect: SelectRect) =>
+    rect.x <= 1 && rect.y <= 1 && rect.x + rect.w >= state.cardWidth - 1 && rect.y + rect.h >= state.cardHeight - 1;
   const rectsOverlap = (a: SelectRect, b: SelectRect) =>
     a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
@@ -4935,6 +5243,170 @@ export function bindStudio(
       target.addEventListener("pointercancel", end);
     }
   };
+  const placeMotion = (el: HTMLElement, layer: ImageLayer) => {
+    const source = imageOf(layer);
+    const aspect = source && source.naturalWidth > 0 ? source.naturalHeight / source.naturalWidth : 1;
+    const height = imageLayerHeight(layer, aspect);
+    el.style.position = "absolute";
+    el.style.left = `${layer.x}px`;
+    el.style.top = `${layer.y}px`;
+    el.style.width = `${layer.width}px`;
+    el.style.height = `${height}px`;
+    el.style.borderRadius = `${Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2))}px`;
+    el.style.opacity = String(layerOpacity(layer) / 100);
+    el.style.pointerEvents = "none";
+    el.style.objectFit = "fill";
+  };
+  const startVideoPlayer = (layer: ImageLayer, url: string, once: boolean): MotionPlayer => {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = url;
+    const player: MotionPlayer = {
+      id: layer.id,
+      url,
+      once,
+      el: video,
+      stop() {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      },
+      setOnce(next) {
+        player.once = next;
+      },
+      restart() {
+        video.loop = !player.once;
+        try {
+          video.currentTime = 0;
+        } catch {
+          /* the file can still be loading */
+        }
+        void video.play().catch(() => {});
+      },
+    };
+    return player;
+  };
+  const gifStill = new Set<string>();
+  const startGifPlayer = (layer: ImageLayer, url: string, once: boolean): MotionPlayer => {
+    const canvas = document.createElement("canvas");
+    let clip: GifClip | null = null;
+    let index = 0;
+    let timer = 0;
+    let stopped = false;
+    const draw = () => {
+      const frame = clip?.frames[index];
+      if (!frame) return;
+      if (canvas.width !== frame.width || canvas.height !== frame.height) {
+        canvas.width = frame.width;
+        canvas.height = frame.height;
+      }
+      canvas.getContext("2d")?.drawImage(frame, 0, 0);
+    };
+    const player: MotionPlayer = {
+      id: layer.id,
+      url,
+      once,
+      el: canvas,
+      stop() {
+        stopped = true;
+        window.clearTimeout(timer);
+      },
+      setOnce(next) {
+        player.once = next;
+      },
+      restart() {
+        window.clearTimeout(timer);
+        if (!clip) return;
+        index = 0;
+        draw();
+        const step = () => {
+          if (stopped || !clip) return;
+          if (index + 1 >= clip.frames.length) {
+            if (player.once) return;
+            index = 0;
+          } else index += 1;
+          draw();
+          timer = window.setTimeout(step, clip.times[index] ?? 100);
+        };
+        timer = window.setTimeout(step, clip.times[0] ?? 100);
+      },
+    };
+    void gifClip(url).then((decoded) => {
+      if (stopped) return;
+      if (!decoded) {
+        gifStill.add(url);
+        player.stop();
+        player.el.remove();
+        motionPlayers.delete(layer.id);
+        motionSkip.delete(layer.id);
+        paint();
+        return;
+      }
+      clip = decoded;
+      player.restart();
+    });
+    return player;
+  };
+  const syncMotion = (restart: boolean) => {
+    if (!scaler) return;
+    const layers = state.layers.filter(
+      (layer): layer is ImageLayer =>
+        layer.kind === "image" &&
+        isMotionSrc(layer.src) &&
+        !layer.crop &&
+        !layer.tint &&
+        imageBlur(layer) <= 0 &&
+        layerBlurBottom(layer) <= 0 &&
+        !enterSkip.has(layer.id) &&
+        !state.code.trim(),
+    );
+    const keep = new Set(layers.map((layer) => layer.id));
+    for (const [id, player] of motionPlayers) {
+      if (keep.has(id)) continue;
+      player.stop();
+      player.el.remove();
+      motionPlayers.delete(id);
+    }
+    motionSkip.clear();
+    if (layers.length === 0 || !root.isConnected) {
+      motionHost?.remove();
+      motionHost = null;
+      return;
+    }
+    if (!motionHost || motionHost.parentElement !== scaler) {
+      motionHost?.remove();
+      motionHost = document.createElement("div");
+      motionHost.className = "studio__motion";
+      if (enterHost?.parentElement === scaler) scaler.insertBefore(motionHost, enterHost);
+      else scaler.append(motionHost);
+    }
+    motionHost.style.borderRadius = `${state.radius}px`;
+    for (const layer of layers) {
+      const url = srcUrl(layer.src);
+      if (!url || (!isVideoSrc(layer.src) && gifStill.has(url))) continue;
+      let player = motionPlayers.get(layer.id);
+      if (player && player.url !== url) {
+        player.stop();
+        player.el.remove();
+        motionPlayers.delete(layer.id);
+        player = undefined;
+      }
+      const once = mediaPlayOf(layer) === "once";
+      if (!player) {
+        player = isVideoSrc(layer.src) ? startVideoPlayer(layer, url, once) : startGifPlayer(layer, url, once);
+        motionHost.append(player.el);
+        motionPlayers.set(layer.id, player);
+        player.restart();
+      } else if (player.once !== once) {
+        player.setOnce(once);
+        player.restart();
+      } else if (restart) player.restart();
+      placeMotion(player.el, layer);
+      motionSkip.add(layer.id);
+    }
+  };
   paint = () => {
     if (penEdit) {
       const edited = layerById(penEdit.id);
@@ -4942,7 +5414,10 @@ export function bindStudio(
       if (!alive) penEdit = null;
     }
     for (const id of [...selected]) if (!layerById(id)) selected.delete(id);
-    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id, backgroundPaint());
+    const restartMotion = overlayEpoch !== motionEpoch;
+    if (restartMotion) overlayEpoch = motionEpoch;
+    syncMotion(restartMotion);
+    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id, backgroundPaint(), 1, motionSkip);
     paintCropGhost();
     paintDragStroke();
     paintPenChrome();
@@ -4955,6 +5430,278 @@ export function bindStudio(
       root.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach(paintRangeFill);
     }
   };
+
+  const layerPlate = (layer: StudioLayer): HTMLImageElement | null => {
+    const pad = 24;
+    let box: { x: number; y: number; w: number; h: number } | null = null;
+    if (layer.kind === "image") {
+      const source = imageOf(layer);
+      if (!source) return null;
+      const shadow = shapeShadow(layer);
+      const extra = Math.max(imageBlur(layer), layerBlurBottom(layer)) + shadow.blur + shadow.distance + shadow.size + pad;
+      const height = imageLayerHeight(layer, source.naturalHeight / source.naturalWidth);
+      box = { x: layer.x - extra, y: layer.y - extra, w: layer.width + extra * 2, h: height + extra * 2 };
+    } else if (layer.kind === "shape") {
+      const shadow = shapeShadow(layer);
+      const stroke = shapeStroke(layer);
+      const extra = Math.max(layer.blurFrom ?? 0, layer.blurTo ?? 0, layerBlurBottom(layer)) + stroke.width + shadow.blur + shadow.distance + shadow.size + pad;
+      box = { x: layer.x - extra, y: layer.y - extra, w: layer.width + extra * 2, h: layer.height + extra * 2 };
+    } else if (layer.kind === "line") {
+      const bounds = lineBounds(layer);
+      const extra = layer.stroke + pad;
+      box = { x: bounds.x - extra, y: bounds.y - extra, w: bounds.w + extra * 2, h: bounds.h + extra * 2 };
+    } else if (layer.kind === "pen") {
+      const bounds = penBounds(layer);
+      const extra = layer.strokeWidth + pad;
+      box = { x: bounds.x - extra, y: bounds.y - extra, w: bounds.w + extra * 2, h: bounds.h + extra * 2 };
+    }
+    if (!box) return null;
+    const plate = document.createElement("canvas");
+    drawCard(plate, { ...state, color: "transparent", layers: [layer] }, imageOf, undefined, null, 1);
+    const left = Math.max(0, Math.floor(box.x));
+    const top = Math.max(0, Math.floor(box.y));
+    const right = Math.min(plate.width, Math.ceil(box.x + box.w));
+    const bottom = Math.min(plate.height, Math.ceil(box.y + box.h));
+    const width = right - left;
+    const height = bottom - top;
+    if (width < 1 || height < 1) return null;
+    const piece = document.createElement("canvas");
+    piece.width = width;
+    piece.height = height;
+    piece.getContext("2d")?.drawImage(plate, left, top, width, height, 0, 0, width, height);
+    const image = document.createElement("img");
+    image.alt = "";
+    image.draggable = false;
+    image.src = piece.toDataURL("image/png");
+    image.style.position = "absolute";
+    image.style.left = `${left}px`;
+    image.style.top = `${top}px`;
+    image.style.width = `${width}px`;
+    image.style.height = `${height}px`;
+    return image;
+  };
+  const enterText = (layer: TextLayer): HTMLElement => {
+    const el = document.createElement("div");
+    const probe = document.createElement("canvas").getContext("2d");
+    const extras = extraFonts();
+    const maxText = Math.max(1, state.cardWidth - FONT_SIDE_MARGIN * 2);
+    const font = textFont(layer, layer.size, extras);
+    if (probe) probe.font = font;
+    const lines = wrapText(layer.text.trim(), maxText, (value) => probe?.measureText(value).width ?? value.length * layer.size);
+    const widths = lines.map((line) => probe?.measureText(line).width ?? 0);
+    const width = Math.max(layer.size, ...widths, 0);
+    el.style.position = "absolute";
+    el.style.left = `${layer.x}px`;
+    el.style.top = `${layer.y}px`;
+    el.style.width = `${width}px`;
+    el.style.font = font;
+    el.style.lineHeight = `${Math.round(layer.size * 1.25)}px`;
+    el.style.color = layer.color;
+    el.style.textAlign = layer.align;
+    el.style.whiteSpace = "pre";
+    if (layer.underline) el.style.textDecoration = "underline";
+    lines.forEach((line, index) => {
+      if (index > 0) el.appendChild(document.createElement("br"));
+      el.appendChild(document.createTextNode(line));
+    });
+    return el;
+  };
+  const playEnter = async (): Promise<void> => {
+    if (config.id !== "presentation" || !scaler) return;
+    enterOnShow = false;
+    enterRun += 1;
+    const run = enterRun;
+    enterHost?.remove();
+    enterHost = null;
+    const layers = state.layers.filter((layer) => layer.enter === "once" || layer.enter === "loop");
+    if (layers.length === 0 || !root.isConnected) {
+      if (enterSkip.size > 0) {
+        enterSkip.clear();
+        paint();
+      }
+      return;
+    }
+    const loadFace = (layer: TextLayer) => {
+      const family = fontStack(layer.fontId, extraFonts()).split(",")[0]?.replaceAll('"', "").trim();
+      if (!family) return Promise.resolve();
+      return document.fonts.load(`${layer.italic ? "italic " : ""}${layer.weight} ${layer.size}px "${family}"`).catch(() => undefined);
+    };
+    const blurPromise = loadBlur();
+    await Promise.all(layers.filter(isTextLayer).map((layer) => loadFace(layer)));
+    if (run !== enterRun || !root.isConnected) return;
+    let blur: ProgressiveBlurApi;
+    try {
+      blur = await blurPromise;
+    } catch {
+      enterSkip.clear();
+      paint();
+      return;
+    }
+    if (run !== enterRun || !root.isConnected) return;
+    enterSkip.clear();
+    const host = document.createElement("div");
+    host.className = "studio__enter";
+    type Piece = { id: string; el: HTMLElement; loop: boolean; group: string | null; kind: "text" | "object" };
+    const pieces: Piece[] = [];
+    for (const layer of layers) {
+      const group = enterGroupKey(state, layer.id);
+      const loop = layer.enter === "loop";
+      if (isTextLayer(layer)) {
+        if (!layer.text.trim()) continue;
+        const el = enterText(layer);
+        host.append(el);
+        pieces.push({ id: layer.id, el, loop, group, kind: "text" });
+      } else {
+        const image = layerPlate(layer);
+        if (!image) continue;
+        host.append(image);
+        pieces.push({ id: layer.id, el: image, loop, group, kind: "object" });
+      }
+    }
+    if (pieces.length === 0) {
+      enterSkip.clear();
+      paint();
+      return;
+    }
+    const plates = pieces.flatMap((piece) => (piece.el instanceof HTMLImageElement ? [piece.el] : []));
+    await Promise.all(plates.map((image) => image.decode().catch(() => undefined)));
+    if (run !== enterRun || !root.isConnected) return;
+    enterSkip.clear();
+    for (const piece of pieces) enterSkip.add(piece.id);
+    const scale = viewScale > 0 ? viewScale : 1;
+    const motion = { blur: blur.WRITE.blur / scale, rise: blur.WRITE.rise / scale, autoplay: true };
+    const together = { ...motion, delay: 0, step: 0 };
+    paint();
+    scaler.append(host);
+    enterHost = host;
+    const playList = (
+      list: Piece[],
+      options: { blur: number; rise: number; autoplay: boolean; delay?: number; step?: number },
+      asRows: boolean,
+    ) => {
+      if (list.length === 0 || run !== enterRun) return;
+      const texts = asRows ? [] : list.filter((piece) => piece.kind === "text");
+      const rows = (asRows ? list : list.filter((piece) => piece.kind === "object")).map((piece) => piece.el);
+      const plays = [
+        ...texts.map((piece) => blur.writeText(piece.el, options)),
+        ...(rows.length > 0 ? [blur.writeContent({ rows }, options)] : []),
+      ];
+      void Promise.all(plays.map((play) => play.finished)).then(() => {
+        if (run !== enterRun || !root.isConnected) return;
+        const keep = list.filter((piece) => piece.loop && state.layers.some((layer) => layer.id === piece.id && layer.enter === "loop"));
+        let dropped = false;
+        for (const piece of list) {
+          if (keep.includes(piece)) continue;
+          piece.el.remove();
+          enterSkip.delete(piece.id);
+          dropped = true;
+        }
+        if (enterSkip.size === 0) {
+          enterHost?.remove();
+          enterHost = null;
+          paint();
+          return;
+        }
+        if (keep.length === 0) {
+          if (dropped) paint();
+          return;
+        }
+        if (dropped) paint();
+        playList(keep, options, asRows);
+      });
+    };
+    const solos = pieces.filter((piece) => !piece.group);
+    const grouped = new Map<string, Piece[]>();
+    for (const piece of pieces) {
+      if (!piece.group) continue;
+      const list = grouped.get(piece.group) ?? [];
+      list.push(piece);
+      grouped.set(piece.group, list);
+    }
+    for (const loop of [false, true]) {
+      const batch = solos.filter((piece) => piece.loop === loop);
+      for (const piece of batch) if (piece.kind === "text") playList([piece], motion, false);
+      const rows = batch.filter((piece) => piece.kind === "object");
+      if (rows.length > 0) playList(rows, motion, false);
+    }
+    for (const list of grouped.values()) {
+      for (const loop of [false, true]) {
+        const batch = list.filter((piece) => piece.loop === loop);
+        if (batch.length > 0) playList(batch, together, true);
+      }
+    }
+  };
+  const setEnter = (mode: LayerEnter) => {
+    const picked = enterTargets();
+    if (picked.length === 0) return;
+    const on = !picked.every((layer) => layer.enter === mode);
+    recordChange(() => {
+      let changed = false;
+      for (const layer of picked) {
+        if (on) {
+          if (layer.enter === mode) continue;
+          layer.enter = mode;
+          changed = true;
+        } else if (layer.enter) {
+          delete layer.enter;
+          changed = true;
+        }
+      }
+      return changed;
+    });
+    syncForm();
+    if (on) void playEnter();
+    else {
+      stopEnter();
+      paint();
+    }
+  };
+  enterOnce?.addEventListener("click", () => setEnter("once"));
+  enterLoop?.addEventListener("click", () => setEnter("loop"));
+  const setMotion = (mode: MediaPlay) => {
+    const clips = motionLayers();
+    if (clips.length > 0) {
+      if (clips.every((layer) => mediaPlayOf(layer) === mode)) return;
+      recordChange(() => {
+        let changed = false;
+        for (const layer of clips) {
+          if (mode === "loop") {
+            if (layer.play) {
+              delete layer.play;
+              changed = true;
+            }
+          } else if (layer.play !== "once") {
+            layer.play = "once";
+            changed = true;
+          }
+        }
+        return changed;
+      });
+    } else if (state.background?.mode === "video") {
+      if (mediaPlayOf(state.background) === mode) return;
+      recordChange(() => {
+        if (!state.background || state.background.mode !== "video") return false;
+        if (mode === "loop") delete state.background.play;
+        else state.background.play = "once";
+        return true;
+      });
+    } else return;
+    motionEpoch += 1;
+    syncForm();
+    void redraw();
+  };
+  motionOnce?.addEventListener("click", () => setMotion("once"));
+  motionLoop?.addEventListener("click", () => setMotion("loop"));
+  if (config.id === "presentation") {
+    const onPageEnter = () => {
+      if (!root.isConnected) return;
+      motionEpoch += 1;
+      syncVideoLoop();
+      void playEnter();
+    };
+    document.addEventListener(PAGE_ENTER_EVENT, onPageEnter);
+    stopPageEnter = () => document.removeEventListener(PAGE_ENTER_EVENT, onPageEnter);
+  }
 
   const placeAt = (element: HTMLElement, x: number, y: number) => {
     element.style.left = `${x * viewScale}px`;
@@ -5241,6 +5988,21 @@ export function bindStudio(
       frame.style.height = `${outline.box.h * viewScale}px`;
       const members = outline.key.startsWith("group:") ? outline.key.slice(6).split("\0") : [outline.key];
       frame.dataset.locked = members.every((id) => isLayerLocked(state, id)) ? "true" : "false";
+    }
+    if (visible && backgroundOn && state.background) {
+      const key = "background";
+      live.add(key);
+      let frame = frameEls.get(key);
+      if (!frame) {
+        frame = document.createElement("div");
+        frame.className = "studio__select-frame";
+        overlay.prepend(frame);
+        frameEls.set(key, frame);
+      }
+      placeAt(frame, 0, 0);
+      frame.style.width = `${state.cardWidth * viewScale}px`;
+      frame.style.height = `${state.cardHeight * viewScale}px`;
+      frame.dataset.locked = "false";
     }
     for (const [id, frame] of frameEls) {
       if (live.has(id)) continue;
@@ -5759,7 +6521,7 @@ export function bindStudio(
   };
   const addText = () => {
     finishPenWork();
-    const title = ensureLayer(state, "title");
+    const title = firstLayer(state, "title") ?? placeholderLayer(state, "title");
     commitLayers(() => {
       const size = title.size;
       const layer: TextLayer = {
@@ -5853,21 +6615,24 @@ export function bindStudio(
     const picked = selectedLayers();
     if (picked.length === 0) return;
     layerClipboard = structuredClone(picked);
+    layerClipboardOwner = state;
+    clipKind = "layer";
     clipboardGroups = (state.groups ?? [])
       .map((group) => group.filter((id) => selected.has(id)))
       .filter((group) => group.length >= 2)
       .map((group) => [...group]);
   };
   const pasteLayers = (at: Point | null) => {
-    if (layerClipboard.length === 0) return;
+    if (layerClipboard.length === 0 || clipKind === "page") return;
+    const keepPlace = layerClipboardOwner != null && layerClipboardOwner !== state;
     commitLayers(() => {
       const copies = structuredClone(layerClipboard);
       const leftOf = (layer: StudioLayer) =>
         layer.kind === "line" ? Math.min(layer.x, layer.x2) : layer.kind === "pen" ? Math.min(...layer.points.map((point) => point.x)) : layer.x;
       const topOf = (layer: StudioLayer) =>
         layer.kind === "line" ? Math.min(layer.y, layer.y2) : layer.kind === "pen" ? Math.min(...layer.points.map((point) => point.y)) : layer.y;
-      const dx = at ? at.x - Math.min(...copies.map(leftOf)) : PASTE_OFFSET;
-      const dy = at ? at.y - Math.min(...copies.map(topOf)) : PASTE_OFFSET;
+      const dx = keepPlace ? 0 : at ? at.x - Math.min(...copies.map(leftOf)) : PASTE_OFFSET;
+      const dy = keepPlace ? 0 : at ? at.y - Math.min(...copies.map(topOf)) : PASTE_OFFSET;
       const idMap = new Map<string, string>();
       selected.clear();
       for (const layer of copies) {
@@ -5965,21 +6730,22 @@ export function bindStudio(
     drag.axis = locked.axis;
     return locked;
   };
-  // Each kind keeps one layer so the panel always has something to edit.
-  const canDelete = (picked: StudioLayer[]) =>
-    !picked.some((layer) => isLayerLocked(state, layer.id)) &&
-    (["title", "body", "image"] as const).every(
-      (kind) =>
-        !picked.some((layer) => layer.kind === kind) ||
-        state.layers.some((layer) => layer.kind === kind && !selected.has(layer.id)),
-    );
+  const canDelete = (picked: StudioLayer[]) => !picked.some((layer) => isLayerLocked(state, layer.id));
   const deleteLayers = () => {
     const picked = selectedLayers();
-    if (picked.length === 0 || !canDelete(picked)) return;
+    const dropBackground = backgroundOn && state.background != null;
+    if ((picked.length === 0 && !dropBackground) || !canDelete(picked)) return;
     commitLayers(() => {
-      state.layers = state.layers.filter((layer) => !selected.has(layer.id));
-      selected.clear();
-      pruneGroups(state);
+      if (picked.length > 0) {
+        state.layers = state.layers.filter((layer) => !selected.has(layer.id));
+        selected.clear();
+        pruneGroups(state);
+      }
+      if (dropBackground) delete state.background;
+      backgroundOn = false;
+      if (cardIsBare(state)) {
+        state.color = bareCardColor(document.documentElement.dataset.mode === "light" ? "light" : "dark");
+      }
     });
   };
   const groupSelection = () => {
@@ -6060,11 +6826,14 @@ export function bindStudio(
   const openLayerMenu = (clientX: number, clientY: number) => {
     const point = cardPoint({ clientX, clientY });
     const hit = hitAt(point.x, point.y);
-    if (!hit) selected.clear();
-    else if (!groupedIds(state, hit.id).every((id) => selected.has(id))) {
+    if (!hit) {
+      selected.clear();
+      backgroundOn = state.background != null && !state.code.trim();
+    } else if (!groupedIds(state, hit.id).every((id) => selected.has(id))) {
+      backgroundOn = false;
       selected.clear();
       for (const id of groupedIds(state, hit.id)) selected.add(id);
-    }
+    } else backgroundOn = false;
     menuPoint = point;
     paint();
     const picked = selectedLayers();
@@ -6100,11 +6869,9 @@ export function bindStudio(
     if (adjust) adjust.hidden = !picked.some((layer) => layer.kind === "image");
     const remove = menuButton("delete");
     if (remove) {
-      remove.disabled = picked.length === 0 || !canDelete(picked);
-      remove.title =
-        picked.length === 0 || !remove.disabled ? ""
-        : pickedLocked() ? "잠긴 객체는 삭제할 수 없습니다."
-        : "타이틀·본문·이미지는 하나씩 남아 있어야 합니다.";
+      const dropBackground = backgroundOn && state.background != null;
+      remove.disabled = (picked.length === 0 && !dropBackground) || (picked.length > 0 && !canDelete(picked));
+      remove.title = remove.disabled && pickedLocked() ? "잠긴 객체는 삭제할 수 없습니다." : "";
     }
     menu.hidden = false;
     const margin = 8;
@@ -6325,6 +7092,15 @@ export function bindStudio(
     draft.hover = raw;
   };
 
+  if (config.id === "presentation") {
+    canvas.tabIndex = -1;
+    stage.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest("input, textarea, select, button, a, [contenteditable='true']")) return;
+      canvas.focus({ preventScroll: true });
+    });
+  }
   canvas.addEventListener("pointerdown", (event) => {
     if (state.code.trim()) return;
     const mouse = event.pointerType === "mouse";
@@ -6430,6 +7206,7 @@ export function bindStudio(
       return;
     }
     if (penEdit) commitPenEdit();
+    backgroundOn = false;
     const members = hit ? groupedIds(state, hit.id) : [];
     const membersOn = members.length > 0 && members.every((id) => selected.has(id));
     let shiftRelease: string[] | null = null;
@@ -6569,6 +7346,7 @@ export function bindStudio(
       const next = new Set(marquee.moved && marquee.fresh ? [] : marquee.base);
       if (marquee.moved) {
         const rect = selectRect(marquee.x, marquee.y, marquee.x2, marquee.y2);
+        backgroundOn = state.background != null && coversCard(rect);
         for (const box of hits) {
           if (!rectsOverlap(rect, box) || isLayerLocked(state, box.id)) continue;
           for (const id of groupedIds(state, box.id)) next.add(id);
@@ -6647,8 +7425,10 @@ export function bindStudio(
       return;
     }
     if (marquee && marquee.pointerId === event.pointerId) {
+      const click = !marquee.moved;
       marquee = null;
       delete canvas.dataset.selecting;
+      if (click && !state.code.trim() && state.background && selected.size === 0) backgroundOn = true;
       paint();
       return;
     }
@@ -6773,8 +7553,14 @@ export function bindStudio(
     });
   };
   const dragsTheme = (event: DragEvent) => !state.code.trim() && !!event.dataTransfer?.types.includes(THEME_DRAG);
+  const dragsFile = (event: DragEvent) =>
+    config.id === "presentation" &&
+    !!config.pageId &&
+    !state.code.trim() &&
+    !!event.dataTransfer?.types.includes("Files") &&
+    !event.dataTransfer.types.includes(THEME_DRAG);
   stage.addEventListener("dragover", (event) => {
-    if (!dragsTheme(event)) return;
+    if (!dragsTheme(event) && !dragsFile(event)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
     stage.dataset.dropping = "true";
@@ -6784,11 +7570,32 @@ export function bindStudio(
   });
   stage.addEventListener("drop", (event) => {
     delete stage.dataset.dropping;
+    if (dragsFile(event)) {
+      const files = [...(event.dataTransfer?.files ?? [])].filter(isPageMedia);
+      const pageId = config.pageId;
+      if (!files.length || !pageId) return;
+      event.preventDefault();
+      const at = cardPoint(event);
+      void (async () => {
+        const saved = await uploadPageFiles(pageId, files);
+        if (saved.length < files.length) showToast("파일을 페이지 폴더에 넣지 못했습니다.");
+        let offset = 0;
+        for (const item of saved) {
+          if (item.kind === "video") usePageVideo(item.src);
+          else {
+            await insertImage(item.src, { x: at.x + offset, y: at.y + offset });
+            offset += 24;
+          }
+        }
+      })();
+      return;
+    }
     if (!dragsTheme(event)) return;
     const src = event.dataTransfer?.getData(THEME_DRAG);
     if (!src) return;
     event.preventDefault();
-    void insertImage(src, cardPoint(event));
+    if (sourceOf(src)?.kind === "video") usePageVideo(src);
+    else void insertImage(src, cardPoint(event));
   });
   themeGrid?.addEventListener("dragend", () => delete stage.dataset.dropping);
 
@@ -6942,10 +7749,11 @@ export function bindStudio(
       return;
     }
     // Backspace is the Delete key on Mac keyboards.
-    if (!mod && !cropping && !typing && (event.key === "Delete" || event.key === "Backspace") && selected.size > 0) {
+    if (!mod && !cropping && !typing && (event.key === "Delete" || event.key === "Backspace") && (selected.size > 0 || backgroundOn)) {
       event.preventDefault();
-      if (canDelete(selectedLayers())) deleteLayers();
-      else showToast(pickedLocked() ? "잠긴 객체는 삭제할 수 없습니다." : "타이틀·본문·이미지는 하나씩 남아 있어야 합니다.");
+      const picked = selectedLayers();
+      if (picked.length > 0 && !canDelete(picked)) showToast("잠긴 객체는 삭제할 수 없습니다.");
+      else deleteLayers();
       return;
     }
     if (mod && !cropping) {
@@ -6965,7 +7773,7 @@ export function bindStudio(
       if (event.code === "KeyC" && selected.size > 0) {
         event.preventDefault();
         copyLayers();
-      } else if (event.code === "KeyV" && layerClipboard.length > 0) {
+      } else if (event.code === "KeyV" && layerClipboard.length > 0 && clipKind !== "page") {
         event.preventDefault();
         pasteLayers(lastPointer);
       }

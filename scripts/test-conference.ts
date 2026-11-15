@@ -14,8 +14,8 @@ import {
   type ConferenceIndex,
 } from "../src/shared/conference.ts";
 import { createPngEncoder, crc32, pixelsPerMeter, printStrips } from "../src/shared/print-png.ts";
-import { designToCode, normalizeStudioState, rgbToHex } from "../src/shared/studio.ts";
-import { createPresentationDeck, createTypedPage, defaultPresentationDeck, defaultsWithPage, duplicatePresentationPage, insertPresentationPage, loadPresentationDeck, movePresentationPages, removePresentationPage, removePresentationPages, reorderPresentationPage, savePresentationDeck, syncPresentationMode } from "../src/shared/presentation.ts";
+import { bareCardColor, cardIsBare, designToCode, normalizeStudioState, rgbToHex } from "../src/shared/studio.ts";
+import { createBlankPage, createPresentationDeck, createTypedPage, defaultPresentationDeck, defaultsWithPage, duplicatePresentationPage, insertPresentationPage, loadPresentationDeck, movePresentationPages, recolorBarePages, removePresentationPage, removePresentationPages, reorderPresentationPage, savePresentationDeck, syncPresentationMode } from "../src/shared/presentation.ts";
 import { hrefFor, parseHash } from "../src/router.ts";
 
 const store = new Map<string, string>();
@@ -203,6 +203,24 @@ assert.equal(reordered.selected, 2);
 assert.equal(titleText(reordered.pages, 0), "AI");
 assert.equal(titleText(reordered.pages, 2), "생성형 AI에서 에이전틱 AI, 그리고 AX까지: UX 디자인 프로세스의 확장");
 assert.equal(reordered.pages.map((page) => page.id).join(","), deck.pages.map((page) => page.id).join(","));
+const blankDark = createBlankPage("dark");
+const blankLight = createBlankPage("light");
+assert.equal(blankDark.state.color, bareCardColor("dark"));
+assert.equal(blankLight.state.color, bareCardColor("light"));
+assert.equal(blankDark.state.layers.length, 0);
+assert.equal(blankDark.state.background, undefined);
+assert.equal(cardIsBare(blankDark.state), true);
+assert.equal(cardIsBare(blankLight.state), true);
+assert.notEqual(blankDark.id, blankLight.id);
+const type1 = createTypedPage(1, index, "dark");
+assert.equal(type1.type, 1);
+assert.equal(type1.tone, null);
+assert.equal(type1.state.color, rgbToHex(1, 1, 2));
+assert.equal(type1.state.background?.id, "slide");
+assert.equal(titleText([type1], 0), "WE ARE IN THE AI ARA");
+const type1Title = type1.state.layers.find((layer) => layer.kind === "title");
+assert.equal(type1Title?.kind === "title" ? type1Title.align : "", "center");
+assert.notEqual(type1.id, createTypedPage(1, index, "light").id);
 const typed = createTypedPage(2, index, "dark");
 assert.equal(typed.type, 2);
 assert.notEqual(typed.id, "page-01");
@@ -262,5 +280,57 @@ const merged = defaultsWithPage(fresh, 3, index);
 assert.equal(merged.length, defaultCount + 1);
 assert.equal(merged[3]?.id, added.id);
 assert.equal(merged[2]?.id, fresh.pages[2]?.id);
+
+// An empty page keeps no invented layers, and its floor follows the mode without recoloring pages that still have content.
+const emptied = normalizeStudioState({
+  themeSlug: "x",
+  color: rgbToHex(16, 42, 74),
+  cardWidth: 3840,
+  cardHeight: 2160,
+  layers: [],
+  background: { id: "slide", mode: "image" },
+});
+assert.ok(emptied);
+assert.equal(emptied.layers.length, 0);
+assert.equal(emptied.background?.id, "slide");
+assert.equal(cardIsBare(emptied), false);
+delete emptied.background;
+assert.equal(cardIsBare(emptied), true);
+const ghost = normalizeStudioState({
+  themeSlug: "x",
+  color: rgbToHex(16, 42, 74),
+  layers: [
+    { id: "image", kind: "image", src: "", x: 0, y: 0, width: 100, opacity: 0 },
+    { id: "body", kind: "body", text: "  ", x: 0, y: 0, size: 32, fontId: "pretendard", color: rgbToHex(0, 0, 0) },
+  ],
+});
+assert.equal(cardIsBare(ghost!), true);
+const titled = normalizeStudioState({
+  themeSlug: "x",
+  color: rgbToHex(16, 42, 74),
+  layers: [{ id: "t", kind: "title", text: "A", x: 0, y: 0, size: 32, fontId: "pretendard", color: rgbToHex(0, 0, 0) }],
+});
+assert.equal(cardIsBare(titled!), false);
+assert.equal(bareCardColor("dark"), rgbToHex(1, 1, 2));
+assert.equal(bareCardColor("light"), rgbToHex(252, 252, 255));
+const bareDeck = createPresentationDeck(index);
+const barePage = bareDeck.pages[3];
+assert.ok(barePage);
+barePage.state.layers = [];
+delete barePage.state.background;
+barePage.state.color = rgbToHex(16, 42, 74);
+barePage.type = 2;
+barePage.tone = "dark";
+syncPresentationMode(bareDeck, "light");
+assert.equal(barePage.state.color, rgbToHex(16, 42, 74));
+const keptColor = bareDeck.pages[0]?.state.color;
+assert.notEqual(keptColor, bareCardColor("light"));
+assert.equal(recolorBarePages(bareDeck, "dark"), true);
+assert.equal(barePage.state.color, bareCardColor("dark"));
+assert.equal(bareDeck.pages[0]?.state.color, keptColor);
+assert.equal(recolorBarePages(bareDeck, "dark"), false);
+assert.equal(recolorBarePages(bareDeck, "light"), true);
+assert.equal(barePage.state.color, bareCardColor("light"));
+assert.equal(bareDeck.pages[0]?.state.color, keptColor);
 
 console.log("OK: conference presets, slugs, backgrounds, video and print sizes, PNG encoder, baselines, and routes");

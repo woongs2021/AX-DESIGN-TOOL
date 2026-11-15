@@ -1,0 +1,63 @@
+{
+  "type": 1,
+  "tone": null,
+  "role": "divider",
+  "state": {
+    "presetId": "conf-slide",
+    "cardWidth": 3840,
+    "cardHeight": 2160,
+    "themeSlug": "",
+    "color": "#010102",
+    "radius": 0,
+    "code": "",
+    "panel": "design",
+    "controlsWidth": 360,
+    "layers": [
+      {
+        "id": "image",
+        "kind": "image",
+        "src": "",
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "radius": 0,
+        "crop": null,
+        "blend": "normal",
+        "opacity": 0
+      },
+      {
+        "id": "title",
+        "kind": "title",
+        "text": "WE ARE IN THE AI ARA",
+        "x": 766.5,
+        "y": 972,
+        "size": 200,
+        "fontId": "montserrat",
+        "color": "#fcfcff",
+        "gradient": null,
+        "blend": "normal",
+        "weight": 400,
+        "italic": false,
+        "underline": false,
+        "align": "center"
+      },
+      {
+        "id": "body",
+        "kind": "body",
+        "text": "",
+        "x": 0,
+        "y": 0,
+        "size": 32,
+        "fontId": "pretendard",
+        "color": "#fcfcff",
+        "gradient": null,
+        "blend": "normal",
+        "weight": 400,
+        "italic": false,
+        "underline": false,
+        "align": "left"
+      }
+    ],
+    "background": { "id": "slide", "mode": "image" }
+  }
+}
