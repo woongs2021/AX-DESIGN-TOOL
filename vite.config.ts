@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 import { startFigmaBridge } from "./scripts/figma-bridge.ts";
+import { presentationProject } from "./scripts/presentation-project.ts";
 
 const PRESENTATION_DEFAULTS_ROUTE = "/__presentation-defaults";
 const presentationDefaultsFile = resolve("src/shared/presentation-defaults.json");
@@ -57,7 +58,7 @@ if (!existsSync(`${publicDir}/data/index.json`)) {
 }
 
 export default defineConfig({
-  plugins: [figmaBridge(), presentationDefaults()],
+  plugins: [figmaBridge(), presentationDefaults(), presentationProject()],
   base: "./",
   // Serve / copy the built index bundle (JSON + assets). UI never reads Markdown.
   publicDir: existsSync(publicDir) ? publicDir : false,
@@ -66,6 +67,9 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    watch: {
+      ignored: ["**/presentation/**"],
+    },
     fs: {
       allow: ["."],
     },

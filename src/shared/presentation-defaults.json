@@ -239,6 +239,1027 @@
       }
     },
     {
+      "id": "page-09",
+      "type": 1,
+      "tone": null,
+      "role": "divider",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "radius": 0,
+            "crop": null,
+            "blend": "normal",
+            "opacity": 0
+          },
+          {
+            "id": "title",
+            "kind": "title",
+            "text": "WE ARE IN THE AI ARA",
+            "x": 766.5,
+            "y": 972,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "center"
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "",
+            "x": 0,
+            "y": 0,
+            "size": 32,
+            "fontId": "pretendard",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ],
+        "background": {
+          "id": "slide",
+          "mode": "image"
+        }
+      }
+    },
+    {
+      "id": "page-8539566e-7959-4ca9-948d-0e86168d0002",
+      "type": 2,
+      "tone": "dark",
+      "role": "content",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "radius": 0,
+            "crop": null,
+            "blend": "normal",
+            "opacity": 0
+          },
+          {
+            "id": "ground",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
+            "color": "#010102",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#010102",
+              "gradient": null
+            },
+            "blend": "normal",
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": {
+              "angle": 120,
+              "from": "#010102",
+              "to": "#16427c"
+            },
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "From Generative AI to Agentic AI and AX:\nExpanding the UX Design Process",
+            "x": 112,
+            "y": 322,
+            "size": 104,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "footer-1",
+            "kind": "body",
+            "text": "Speech",
+            "x": 126,
+            "y": 2020,
+            "size": 36,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "footer-2",
+            "kind": "body",
+            "text": "Woonghee Park",
+            "x": 1230,
+            "y": 2020,
+            "size": 36,
+            "fontId": "pretendard",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "footer-3",
+            "kind": "body",
+            "text": "AX Design",
+            "x": 2472,
+            "y": 2020,
+            "size": 36,
+            "fontId": "pretendard",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "footer-4",
+            "kind": "body",
+            "text": "2026",
+            "x": 3635,
+            "y": 2020,
+            "size": 36,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "title",
+            "kind": "title",
+            "text": "생성형 AI에서 에이전틱 AI, 그리고 AX까지: UX 디자인 프로세스의 확장",
+            "x": 112,
+            "y": 138,
+            "size": 128,
+            "fontId": "pretendard",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 300,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-03",
+      "type": 2,
+      "tone": "dark",
+      "role": "content",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "radius": 0,
+            "crop": null,
+            "blend": "normal",
+            "opacity": 0
+          },
+          {
+            "id": "ground",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
+            "color": "#010102",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#010102",
+              "gradient": null
+            },
+            "blend": "normal",
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": {
+              "angle": 120,
+              "from": "#010102",
+              "to": "#16427c"
+            },
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "ink",
+            "kind": "title",
+            "text": "Creativity",
+            "x": 96,
+            "y": 980,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#4065f8",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "ink-2",
+            "kind": "title",
+            "text": "Curiosity",
+            "x": 2916,
+            "y": 980,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#4065f8",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "",
+            "x": 0,
+            "y": 0,
+            "size": 32,
+            "fontId": "pretendard",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-06",
+      "type": 3,
+      "tone": "dark",
+      "role": "content",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "conf:speaker-001",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "ground",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
+            "color": "#010102",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#d0d7e8",
+              "gradient": null
+            },
+            "blend": "normal",
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": {
+              "angle": 120,
+              "from": "#010102",
+              "to": "#16427c"
+            },
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "conf:speaker-001",
+            "x": 138,
+            "y": 720,
+            "width": 1140,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.21183618970354595,
+              "w": 1,
+              "h": 0.5763276205929081
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-2",
+            "kind": "image",
+            "src": "conf:speaker-002",
+            "x": 1350,
+            "y": 720,
+            "width": 1140,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18894297400534088,
+              "w": 1,
+              "h": 0.6221140519893182
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-3",
+            "kind": "image",
+            "src": "conf:speaker-003",
+            "x": 2562,
+            "y": 720,
+            "width": 1142,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18418345008756565,
+              "w": 1,
+              "h": 0.6316330998248687
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "3 Agendas",
+            "x": 126,
+            "y": 2020,
+            "size": 36,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "veil-0",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 138,
+            "y": 720,
+            "width": 1140,
+            "height": 860,
+            "radius": 0,
+            "color": "#000000",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#000000",
+              "gradient": null
+            },
+            "blend": "normal",
+            "opacity": 60,
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": null,
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "caption",
+            "kind": "body",
+            "text": "Visual Design\nCapabilities",
+            "x": 329.5,
+            "y": 1034,
+            "size": 104,
+            "fontId": "montserrat",
+            "color": "#f2f2f2",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "center"
+          },
+          {
+            "id": "title",
+            "kind": "title",
+            "text": "TODAY’s AGENDA",
+            "x": 112,
+            "y": 112,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-07",
+      "type": 3,
+      "tone": "dark",
+      "role": "content",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "conf:speaker-001",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "ground",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
+            "color": "#010102",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#d0d7e8",
+              "gradient": null
+            },
+            "blend": "normal",
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": {
+              "angle": 120,
+              "from": "#010102",
+              "to": "#16427c"
+            },
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "conf:speaker-001",
+            "x": 138,
+            "y": 720,
+            "width": 1140,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.21183618970354595,
+              "w": 1,
+              "h": 0.5763276205929081
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-2",
+            "kind": "image",
+            "src": "conf:speaker-002",
+            "x": 1350,
+            "y": 720,
+            "width": 1140,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18894297400534088,
+              "w": 1,
+              "h": 0.6221140519893182
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-3",
+            "kind": "image",
+            "src": "conf:speaker-003",
+            "x": 2562,
+            "y": 720,
+            "width": 1142,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18418345008756565,
+              "w": 1,
+              "h": 0.6316330998248687
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "3 Agendas",
+            "x": 126,
+            "y": 2020,
+            "size": 36,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "veil-1",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 1350,
+            "y": 720,
+            "width": 1140,
+            "height": 860,
+            "radius": 0,
+            "color": "#000000",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#000000",
+              "gradient": null
+            },
+            "blend": "normal",
+            "opacity": 60,
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": null,
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "caption",
+            "kind": "body",
+            "text": "Vibe coding\nCapabilities",
+            "x": 1570.5,
+            "y": 1034,
+            "size": 104,
+            "fontId": "montserrat",
+            "color": "#f2f2f2",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "center"
+          },
+          {
+            "id": "title",
+            "kind": "title",
+            "text": "TODAY’s AGENDA",
+            "x": 112,
+            "y": 112,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-08",
+      "type": 3,
+      "tone": "dark",
+      "role": "content",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "conf:speaker-001",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "ground",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
+            "color": "#010102",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#d0d7e8",
+              "gradient": null
+            },
+            "blend": "normal",
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": {
+              "angle": 120,
+              "from": "#010102",
+              "to": "#16427c"
+            },
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "conf:speaker-001",
+            "x": 138,
+            "y": 720,
+            "width": 1140,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.21183618970354595,
+              "w": 1,
+              "h": 0.5763276205929081
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-2",
+            "kind": "image",
+            "src": "conf:speaker-002",
+            "x": 1350,
+            "y": 720,
+            "width": 1140,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18894297400534088,
+              "w": 1,
+              "h": 0.6221140519893182
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-3",
+            "kind": "image",
+            "src": "conf:speaker-003",
+            "x": 2562,
+            "y": 720,
+            "width": 1142,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18418345008756565,
+              "w": 1,
+              "h": 0.6316330998248687
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "3 Agendas",
+            "x": 126,
+            "y": 2020,
+            "size": 36,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 700,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          },
+          {
+            "id": "veil-2",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 2562,
+            "y": 720,
+            "width": 1142,
+            "height": 860,
+            "radius": 0,
+            "color": "#000000",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#000000",
+              "gradient": null
+            },
+            "blend": "normal",
+            "opacity": 60,
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": null,
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "caption",
+            "kind": "body",
+            "text": "Pathfinding\nAbility",
+            "x": 2813.5,
+            "y": 1034,
+            "size": 104,
+            "fontId": "montserrat",
+            "color": "#f2f2f2",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "center"
+          },
+          {
+            "id": "title",
+            "kind": "title",
+            "text": "TODAY’s AGENDA",
+            "x": 112,
+            "y": 112,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-10",
+      "type": 3,
+      "tone": "dark",
+      "role": "content",
+      "state": {
+        "presetId": "conf-slide",
+        "cardWidth": 3840,
+        "cardHeight": 2160,
+        "themeSlug": "conf:speaker-001",
+        "color": "#010102",
+        "radius": 0,
+        "code": "",
+        "panel": "design",
+        "controlsWidth": 360,
+        "layers": [
+          {
+            "id": "ground",
+            "kind": "shape",
+            "shape": "rect",
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
+            "color": "#010102",
+            "shadow": {
+              "size": 0,
+              "blur": 0,
+              "distance": 0,
+              "opacity": 55
+            },
+            "stroke": {
+              "width": 0,
+              "opacity": 100,
+              "color": "#a1d0f6",
+              "gradient": null
+            },
+            "blend": "normal",
+            "blurFrom": 0,
+            "blurTo": 0,
+            "gradient": {
+              "angle": 120,
+              "from": "#010102",
+              "to": "#16427c"
+            },
+            "inner": 0.38,
+            "nodes": null
+          },
+          {
+            "id": "image",
+            "kind": "image",
+            "src": "conf:speaker-001",
+            "x": 0,
+            "y": 116,
+            "width": 1376,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.21351156069364163,
+              "w": 1,
+              "h": 0.5729768786127167
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-2",
+            "kind": "image",
+            "src": "conf:speaker-002",
+            "x": 1376,
+            "y": 116,
+            "width": 1374,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.18910091907794918,
+              "w": 1,
+              "h": 0.6217981618441016
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-3",
+            "kind": "image",
+            "src": "conf:speaker-003",
+            "x": 0,
+            "y": 1148,
+            "width": 1376,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.22691860465116276,
+              "w": 1,
+              "h": 0.5461627906976745
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "image-4",
+            "kind": "image",
+            "src": "conf:speaker-004",
+            "x": 1376,
+            "y": 1146,
+            "width": 1374,
+            "radius": 0,
+            "crop": {
+              "x": 0,
+              "y": 0.252870269286754,
+              "w": 1,
+              "h": 0.494259461426492
+            },
+            "blend": "normal"
+          },
+          {
+            "id": "title",
+            "kind": "title",
+            "text": "WE SEE\nAI-ISH\nDESIGNS",
+            "x": 2819,
+            "y": 122,
+            "size": 200,
+            "fontId": "montserrat",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "right"
+          },
+          {
+            "id": "body",
+            "kind": "body",
+            "text": "",
+            "x": 0,
+            "y": 0,
+            "size": 32,
+            "fontId": "pretendard",
+            "color": "#fcfcff",
+            "gradient": null,
+            "blend": "normal",
+            "weight": 400,
+            "italic": false,
+            "underline": false,
+            "align": "left"
+          }
+        ]
+      }
+    },
+    {
       "id": "page-59c603be-a4ee-4807-a081-35e1724f3237",
       "type": 1,
       "tone": null,
@@ -1796,282 +2817,10 @@
       "name": "박형걸 PM"
     },
     {
-      "id": "page-8539566e-7959-4ca9-948d-0e86168d0002",
-      "type": 2,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "",
-            "x": 0,
-            "y": 0,
-            "width": 100,
-            "radius": 0,
-            "crop": null,
-            "blend": "normal",
-            "opacity": 0
-          },
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#010102",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "From Generative AI to Agentic AI and AX:\nExpanding the UX Design Process",
-            "x": 112,
-            "y": 322,
-            "size": 104,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "footer-1",
-            "kind": "body",
-            "text": "Speech",
-            "x": 126,
-            "y": 2020,
-            "size": 36,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "footer-2",
-            "kind": "body",
-            "text": "Woonghee Park",
-            "x": 1230,
-            "y": 2020,
-            "size": 36,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "footer-3",
-            "kind": "body",
-            "text": "AX Design",
-            "x": 2472,
-            "y": 2020,
-            "size": 36,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "footer-4",
-            "kind": "body",
-            "text": "2026",
-            "x": 3635,
-            "y": 2020,
-            "size": 36,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "생성형 AI에서 에이전틱 AI, 그리고 AX까지: UX 디자인 프로세스의 확장",
-            "x": 112,
-            "y": 138,
-            "size": 128,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 300,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ]
-      }
-    },
-    {
-      "id": "page-03",
-      "type": 2,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "",
-            "x": 0,
-            "y": 0,
-            "width": 100,
-            "radius": 0,
-            "crop": null,
-            "blend": "normal",
-            "opacity": 0
-          },
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#010102",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "ink",
-            "kind": "title",
-            "text": "Creativity",
-            "x": 96,
-            "y": 980,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#4065f8",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "ink-2",
-            "kind": "title",
-            "text": "Curiosity",
-            "x": 2316,
-            "y": 980,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#4065f8",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "",
-            "x": 0,
-            "y": 0,
-            "size": 32,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ]
-      }
-    },
-    {
-      "id": "page-04",
+      "id": "page-4c9baab0-c3c2-4d7a-8358-a92939290ac3",
       "type": 1,
       "tone": null,
-      "role": "divider",
+      "role": "content",
       "state": {
         "presetId": "conf-slide",
         "cardWidth": 3840,
@@ -2084,960 +2833,23 @@
         "controlsWidth": 360,
         "layers": [
           {
-            "id": "image",
-            "kind": "image",
-            "src": "",
-            "x": 0,
-            "y": 0,
-            "width": 100,
-            "radius": 0,
-            "crop": null,
-            "blend": "normal",
-            "opacity": 0
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "",
-            "x": 0,
-            "y": 0,
-            "size": 32,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "title",
+            "id": "layer-mwhqec1l-c19erl",
             "kind": "title",
-            "text": "",
-            "x": 0,
-            "y": 0,
-            "size": 32,
+            "text": "AI + DESIGN FUTURES",
+            "x": 173,
+            "y": 180,
+            "size": 203,
             "fontId": "montserrat",
-            "color": "#fcfcff",
+            "color": "#ffffff",
             "gradient": null,
             "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ],
-        "background": {
-          "id": "slide",
-          "mode": "video"
-        }
-      }
-    },
-    {
-      "id": "page-05",
-      "type": 3,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "conf:speaker-001",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
             "shadow": {
               "size": 0,
-              "blur": 0,
+              "blur": 80,
               "distance": 0,
               "opacity": 55
             },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#d0d7e8",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "conf:speaker-001",
-            "x": 138,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.21183618970354595,
-              "w": 1,
-              "h": 0.5763276205929081
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-2",
-            "kind": "image",
-            "src": "conf:speaker-002",
-            "x": 1350,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18894297400534088,
-              "w": 1,
-              "h": 0.6221140519893182
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-3",
-            "kind": "image",
-            "src": "conf:speaker-003",
-            "x": 2562,
-            "y": 720,
-            "width": 1142,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18418345008756565,
-              "w": 1,
-              "h": 0.6316330998248687
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "3 Agendas",
-            "x": 126,
-            "y": 2020,
-            "size": 36,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
             "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "TODAY’s AGENDA",
-            "x": 112,
-            "y": 112,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ]
-      }
-    },
-    {
-      "id": "page-06",
-      "type": 3,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "conf:speaker-001",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#d0d7e8",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "conf:speaker-001",
-            "x": 138,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.21183618970354595,
-              "w": 1,
-              "h": 0.5763276205929081
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-2",
-            "kind": "image",
-            "src": "conf:speaker-002",
-            "x": 1350,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18894297400534088,
-              "w": 1,
-              "h": 0.6221140519893182
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-3",
-            "kind": "image",
-            "src": "conf:speaker-003",
-            "x": 2562,
-            "y": 720,
-            "width": 1142,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18418345008756565,
-              "w": 1,
-              "h": 0.6316330998248687
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "3 Agendas",
-            "x": 126,
-            "y": 2020,
-            "size": 36,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "veil-0",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 138,
-            "y": 720,
-            "width": 1140,
-            "height": 860,
-            "radius": 0,
-            "color": "#000000",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#000000",
-              "gradient": null
-            },
-            "blend": "normal",
-            "opacity": 60,
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": null,
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "caption",
-            "kind": "body",
-            "text": "Visual Design\nCapabilities",
-            "x": 329.5,
-            "y": 1034,
-            "size": 104,
-            "fontId": "montserrat",
-            "color": "#f2f2f2",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "center"
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "TODAY’s AGENDA",
-            "x": 112,
-            "y": 112,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ]
-      }
-    },
-    {
-      "id": "page-07",
-      "type": 3,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "conf:speaker-001",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#d0d7e8",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "conf:speaker-001",
-            "x": 138,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.21183618970354595,
-              "w": 1,
-              "h": 0.5763276205929081
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-2",
-            "kind": "image",
-            "src": "conf:speaker-002",
-            "x": 1350,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18894297400534088,
-              "w": 1,
-              "h": 0.6221140519893182
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-3",
-            "kind": "image",
-            "src": "conf:speaker-003",
-            "x": 2562,
-            "y": 720,
-            "width": 1142,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18418345008756565,
-              "w": 1,
-              "h": 0.6316330998248687
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "3 Agendas",
-            "x": 126,
-            "y": 2020,
-            "size": 36,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "veil-1",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 1350,
-            "y": 720,
-            "width": 1140,
-            "height": 860,
-            "radius": 0,
-            "color": "#000000",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#000000",
-              "gradient": null
-            },
-            "blend": "normal",
-            "opacity": 60,
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": null,
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "caption",
-            "kind": "body",
-            "text": "Vibe coding\nCapabilities",
-            "x": 1570.5,
-            "y": 1034,
-            "size": 104,
-            "fontId": "montserrat",
-            "color": "#f2f2f2",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "center"
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "TODAY’s AGENDA",
-            "x": 112,
-            "y": 112,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ]
-      }
-    },
-    {
-      "id": "page-08",
-      "type": 3,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "conf:speaker-001",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#d0d7e8",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "conf:speaker-001",
-            "x": 138,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.21183618970354595,
-              "w": 1,
-              "h": 0.5763276205929081
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-2",
-            "kind": "image",
-            "src": "conf:speaker-002",
-            "x": 1350,
-            "y": 720,
-            "width": 1140,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18894297400534088,
-              "w": 1,
-              "h": 0.6221140519893182
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-3",
-            "kind": "image",
-            "src": "conf:speaker-003",
-            "x": 2562,
-            "y": 720,
-            "width": 1142,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18418345008756565,
-              "w": 1,
-              "h": 0.6316330998248687
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "3 Agendas",
-            "x": 126,
-            "y": 2020,
-            "size": 36,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 700,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "veil-2",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 2562,
-            "y": 720,
-            "width": 1142,
-            "height": 860,
-            "radius": 0,
-            "color": "#000000",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#000000",
-              "gradient": null
-            },
-            "blend": "normal",
-            "opacity": 60,
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": null,
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "caption",
-            "kind": "body",
-            "text": "Pathfinding\nAbility",
-            "x": 2813.5,
-            "y": 1034,
-            "size": 104,
-            "fontId": "montserrat",
-            "color": "#f2f2f2",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "center"
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "TODAY’s AGENDA",
-            "x": 112,
-            "y": 112,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ]
-      }
-    },
-    {
-      "id": "page-09",
-      "type": 1,
-      "tone": null,
-      "role": "divider",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "",
-            "x": 0,
-            "y": 0,
-            "width": 100,
-            "radius": 0,
-            "crop": null,
-            "blend": "normal",
-            "opacity": 0
-          },
-          {
-            "id": "dim",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#000000",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#000000",
-              "gradient": null
-            },
-            "blend": "normal",
-            "opacity": 40,
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": null,
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "WE ARE IN THE AI ARA",
-            "x": 800,
-            "y": 942,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "",
-            "x": 0,
-            "y": 0,
-            "size": 32,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "left"
-          }
-        ],
-        "background": {
-          "id": "slide",
-          "mode": "image"
-        }
-      }
-    },
-    {
-      "id": "page-10",
-      "type": 3,
-      "tone": "dark",
-      "role": "content",
-      "state": {
-        "presetId": "conf-slide",
-        "cardWidth": 3840,
-        "cardHeight": 2160,
-        "themeSlug": "conf:speaker-001",
-        "color": "#010102",
-        "radius": 0,
-        "code": "",
-        "panel": "design",
-        "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "ground",
-            "kind": "shape",
-            "shape": "rect",
-            "x": 0,
-            "y": 0,
-            "width": 3840,
-            "height": 2160,
-            "radius": 0,
-            "color": "#010102",
-            "shadow": {
-              "size": 0,
-              "blur": 0,
-              "distance": 0,
-              "opacity": 55
-            },
-            "stroke": {
-              "width": 0,
-              "opacity": 100,
-              "color": "#a1d0f6",
-              "gradient": null
-            },
-            "blend": "normal",
-            "blurFrom": 0,
-            "blurTo": 0,
-            "gradient": {
-              "angle": 120,
-              "from": "#010102",
-              "to": "#16427c"
-            },
-            "inner": 0.38,
-            "nodes": null
-          },
-          {
-            "id": "image",
-            "kind": "image",
-            "src": "conf:speaker-001",
-            "x": 0,
-            "y": 116,
-            "width": 1376,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.21351156069364163,
-              "w": 1,
-              "h": 0.5729768786127167
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-2",
-            "kind": "image",
-            "src": "conf:speaker-002",
-            "x": 1376,
-            "y": 116,
-            "width": 1374,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.18910091907794918,
-              "w": 1,
-              "h": 0.6217981618441016
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-3",
-            "kind": "image",
-            "src": "conf:speaker-003",
-            "x": 0,
-            "y": 1148,
-            "width": 1376,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.22691860465116276,
-              "w": 1,
-              "h": 0.5461627906976745
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "image-4",
-            "kind": "image",
-            "src": "conf:speaker-004",
-            "x": 1376,
-            "y": 1146,
-            "width": 1374,
-            "radius": 0,
-            "crop": {
-              "x": 0,
-              "y": 0.252870269286754,
-              "w": 1,
-              "h": 0.494259461426492
-            },
-            "blend": "normal"
-          },
-          {
-            "id": "title",
-            "kind": "title",
-            "text": "WE SEE\nAI-ISH\nDESIGNS",
-            "x": 2882,
-            "y": 112,
-            "size": 200,
-            "fontId": "montserrat",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
-            "italic": false,
-            "underline": false,
-            "align": "right"
-          },
-          {
-            "id": "body",
-            "kind": "body",
-            "text": "",
-            "x": 0,
-            "y": 0,
-            "size": 32,
-            "fontId": "pretendard",
-            "color": "#fcfcff",
-            "gradient": null,
-            "blend": "normal",
-            "weight": 400,
             "italic": false,
             "underline": false,
             "align": "left"

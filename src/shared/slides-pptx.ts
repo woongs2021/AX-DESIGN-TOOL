@@ -35,6 +35,10 @@ export type SceneItem =
       underline: boolean;
       align: "left" | "center" | "right";
       color: SceneColor;
+      /** Progressive-blur entrance. once plays one pass. loop repeats while the slide stays open. */
+      enter?: "once" | "loop";
+      /** Layers that share this key blur in together. */
+      enterGroup?: string;
     }
   | {
       kind: "shape";
@@ -46,6 +50,10 @@ export type SceneItem =
       geometry: SceneGeometry;
       fill: SceneFill | null;
       stroke: { width: number; color: SceneColor } | null;
+      /** Progressive-blur entrance. once plays one pass. loop repeats while the slide stays open. */
+      enter?: "once" | "loop";
+      /** Layers that share this key blur in together. */
+      enterGroup?: string;
     }
   | {
       kind: "line";
@@ -62,10 +70,26 @@ export type SceneItem =
       /** The stroked part, shortened under the arrowheads, and the arrowhead polygons, as the canvas draws them. */
       segment: { x1: number; y1: number; x2: number; y2: number };
       heads: { x: number; y: number }[][];
+      /** Progressive-blur entrance. once plays one pass. loop repeats while the slide stays open. */
+      enter?: "once" | "loop";
+      /** Layers that share this key blur in together. */
+      enterGroup?: string;
     }
-  | { kind: "picture"; name: string; x: number; y: number; w: number; h: number; png: Uint8Array };
-/** background is the card color and background photo as JPEG. video is the background video's URL; background then holds one of its frames. */
-export type SlideScene = { width: number; height: number; background: Uint8Array; video?: string; items: SceneItem[] };
+  | {
+      kind: "picture";
+      name: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      png: Uint8Array;
+      /** Progressive-blur entrance. once plays one pass. loop repeats while the slide stays open. */
+      enter?: "once" | "loop";
+      /** Layers that share this key blur in together. */
+      enterGroup?: string;
+    };
+/** background is the card color and background photo as JPEG. video is the background video's URL; background then holds one of its frames. videoPlay once plays a single pass. Absent loops. */
+export type SlideScene = { width: number; height: number; background: Uint8Array; video?: string; videoPlay?: "once" | "loop"; items: SceneItem[] };
 
 const NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";

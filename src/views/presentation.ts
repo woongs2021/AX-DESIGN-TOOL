@@ -2,9 +2,13 @@
  * PowerPoint-style shell around the shared studio editor.
  * The left rail is the ten pages. The right side is the selected Slide.
  */
+import { PAGE_ENTER_EVENT } from "../shared/presentation-files.ts";
+import { syncPresentationProject } from "./presentation-project.ts";
 import {
   bindStudio,
   conferenceStudioConfig,
+  notePageClip,
+  pageClipIsCurrent,
   renderStudio,
   renderStudioScene,
   renderStudioStill,
@@ -17,6 +21,7 @@ import { scenesPdf } from "../shared/scene-pdf.ts";
 import { slidesPptx, type SlideScene } from "../shared/slides-pptx.ts";
 import { showToast } from "../feedback.ts";
 import {
+  createBlankPage,
   createTypedPage,
   duplicatePresentationPage,
   insertPresentationPage,
@@ -36,8 +41,10 @@ const RAIL_KEY = "ax-presentation-rail";
 const RAIL_MIN = 160;
 const RAIL_DEFAULT = 188;
 const STAGE_MIN = 480;
+const SAMPLE_KEY = "ax-presentation-sample";
 let stopPageKeys: (() => void) | null = null;
 let stopPageClip: (() => void) | null = null;
+let stopPageMenu: (() => void) | null = null;
 let railObserver: ResizeObserver | null = null;
 /** Page list offset, kept across re-renders so a click does not move the list. */
 let railScroll = { top: 0, left: 0 };
@@ -50,6 +57,14 @@ const typeThumbCache = new Map<string, string>();
 const typeThumbPending = new Set<string>();
 type PageClip = { kind: "type"; type: PresentationType } | { kind: "pages"; pages: PresentationPage[] };
 let pageClip: PageClip | null = null;
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+const PAGE_LONG_PRESS_MS = 500;
+type PageMenuAnchor = { kind: "page"; at: number } | { kind: "type"; type: PresentationType };
+type PageMenuRequest = { x: number; y: number; anchor: PageMenuAnchor };
+let pendingPageMenu: PageMenuRequest | null = null;
+let pageLongPress: { timer: number; pointerId: number; x: number; y: number } | null = null;
+/** The press that opened the page menu must not also drag the page. */
+let blockPageDrag = false;
 /** Shift+click range, by page id. It always holds the selected page; fewer than two means a single page. */
 const pickedIds = new Set<string>();
 let pickAnchor: string | null = null;
@@ -74,6 +89,81 @@ function pickRange(deck: PresentationDeck, at: number): void {
     if (page) pickedIds.add(page.id);
   }
 }
+
+function cancelPageLongPress(): void {
+  if (pageLongPress) window.clearTimeout(pageLongPress.timer);
+  pageLongPress = null;
+}
+
+function pageAts(deck: PresentationDeck, at: number): number[] {
+  const source = deck.pages[at];
+  if (!source) return [];
+  return pickedIds.size > 1 && pickedIds.has(source.id) ? pickedAts(deck) : [at];
+}
+
+function copyPageType(type: PresentationType): void {
+  pageClip = { kind: "type", type };
+  notePageClip();
+}
+
+function copyPageAt(deck: PresentationDeck, at: number): boolean {
+  const pages = pageAts(deck, at).flatMap((item) => deck.pages[item] ?? []);
+  if (!pages.length) return false;
+  pageClip = { kind: "pages", pages: pages.map(duplicatePresentationPage) };
+  notePageClip();
+  return true;
+}
+
+function cutPageAt(deck: PresentationDeck, at: number, remember: () => void, onChange: () => void): boolean {
+  const ats = pageAts(deck, at);
+  const pages = ats.flatMap((item) => deck.pages[item] ?? []);
+  if (!pages.length) return false;
+  remember();
+  const before = snapDeck(deck);
+  if (!removePresentationPages(deck, ats)) {
+    showToast("페이지는 한 장 이상 남아야 합니다.");
+    return false;
+  }
+  markDeck(before);
+  pageClip = { kind: "pages", pages: pages.map((page) => structuredClone(page)) };
+  notePageClip();
+  clearPicked();
+  onChange();
+  document.querySelector<HTMLButtonElement>(`[data-deck-page="${deck.selected}"]`)?.focus({ preventScroll: true });
+  return true;
+}
+
+function pastePageClip(deck: PresentationDeck, index: ConferenceIndex, remember: () => void, onChange: () => void): boolean {
+  if (!pageClip) return false;
+  remember();
+  const created = pageClip.kind === "type"
+    ? [createTypedPage(pageClip.type, index, appTone())]
+    : pageClip.pages.map((page) => (deck.pages.some((item) => item.id === page.id) ? duplicatePresentationPage(page) : structuredClone(page)));
+  markDeck(snapDeck(deck));
+  for (const page of created) insertPresentationPage(deck, deck.selected, page);
+  clearPicked();
+  if (created.length > 1) {
+    for (const page of created) pickedIds.add(page.id);
+    pickAnchor = created[0]?.id ?? null;
+  }
+  onChange();
+  document.querySelector<HTMLButtonElement>(`[data-deck-page="${deck.selected}"]`)?.focus({ preventScroll: true });
+  return true;
+}
+
+function deletePageAt(deck: PresentationDeck, at: number, remember: () => void, onChange: () => void): boolean {
+  const ats = pageAts(deck, at);
+  if (!ats.length) return false;
+  remember();
+  const before = snapDeck(deck);
+  if (!(ats.length > 1 ? removePresentationPages(deck, ats) : removePresentationPage(deck, at))) return false;
+  clearPicked();
+  markDeck(before);
+  onChange();
+  document.querySelector<HTMLButtonElement>(`[data-deck-page="${deck.selected}"]`)?.focus({ preventScroll: true });
+  return true;
+}
+
 /** Page add, delete, move, and rename. Slide edits keep the studio's per-page history. */
 type DeckSnap = { pages: PresentationPage[]; names: string[]; selected: number };
 const DECK_HISTORY_LIMIT = 50;
@@ -110,15 +200,94 @@ function readRailWidth(): number {
   return RAIL_DEFAULT;
 }
 
-export function presentationStudioConfig(index: ConferenceIndex, historyKey: string): StudioConfig {
+function readSampleScale(): number {
+  try {
+    const raw = localStorage.getItem(SAMPLE_KEY);
+    if (raw == null || raw === "") return 1;
+    const value = Number(raw);
+    if (Number.isFinite(value)) return Math.min(1, Math.max(0, value));
+  } catch {
+    /* Keep the enlarged preview at its full size. */
+  }
+  return 1;
+}
+
+/** Shrinks only the enlarged type image. Its current 16:9 size is the maximum. */
+function bindSampleHeight(root: HTMLElement): void {
+  const types = root.querySelector<HTMLElement>(".deck__types");
+  const splitter = root.querySelector<HTMLElement>("#deck-type-splitter");
+  if (!types || !splitter) return;
+  let scale = readSampleScale();
+  const travel = () => {
+    const style = getComputedStyle(types);
+    const width = types.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return Math.max(1, width * (9 / 16));
+  };
+  const apply = (next: number) => {
+    scale = Math.round(Math.min(1, Math.max(0, next)) * 1000) / 1000;
+    if (scale >= 0.999) types.style.removeProperty("--deck-sample-scale");
+    else types.style.setProperty("--deck-sample-scale", String(scale));
+    const shown = Math.round(scale * 100);
+    splitter.setAttribute("aria-valuenow", String(shown));
+    splitter.setAttribute("aria-valuetext", `${shown}%`);
+    try {
+      localStorage.setItem(SAMPLE_KEY, String(scale));
+    } catch {
+      /* The size still applies until the next reload. */
+    }
+  };
+  apply(scale);
+  splitter.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    try {
+      splitter.setPointerCapture(event.pointerId);
+    } catch {
+      /* the pointer can already be inactive */
+    }
+    const distance = travel();
+    const originY = event.clientY;
+    const origin = scale;
+    splitter.classList.add("is-dragging");
+    const previousCursor = document.documentElement.style.cursor;
+    document.documentElement.style.cursor = "row-resize";
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      apply(origin + (ev.clientY - originY) / distance);
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== event.pointerId) return;
+      splitter.classList.remove("is-dragging");
+      document.documentElement.style.cursor = previousCursor;
+      splitter.removeEventListener("pointermove", move);
+      splitter.removeEventListener("pointerup", end);
+      splitter.removeEventListener("pointercancel", end);
+    };
+    splitter.addEventListener("pointermove", move);
+    splitter.addEventListener("pointerup", end);
+    splitter.addEventListener("pointercancel", end);
+  });
+  splitter.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const step = event.shiftKey ? 0.15 : 0.05;
+    apply(scale + (event.key === "ArrowDown" ? step : -step));
+  });
+}
+
+export function presentationStudioConfig(index: ConferenceIndex, historyKey: string, pageId = ""): StudioConfig {
   const base = conferenceStudioConfig(index);
   const slide = base.presets.find((item) => item.id === "conf-slide") ?? base.presets[0];
   return {
     id: "presentation",
     historyKey,
+    ...(pageId ? { pageId } : {}),
     presets: slide ? [slide] : base.presets,
     presetThumbs: base.presetThumbs,
-    groups: base.groups,
+    groups: [
+      ...base.groups.map((group) => ({ ...group, hidden: true })),
+      { id: "page", label: "이 페이지", items: [] },
+    ],
     conference: index,
   };
 }
@@ -169,13 +338,17 @@ export function renderPresentation(deck: PresentationDeck, index: ConferenceInde
         </div>`;
     })
     .join("");
-  const config = presentationStudioConfig(index, `presentation:${page.id}`);
+  const config = presentationStudioConfig(index, `presentation:${page.id}`, page.id);
   const rail = readRailWidth();
   return `
     <div class="deck" style="--deck-rail:${rail}px">
       <div class="deck__rail-host">
         <aside class="deck__rail" aria-label="프레젠테이션 페이지">
-          <div class="deck__types" role="group" aria-label="페이지 유형">${types}${sample}</div>
+          <div class="deck__types" role="group" aria-label="페이지 유형">
+            <div class="deck__types-row">${types}</div>
+            ${sample}
+          </div>
+          <div class="deck__type-splitter" id="deck-type-splitter" role="separator" aria-orientation="horizontal" aria-label="확대 프리뷰 높이" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" tabindex="0"></div>
           <div class="deck__pages">${pages}</div>
         </aside>
         <div class="deck__scroll-thumb" hidden></div>
@@ -185,6 +358,12 @@ export function renderPresentation(deck: PresentationDeck, index: ConferenceInde
         ${renderStudio(page.state, config)}
       </div>
     </div>`;
+}
+
+/** Drops the page menu when the presentation view is rebuilt or left. */
+export function releasePresentationMenu(): void {
+  stopPageMenu?.();
+  stopPageMenu = null;
 }
 
 export function bindPresentation(
@@ -198,6 +377,8 @@ export function bindPresentation(
   stopPageKeys = null;
   stopPageClip?.();
   stopPageClip = null;
+  stopPageMenu?.();
+  stopPageMenu = null;
   stopDeckKeys?.();
   stopDeckKeys = null;
   if (historyDeck !== deck) {
@@ -211,7 +392,7 @@ export function bindPresentation(
   const page = deck.pages[deck.selected];
   if (!page) return;
   const deckRoot = root.querySelector<HTMLElement>(".deck");
-  const config = presentationStudioConfig(index, `presentation:${page.id}`);
+  const config = presentationStudioConfig(index, `presentation:${page.id}`, page.id);
   const remember = () => {
     const canvas = document.querySelector<HTMLCanvasElement>("#studio-canvas");
     if (!canvas || canvas.width !== page.state.cardWidth || canvas.height !== page.state.cardHeight) return;
@@ -224,7 +405,8 @@ export function bindPresentation(
   bindPageNames(root, deck, remember, onChange);
   root.querySelectorAll<HTMLButtonElement>("[data-deck-type]").forEach((button) => {
     button.addEventListener("dragstart", (event) => event.preventDefault());
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
+      if (ignorePageClick || event.ctrlKey) return;
       const type = Number(button.dataset.deckType);
       if (type !== 1 && type !== 2 && type !== 3) return;
       if (pickedType === type) return;
@@ -236,7 +418,10 @@ export function bindPresentation(
   });
   const sampleButton = root.querySelector<HTMLButtonElement>("[data-deck-sample]");
   sampleButton?.addEventListener("dragstart", (event) => event.preventDefault());
-  sampleButton?.addEventListener("click", () => sampleButton.focus({ preventScroll: true }));
+  sampleButton?.addEventListener("click", (event) => {
+    if (ignorePageClick || event.ctrlKey) return;
+    sampleButton.focus({ preventScroll: true });
+  });
   const deckEl = root.querySelector<HTMLElement>(".deck");
   const railSplitter = root.querySelector<HTMLElement>("#deck-splitter");
   if (deckEl && railSplitter) {
@@ -286,8 +471,19 @@ export function bindPresentation(
       applyRail(current + (event.key === "ArrowRight" ? step : -step));
     });
   }
+  bindSampleHeight(root);
 
   bindStudio(root, page.state, config, actions);
+  root.querySelector<HTMLButtonElement>("#studio-add-page")?.addEventListener("click", () => {
+    remember();
+    markDeck(snapDeck(deck));
+    insertPresentationPage(deck, deck.selected, createBlankPage(appTone()));
+    clearPicked();
+    onChange();
+    const button = document.querySelector<HTMLButtonElement>(`[data-deck-page="${deck.selected}"]`);
+    button?.focus({ preventScroll: true });
+    button?.scrollIntoView({ block: "nearest" });
+  });
   root.querySelector<HTMLButtonElement>("#studio-deck-export")?.addEventListener("click", () => {
     remember();
     openDeckExport(deck, index);
@@ -297,7 +493,9 @@ export function bindPresentation(
   paintTypeThumbs(root, index);
   bindRailScroll(root);
   bindPageClip(deckRoot, deck, index, remember, onChange);
+  bindPageMenu(deckRoot, deck, index, remember, onChange);
   bindDeckKeys(deckRoot, deck, remember, onChange);
+  syncPresentationProject(deck, onChange);
   const onPageKeys = (event: KeyboardEvent) => {
     if (!deckRoot?.isConnected) {
       stopPageKeys?.();
@@ -316,7 +514,7 @@ export function bindPresentation(
     ) {
       return;
     }
-    if (target instanceof Element && target.closest("#deck-splitter, #studio-splitter, dialog")) return;
+    if (target instanceof Element && target.closest("#deck-splitter, #deck-type-splitter, #studio-splitter, dialog")) return;
     const next = deck.selected + (event.key === "ArrowDown" ? 1 : -1);
     if (!deck.pages[next]) {
       event.preventDefault();
@@ -365,7 +563,7 @@ function bindPageOrder(
       event.preventDefault();
     });
     button.addEventListener("click", (event) => {
-      if (ignorePageClick) return;
+      if (ignorePageClick || event.ctrlKey) return;
       const target = event.target;
       if (target instanceof Element && target.closest(".deck__meta, .deck__name")) return;
       const at = Number(button.querySelector<HTMLElement>("[data-deck-page]")?.dataset.deckPage);
@@ -375,6 +573,7 @@ function bindPageOrder(
       else clearPicked();
       if (at === deck.selected && !event.shiftKey && !hadRange) {
         document.querySelector<HTMLButtonElement>(`[data-deck-page="${at}"]`)?.focus({ preventScroll: true });
+        document.dispatchEvent(new Event(PAGE_ENTER_EVENT));
         return;
       }
       remember();
@@ -384,6 +583,7 @@ function bindPageOrder(
     });
     button.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
+      blockPageDrag = false;
       const target = event.target;
       if (target instanceof Element && target.closest(".deck__meta, .deck__name")) return;
       const from = Number(button.querySelector<HTMLElement>("[data-deck-page]")?.dataset.deckPage);
@@ -443,9 +643,10 @@ function bindPageOrder(
         }
       };
       const move = (ev: PointerEvent) => {
-        if (ev.pointerId !== event.pointerId) return;
+        if (ev.pointerId !== event.pointerId || blockPageDrag) return;
         if (!dragging) {
           if (Math.hypot(ev.clientX - originX, ev.clientY - originY) < 5) return;
+          cancelPageLongPress();
           dragging = true;
           ignorePageClick = true;
           document.addEventListener("click", eatClick, true);
@@ -487,6 +688,8 @@ function bindPageOrder(
         marker?.remove();
         for (const item of carried) item.classList.remove("deck__page--dragging");
         document.documentElement.classList.remove("deck-dragging");
+        if (blockPageDrag) return;
+        cancelPageLongPress();
         if (!dragging && Math.hypot(ev.clientX - originX, ev.clientY - originY) >= 5) {
           dragging = true;
           ignorePageClick = true;
@@ -652,6 +855,200 @@ function bindRailScroll(root: HTMLElement): void {
   railObserver.observe(pages);
 }
 
+function menuAnchor(target: EventTarget | null): PageMenuAnchor | null {
+  if (!(target instanceof Element) || target.closest("input, textarea, select")) return null;
+  const typeButton = target.closest<HTMLElement>("[data-deck-type], [data-deck-sample]");
+  if (typeButton) {
+    const type = Number(typeButton.dataset.deckType ?? typeButton.dataset.deckSample);
+    if (type !== 1 && type !== 2 && type !== 3) return null;
+    return { kind: "type", type };
+  }
+  const page = target.closest<HTMLElement>(".deck__page");
+  const at = Number(page?.querySelector<HTMLElement>("[data-deck-page]")?.dataset.deckPage);
+  if (!page || !Number.isInteger(at)) return null;
+  return { kind: "page", at };
+}
+
+function bindPageMenu(
+  deckRoot: HTMLElement | null,
+  deck: PresentationDeck,
+  index: ConferenceIndex,
+  remember: () => void,
+  onChange: () => void,
+): void {
+  if (!deckRoot) return;
+  const shortcut = (key: string) => (IS_MAC ? `⌘${key}` : `Ctrl+${key}`);
+  const items: { action: string; label: string; hint: string }[] = [
+    { action: "copy", label: "복사", hint: shortcut("C") },
+    { action: "cut", label: "잘라내기", hint: shortcut("X") },
+    { action: "paste", label: "붙여넣기", hint: shortcut("V") },
+    { action: "delete", label: "삭제", hint: IS_MAC ? "⌫" : "Delete" },
+  ];
+  const menu = document.createElement("div");
+  menu.className = "nav-popover studio-menu deck-page-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "페이지 메뉴");
+  menu.hidden = true;
+  menu.innerHTML = items
+    .map(
+      (item) =>
+        `<button type="button" class="nav-popover__item" role="menuitem" data-page-action="${item.action}">${item.label}<span class="studio-menu__hint">${item.hint}</span></button>`,
+    )
+    .join("");
+  document.body.append(menu);
+  let anchor: PageMenuAnchor | null = null;
+  const itemButton = (action: string) => menu.querySelector<HTMLButtonElement>(`[data-page-action="${action}"]`);
+  const visibleButtons = () => [...menu.querySelectorAll<HTMLButtonElement>("[data-page-action]")].filter((button) => !button.hidden && !button.disabled);
+  const close = () => {
+    if (menu.hidden) return;
+    if (document.activeElement instanceof HTMLElement && menu.contains(document.activeElement)) document.activeElement.blur();
+    menu.hidden = true;
+    document.removeEventListener("pointerdown", onOutside, true);
+  };
+  const onOutside = (event: PointerEvent) => {
+    if (event.target instanceof Node && menu.contains(event.target)) return;
+    close();
+  };
+  const show = (request: PageMenuRequest) => {
+    anchor = request.anchor;
+    const pageAnchor = request.anchor.kind === "page" ? request.anchor : null;
+    const ats = pageAnchor ? pageAts(deck, pageAnchor.at) : [];
+    const canRemove = pageAnchor != null && ats.length > 0 && ats.length < deck.pages.length;
+    const enable = (action: string, on: boolean, shown: boolean) => {
+      const button = itemButton(action);
+      if (!button) return;
+      button.hidden = !shown;
+      button.disabled = !on;
+    };
+    enable("copy", true, true);
+    enable("cut", canRemove, pageAnchor != null);
+    enable("paste", pageClip != null, true);
+    enable("delete", canRemove, pageAnchor != null);
+    menu.hidden = false;
+    const margin = 8;
+    const { width, height } = menu.getBoundingClientRect();
+    const left = request.x + width + margin > window.innerWidth ? request.x - width : request.x;
+    const top = request.y + height + margin > window.innerHeight ? request.y - height : request.y;
+    menu.style.left = `${Math.max(margin, left)}px`;
+    menu.style.top = `${Math.max(margin, top)}px`;
+    document.addEventListener("pointerdown", onOutside, true);
+    visibleButtons()[0]?.focus({ preventScroll: true });
+  };
+  const open = (request: PageMenuRequest) => {
+    if (request.anchor.kind === "page") {
+      const page = deck.pages[request.anchor.at];
+      const inRange = Boolean(page && pickedIds.size > 1 && pickedIds.has(page.id));
+      if (page && !inRange && deck.selected !== request.anchor.at) {
+        remember();
+        clearPicked();
+        deck.selected = request.anchor.at;
+        pendingPageMenu = request;
+        onChange();
+        return;
+      }
+    }
+    show(request);
+  };
+  const eatClick = (event: Event) => {
+    document.removeEventListener("click", eatClick, true);
+    ignorePageClick = false;
+    if (event.target instanceof Element && event.target.closest(".deck-page-menu")) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const beginHold = (event: PointerEvent, next: PageMenuAnchor) => {
+    cancelPageLongPress();
+    const { clientX, clientY, pointerId } = event;
+    const timer = window.setTimeout(() => {
+      if (pageLongPress?.pointerId !== pointerId) return;
+      pageLongPress = null;
+      blockPageDrag = true;
+      ignorePageClick = true;
+      document.addEventListener("click", eatClick, true);
+      open({ x: clientX, y: clientY, anchor: next });
+    }, PAGE_LONG_PRESS_MS);
+    pageLongPress = { timer, pointerId, x: clientX, y: clientY };
+  };
+  const onContext = (event: MouseEvent) => {
+    if (!deckRoot.isConnected) {
+      stopPageMenu?.();
+      stopPageMenu = null;
+      return;
+    }
+    const next = menuAnchor(event.target);
+    if (!(event.target instanceof Element) || !event.target.closest(".deck__rail") || !next) return;
+    event.preventDefault();
+    event.stopPropagation();
+    open({ x: event.clientX, y: event.clientY, anchor: next });
+  };
+  const onPointerDown = (event: PointerEvent) => {
+    if (event.button !== 0 || event.ctrlKey) return;
+    ignorePageClick = false;
+    const next = menuAnchor(event.target);
+    if (!(event.target instanceof Element) || !event.target.closest(".deck__rail") || !next) return;
+    beginHold(event, next);
+  };
+  const onPointerMove = (event: PointerEvent) => {
+    const press = pageLongPress;
+    if (!press || press.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < 5) return;
+    cancelPageLongPress();
+  };
+  const onPointerEnd = (event: PointerEvent) => {
+    if (pageLongPress?.pointerId === event.pointerId) cancelPageLongPress();
+  };
+  const onMenuKey = (event: KeyboardEvent) => {
+    if (event.key === "Escape" || event.key === "Tab") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const buttons = visibleButtons();
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    buttons[(at + step + buttons.length) % buttons.length]?.focus();
+  };
+  const onMenuClick = (event: MouseEvent) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-page-action]") : null;
+    if (!button || button.disabled || !anchor) return;
+    const action = button.dataset.pageAction;
+    const target = anchor;
+    close();
+    if (action === "copy") {
+      if (target.kind === "type") copyPageType(target.type);
+      else copyPageAt(deck, target.at);
+    } else if (action === "cut" && target.kind === "page") cutPageAt(deck, target.at, remember, onChange);
+    else if (action === "paste") pastePageClip(deck, index, remember, onChange);
+    else if (action === "delete" && target.kind === "page") deletePageAt(deck, target.at, remember, onChange);
+  };
+  menu.addEventListener("click", onMenuClick);
+  menu.addEventListener("keydown", onMenuKey);
+  deckRoot.addEventListener("pointerdown", onPointerDown);
+  deckRoot.addEventListener("pointermove", onPointerMove);
+  deckRoot.addEventListener("pointerup", onPointerEnd);
+  deckRoot.addEventListener("pointercancel", onPointerEnd);
+  deckRoot.addEventListener("scroll", close, true);
+  document.addEventListener("contextmenu", onContext, true);
+  stopPageMenu = () => {
+    close();
+    cancelPageLongPress();
+    menu.remove();
+    deckRoot.removeEventListener("pointerdown", onPointerDown);
+    deckRoot.removeEventListener("pointermove", onPointerMove);
+    deckRoot.removeEventListener("pointerup", onPointerEnd);
+    deckRoot.removeEventListener("pointercancel", onPointerEnd);
+    deckRoot.removeEventListener("scroll", close, true);
+    document.removeEventListener("contextmenu", onContext, true);
+  };
+  if (pendingPageMenu) {
+    const request = pendingPageMenu;
+    pendingPageMenu = null;
+    show(request);
+  }
+}
+
 function bindPageClip(
   deckRoot: HTMLElement | null,
   deck: PresentationDeck,
@@ -676,31 +1073,15 @@ function bindPageClip(
       if (typeButton && event.code === "KeyC") {
         const type = Number(typeButton.dataset.deckType ?? typeButton.dataset.deckSample);
         if (type !== 1 && type !== 2 && type !== 3) return;
-        pageClip = { kind: "type", type };
+        copyPageType(type);
       } else if (pageButton) {
         const at = Number(pageButton.dataset.deckPage);
-        const source = deck.pages[at];
-        if (!source) return;
-        const ats = pickedIds.size > 1 && pickedIds.has(source.id) ? pickedAts(deck) : [at];
-        const pages = ats.flatMap((item) => deck.pages[item] ?? []);
         if (event.code === "KeyX") {
-          remember();
-          const before = snapDeck(deck);
-          if (!removePresentationPages(deck, ats)) {
+          if (!cutPageAt(deck, at, remember, onChange)) {
             event.preventDefault();
-            showToast("페이지는 한 장 이상 남아야 합니다.");
             return;
           }
-          markDeck(before);
-          pageClip = { kind: "pages", pages: pages.map((page) => structuredClone(page)) };
-          clearPicked();
-          event.preventDefault();
-          event.stopPropagation();
-          onChange();
-          document.querySelector<HTMLButtonElement>(`[data-deck-page="${deck.selected}"]`)?.focus({ preventScroll: true });
-          return;
-        }
-        pageClip = { kind: "pages", pages: pages.map(duplicatePresentationPage) };
+        } else if (!copyPageAt(deck, at)) return;
       } else {
         return;
       }
@@ -708,22 +1089,9 @@ function bindPageClip(
       event.stopPropagation();
       return;
     }
-    if (!pageClip) return;
+    if (!pageClipIsCurrent() || !pastePageClip(deck, index, remember, onChange)) return;
     event.preventDefault();
     event.stopPropagation();
-    remember();
-    const created = pageClip.kind === "type"
-      ? [createTypedPage(pageClip.type, index, appTone())]
-      : pageClip.pages.map((page) => (deck.pages.some((item) => item.id === page.id) ? duplicatePresentationPage(page) : structuredClone(page)));
-    markDeck(snapDeck(deck));
-    for (const page of created) insertPresentationPage(deck, deck.selected, page);
-    clearPicked();
-    if (created.length > 1) {
-      for (const page of created) pickedIds.add(page.id);
-      pickAnchor = created[0]?.id ?? null;
-    }
-    onChange();
-    document.querySelector<HTMLButtonElement>(`[data-deck-page="${deck.selected}"]`)?.focus({ preventScroll: true });
   };
   document.addEventListener("keydown", onClip, true);
   stopPageClip = () => document.removeEventListener("keydown", onClip, true);
@@ -756,14 +1124,7 @@ function bindDeckKeys(
       event.preventDefault();
       event.stopPropagation();
       const at = Number(pageButton.dataset.deckPage);
-      const ats = pickedIds.size > 1 && pickedIds.has(deck.pages[at]?.id ?? "") ? pickedAts(deck) : [at];
-      remember();
-      const before = snapDeck(deck);
-      if (!(ats.length > 1 ? removePresentationPages(deck, ats) : removePresentationPage(deck, at))) return;
-      clearPicked();
-      markDeck(before);
-      onChange();
-      focusSelected();
+      deletePageAt(deck, at, remember, onChange);
       return;
     }
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return;

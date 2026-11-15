@@ -11,6 +11,8 @@ import {
   clampImageWidth,
   clampTextOffset,
   CONTROLS_DEFAULT,
+  bareCardColor,
+  cardIsBare,
   normalizeStudioState,
   rgbToHex,
   type ImageLayer,
@@ -20,6 +22,7 @@ import {
 } from "./studio.ts";
 import type { LinearGradient, ShapeLayer } from "./studio-shapes.ts";
 import PRESENTATION_DEFAULTS from "./presentation-defaults.json";
+import TYPE1_TEMPLATE from "./presentation-type1.json";
 
 export const PRESENTATION_DECK_KEY = "ax-presentation-deck";
 /** Dev server route that rewrites presentation-defaults.json. */
@@ -352,13 +355,27 @@ export function retargetPage(page: PresentationPage, type: PresentationType, ind
   page.thumb = "";
 }
 
-/** Matches type 2 and 3 pages to the app light or dark mode. Type 1 keeps its picture. */
+/** Matches type 2 and 3 pages to the app light or dark mode. Type 1 keeps its picture. An empty page keeps its floor. */
 export function syncPresentationMode(deck: PresentationDeck, tone: PresentationTone): void {
   for (const page of deck.pages) {
-    if (page.type === 1 || page.tone === tone) continue;
+    if (cardIsBare(page.state) || page.type === 1 || page.tone === tone) continue;
     applyPresentationTone(page, tone);
     page.thumb = "";
   }
+}
+
+/** Empty pages follow the app mode: black in dark, white in light. Pages with content stay put. */
+export function recolorBarePages(deck: PresentationDeck, tone: PresentationTone): boolean {
+  let changed = false;
+  for (const page of deck.pages) {
+    if (!cardIsBare(page.state)) continue;
+    const color = bareCardColor(tone);
+    if (page.state.color === color) continue;
+    page.state.color = color;
+    page.thumb = "";
+    changed = true;
+  }
+  return changed;
 }
 
 /** Recolors a type 2 or 3 page. Graphic ink, captions, and veils stay put. */
@@ -380,8 +397,39 @@ export function applyPresentationTone(page: PresentationPage, tone: Presentation
 
 const TYPE_EXAMPLE: Record<PresentationType, string> = { 1: "page-04", 2: "page-01", 3: "page-05" };
 
-/** A fresh page in one of the three predictable layouts. */
+/** An empty slide. The floor is black in dark mode and white in light mode. */
+export function createBlankPage(tone: PresentationTone): PresentationPage {
+  return {
+    id: `page-${crypto.randomUUID()}`,
+    type: 1,
+    tone: null,
+    role: "content",
+    name: "",
+    thumb: "",
+    state: {
+      presetId: "conf-slide",
+      cardWidth: SLIDE_W,
+      cardHeight: SLIDE_H,
+      themeSlug: "",
+      color: bareCardColor(tone),
+      radius: 0,
+      code: "",
+      panel: "design",
+      controlsWidth: CONTROLS_DEFAULT,
+      layers: [],
+    },
+  };
+}
+
+/** A fresh page in one of the three predictable layouts. Type 1 copies the saved page 2 design. */
 export function createTypedPage(type: PresentationType, index: ConferenceIndex | null, tone: PresentationTone): PresentationPage {
+  if (type === 1) {
+    const page = structuredClone(TYPE1_TEMPLATE) as PresentationPage;
+    page.id = `page-${crypto.randomUUID()}`;
+    page.name = "";
+    page.thumb = "";
+    return page;
+  }
   const spec = SPECS.find((item) => item.id === TYPE_EXAMPLE[type]) ?? SPECS[0];
   const page = buildPage(spec, index, 0);
   page.id = `page-${crypto.randomUUID()}`;
@@ -461,7 +509,7 @@ function layoutOf(spec: Spec, index: ConferenceIndex | null): StudioState["layer
   return withRequired(layers);
 }
 
-/** A saved card always keeps one image, body, and title, so reload does not invent defaults. */
+/** A newly built page starts with one image, body, and title. A saved page keeps the layers it has. */
 function withRequired(layers: StudioState["layers"]): StudioState["layers"] {
   const next = [...layers];
   if (!next.some((layer) => layer.kind === "image")) {

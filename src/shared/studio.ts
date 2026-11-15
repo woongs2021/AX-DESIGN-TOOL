@@ -1,4 +1,5 @@
-import { LAYER_BLUR_MAX, clampUnit, layerBlurBottom, parseBlend, parseShadow, shadowOffset, shapeBlend, shapeShadow, vectorSvg, type LineLayer, type LinearGradient, type PenLayer, type ShapeBlend, type ShapeLayer, type ShapeShadow, parseGradient, parseVectorLayer } from "./studio-shapes.ts";
+import { presentationFileUrl } from "./presentation-files.ts";
+import { LAYER_BLUR_MAX, clampUnit, layerBlurBottom, parseBlend, parseLayerEnter, parseShadow, shadowOffset, shapeBlend, shapeShadow, vectorSvg, type LayerEnter, type LineLayer, type LinearGradient, type PenLayer, type ShapeBlend, type ShapeLayer, type ShapeShadow, parseGradient, parseVectorLayer } from "./studio-shapes.ts";
 import { DEFAULT_PRESET_ID, presetById } from "./studio-presets.ts";
 
 export const RADIUS_MIN = 0;
@@ -59,6 +60,8 @@ export type TextLayer = {
   blend?: ShapeBlend;
   /** Absent means no shadow. Same size, blur, distance, and opacity as a shape. */
   shadow?: ShapeShadow;
+  /** Progressive-blur entrance. once plays one pass. loop repeats while the page stays open. */
+  enter?: LayerEnter;
 };
 /** x/y/width describe the cropped part on the card. */
 export type ImageLayer = {
@@ -92,12 +95,51 @@ export type ImageLayer = {
   saturation?: number;
   /** Hue rotation in degrees, -180–180. Absent means unchanged. */
   hue?: number;
+  /** How a gif or video picture plays. Absent means it loops. */
+  play?: MediaPlay;
+  /** Progressive-blur entrance. once plays one pass. loop repeats while the page stays open. */
+  enter?: LayerEnter;
 };
 export type StudioLayer = TextLayer | ImageLayer | ShapeLayer | LineLayer | PenLayer;
 export type LayerKind = StudioLayer["kind"];
 
+/** once plays a single pass. loop repeats until the page is left. */
+export type MediaPlay = "once" | "loop";
+
 /** Conference main background: fills the card under every layer and is not a layer itself. */
-export type StudioBackground = { id: string; mode: "image" | "video" };
+export type StudioBackground = {
+  id: string;
+  mode: "image" | "video";
+  /** A pres: file from the page folder. Used on localhost instead of the conference asset. */
+  file?: string;
+  /** How the video plays. Absent means it loops. */
+  play?: MediaPlay;
+};
+
+export function mediaPlayOf(value: { play?: MediaPlay } | null | undefined): MediaPlay {
+  return value?.play === "once" ? "once" : "loop";
+}
+
+export function parseMediaPlay(raw: unknown): { play?: MediaPlay } {
+  if (!raw || typeof raw !== "object") return {};
+  const play = (raw as { play?: unknown }).play;
+  return play === "once" || play === "loop" ? { play } : {};
+}
+
+function motionName(src: string): string {
+  const clean = src.split("?")[0] ?? src;
+  return clean.slice(clean.lastIndexOf("/") + 1);
+}
+
+/** A gif or video file that can play once or loop. */
+export function isMotionSrc(src: string): boolean {
+  return /\.(gif|mp4|webm|mov)$/i.test(motionName(src));
+}
+
+/** A video file, as opposed to an animated gif. */
+export function isVideoSrc(src: string): boolean {
+  return /\.(mp4|webm|mov)$/i.test(motionName(src));
+}
 
 export type StudioState = {
   /** Conference only. */
@@ -523,6 +565,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
   const x = num(value.x) ?? 0;
   const y = num(value.y) ?? 0;
   if (value.kind === "image") {
+    const src = typeof value.src === "string" && value.src ? value.src : theme;
     const crop = value.crop as Record<string, unknown> | null | undefined;
     const cx = num(crop?.x);
     const cy = num(crop?.y);
@@ -532,7 +575,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
     return {
       id,
       kind: "image",
-      src: typeof value.src === "string" && value.src ? value.src : theme,
+      src,
       x,
       y,
       width: clampImageWidth(num(value.width) ?? IMAGE_MIN),
@@ -550,6 +593,8 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
       ...tune(value.contrast, IMAGE_TONE_LIMIT, "contrast"),
       ...tune(value.saturation, IMAGE_TONE_LIMIT, "saturation"),
       ...tune(value.hue, IMAGE_HUE_LIMIT, "hue"),
+      ...(isMotionSrc(src) ? parseMediaPlay(value) : {}),
+      ...parseLayerEnter(value),
     };
   }
   if (value.kind !== "title" && value.kind !== "body") return null;
@@ -566,6 +611,7 @@ function parseLayer(raw: unknown, ink: string, theme: string): StudioLayer | nul
     blend: parseBlend(value.blend),
     ...(value.shadow && typeof value.shadow === "object" ? { shadow: parseShadow(value.shadow) } : {}),
     ...textStyle(value, value.kind),
+    ...parseLayerEnter(value),
   };
 }
 
@@ -622,7 +668,10 @@ function parseBackground(raw: unknown): StudioBackground | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   if (typeof value.id !== "string" || !value.id) return null;
-  return { id: value.id, mode: value.mode === "video" ? "video" : "image" };
+  const file = typeof value.file === "string" && presentationFileUrl(value.file) ? value.file : "";
+  const mode = value.mode === "video" ? "video" : "image";
+  const play = mode === "video" && (value.play === "once" || value.play === "loop") ? value.play : undefined;
+  return { id: value.id, mode, ...(file ? { file } : {}), ...(play ? { play } : {}) };
 }
 
 /** A stored studio state (baseline or saved card), upgraded to layers. Null when it is not a studio state. */
@@ -655,17 +704,41 @@ export function normalizeStudioState(raw: unknown): StudioState | null {
     ...(groups ? { groups } : {}),
     ...(locked ? { locked } : {}),
   };
-  ensureLayer(state, "image");
-  ensureLayer(state, "body");
-  ensureLayer(state, "title");
   return state;
 }
 
-/** Copy every field, and drop groups and locks when the incoming card has none. */
+function layerIsDrawn(layer: StudioLayer): boolean {
+  if (layer.kind === "title" || layer.kind === "body") return layer.text.trim().length > 0;
+  if (layer.kind === "pen") return layer.fill.trim().length > 0 || (layer.stroke.trim().length > 0 && layer.strokeWidth > 0);
+  if (layer.kind !== "image" && layer.kind !== "shape" && layer.kind !== "line") return true;
+  const opacity = layer.opacity ?? 100;
+  return layer.kind === "image" ? layer.src.trim().length > 0 && opacity > 0 : opacity > 0;
+}
+
+/** Nothing visible is drawn on the card, so the floor color is the whole picture. */
+export function cardIsBare(state: StudioState): boolean {
+  return !state.background && state.layers.every((layer) => !layerIsDrawn(layer));
+}
+
+/** Empty floor. Dark uses the app black, light uses the app white. */
+export function bareCardColor(tone: "light" | "dark"): string {
+  return tone === "dark" ? rgbToHex(1, 1, 2) : rgbToHex(252, 252, 255);
+}
+
+/** A stand-in for the controls. It is not added to the card. */
+export function placeholderLayer(state: StudioState, kind: "image"): ImageLayer;
+export function placeholderLayer(state: StudioState, kind: TextKind): TextLayer;
+export function placeholderLayer(state: StudioState, kind: "image" | TextKind): StudioLayer {
+  if (kind === "image") return defaultLayer("image", state.themeSlug, state.cardWidth, state.cardHeight);
+  return defaultLayer(kind, state.themeSlug, state.cardWidth, state.cardHeight);
+}
+
+/** Copy every field, and drop groups, locks, and the background when the incoming card has none. */
 export function assignStudio(state: StudioState, next: StudioState): void {
   Object.assign(state, next);
   if (!next.groups?.length) delete state.groups;
   if (!next.locked?.length) delete state.locked;
+  if (!next.background) delete state.background;
 }
 
 /** Restore the card to its starting values. The chosen theme, size preset, and panel width stay. */
@@ -871,7 +944,7 @@ export function designToCode(
   if (state.background) {
     items.push(
       state.background.mode === "video"
-        ? `  <video class="studio-bg" src="{{image:background}}" poster="{{image:background-poster}}" autoplay muted loop playsinline></video>`
+        ? `  <video class="studio-bg" src="{{image:background}}" poster="{{image:background-poster}}" autoplay muted${state.background.play === "once" ? "" : " loop"} playsinline></video>`
         : `  <img class="studio-bg" src="{{image:background}}" alt="" />`,
     );
     rules.push("  .studio-card .studio-bg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }");
@@ -930,6 +1003,10 @@ export function designToCode(
         rules.push(`  .studio-card .${name} { position: absolute; ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; ${corner}${fx} }`);
         rules.push(`  .studio-card .${name} .studio-crop { inset: 0; border-radius: inherit; }`);
         rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
+      } else if (isVideoSrc(layer.src)) {
+        const loop = layer.play === "once" ? "" : " loop";
+        items.push(`  <video class="${name}" src="${src}" muted${loop} autoplay playsinline></video>`);
+        rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; ${corner}${fx} }`);
       } else {
         items.push(`  <img class="${name}" src="${src}" alt="" />`);
         rules.push(`  .studio-card .${name} { ${place} width: ${px(layer.width)}; ${corner}${fx} }`);
