@@ -355,12 +355,19 @@ export function retargetPage(page: PresentationPage, type: PresentationType, ind
   page.thumb = "";
 }
 
-/** Matches type 2 and 3 pages to the app light or dark mode. Type 1 keeps its picture. An empty page keeps its floor. */
+/** Matches type 2 and 3 pages to the app light or dark mode. Type 1 keeps its picture. A card color left on the black or white default follows the mode. An empty page keeps a custom floor. */
 export function syncPresentationMode(deck: PresentationDeck, tone: PresentationTone): void {
+  const floor = bareCardColor(tone);
+  const defaults = new Set([bareCardColor("dark"), bareCardColor("light")]);
   for (const page of deck.pages) {
-    if (cardIsBare(page.state) || page.type === 1 || page.tone === tone) continue;
-    applyPresentationTone(page, tone);
-    page.thumb = "";
+    if (!(cardIsBare(page.state) || page.type === 1 || page.tone === tone)) {
+      applyPresentationTone(page, tone);
+      page.thumb = "";
+    }
+    if (defaults.has(page.state.color) && page.state.color !== floor) {
+      page.state.color = floor;
+      page.thumb = "";
+    }
   }
 }
 

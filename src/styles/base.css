@@ -2285,28 +2285,43 @@ html[data-mode="light"] .studio__radius input[type="range"] {
 
 /* Same ground as the code block, so marks and cut-outs match that surface. */
 .studio__theme--speaker,
-.studio__theme--logo {
+.studio__theme--logo,
+.studio__theme--mark {
   background: var(--code-bg);
 }
 
 html[data-mode="dark"] .studio__theme--speaker,
-html[data-mode="dark"] .studio__theme--logo {
+html[data-mode="dark"] .studio__theme--logo,
+html[data-mode="dark"] .studio__theme--mark {
   background: color-mix(in srgb, var(--fg) 6%, var(--studio-ink-dark));
 }
 
 .studio__theme--speaker img,
-.studio__theme--logo img {
+.studio__theme--logo img,
+.studio__theme--mark img {
   object-fit: contain;
 }
 
-.studio__theme--logo img {
+.studio__theme--logo img,
+.studio__theme--mark img {
   padding: 8px;
   box-sizing: border-box;
 }
 
-/* Black-only marks disappear on the dark code ground. Flip those thumbnails so the artwork stays readable; the file colors are unchanged on the card. */
-html[data-mode="dark"] .studio__theme--logo.is-mono img {
+/* Mono ink follows the UI. The file colors on the card stay as they are. */
+html[data-mode="dark"] .studio__theme--logo.is-ink-dark img,
+html[data-mode="dark"] .studio__theme--mark.is-ink-dark img,
+html[data-mode="light"] .studio__theme--logo.is-ink-light img,
+html[data-mode="light"] .studio__theme--mark.is-ink-light img {
   filter: invert(1);
+}
+
+/* Both light and dark ink, so a middle plate keeps either readable in both modes. */
+.studio__theme--logo.is-ink-mixed,
+.studio__theme--mark.is-ink-mixed,
+html[data-mode="dark"] .studio__theme--logo.is-ink-mixed,
+html[data-mode="dark"] .studio__theme--mark.is-ink-mixed {
+  background: color-mix(in srgb, var(--fg) 46%, var(--bg));
 }
 
 .studio__text-style {
