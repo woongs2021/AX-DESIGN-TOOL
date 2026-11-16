@@ -2,7 +2,7 @@
  * PowerPoint-style shell around the shared studio editor.
  * The left rail is the ten pages. The right side is the selected Slide.
  */
-import { PAGE_ENTER_EVENT } from "../shared/presentation-files.ts";
+import { PAGE_ENTER_EVENT, PRESENT_LAYOUT_EVENT } from "../shared/presentation-files.ts";
 import { syncPresentationProject } from "./presentation-project.ts";
 import {
   bindStudio,
@@ -364,6 +364,236 @@ export function renderPresentation(deck: PresentationDeck, index: ConferenceInde
 export function releasePresentationMenu(): void {
   stopPageMenu?.();
   stopPageMenu = null;
+  detachPresent();
+}
+
+let presenting = false;
+let presentDeck: PresentationDeck | null = null;
+let presentChange: (() => void) | null = null;
+let presentShield: HTMLElement | null = null;
+let presentMenu: HTMLElement | null = null;
+let stopPresentKeys: (() => void) | null = null;
+let presentReplay = 0;
+const PRESENT_LONG_PRESS_MS = 500;
+
+let presentOwnsFullscreen = false;
+
+function refitPresent(): void {
+  requestAnimationFrame(() => document.dispatchEvent(new Event(PRESENT_LAYOUT_EVENT)));
+}
+
+function requestPresentFullscreen(): void {
+  const root = document.documentElement;
+  if (document.fullscreenElement === root) {
+    presentOwnsFullscreen = true;
+    return;
+  }
+  if (!root.requestFullscreen) return;
+  void root.requestFullscreen().then(() => {
+    if (!presenting) {
+      if (document.fullscreenElement === root) void document.exitFullscreen()?.catch(() => {});
+      return;
+    }
+    presentOwnsFullscreen = document.fullscreenElement === root;
+  }).catch(() => {
+    presentOwnsFullscreen = false;
+  });
+}
+
+function releasePresentFullscreen(): void {
+  const owned = presentOwnsFullscreen;
+  presentOwnsFullscreen = false;
+  if (owned && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+}
+
+document.addEventListener("fullscreenchange", () => {
+  if (document.fullscreenElement) {
+    if (presenting) refitPresent();
+    return;
+  }
+  if (!presentOwnsFullscreen) return;
+  presentOwnsFullscreen = false;
+  if (presenting) leavePresentationMode();
+});
+
+/** Leaves the full-screen presentation when the route is no longer the deck. */
+export function leavePresentationMode(): void {
+  const was = presenting;
+  presenting = false;
+  presentReplay += 1;
+  detachPresent();
+  document.documentElement.classList.remove("is-presenting");
+  releasePresentFullscreen();
+  if (was) refitPresent();
+}
+
+function detachPresent(): void {
+  stopPresentKeys?.();
+  stopPresentKeys = null;
+  presentShield?.remove();
+  presentShield = null;
+  presentMenu?.remove();
+  presentMenu = null;
+}
+
+function presentStep(delta: number): void {
+  const deck = presentDeck;
+  const change = presentChange;
+  if (!delta || !deck || !change) return;
+  const next = deck.selected + delta;
+  if (!deck.pages[next]) return;
+  presentReplay += 1;
+  presentMenu?.remove();
+  presentMenu = null;
+  clearPicked();
+  deck.selected = next;
+  change();
+}
+
+function openPresentMenu(x: number, y: number): void {
+  presentMenu?.remove();
+  const menu = document.createElement("div");
+  menu.className = "nav-popover studio-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", "프레젠테이션");
+  menu.innerHTML = `<button type="button" class="nav-popover__item" role="menuitem">끄기<span class="studio-menu__hint">Esc</span></button>`;
+  menu.querySelector("button")?.addEventListener("click", () => leavePresentationMode());
+  document.body.append(menu);
+  presentMenu = menu;
+  const box = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - box.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - box.height - 8))}px`;
+  menu.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+}
+
+function showPresent(replay: boolean): void {
+  presenting = true;
+  document.documentElement.classList.add("is-presenting");
+  if (replay) requestPresentFullscreen();
+  refitPresent();
+  detachPresent();
+  const shield = document.createElement("div");
+  shield.className = "present-shield";
+  shield.setAttribute("aria-hidden", "true");
+  document.body.append(shield);
+  presentShield = shield;
+  let press: { id: number; x: number; y: number; moved: boolean; opened: boolean; timer: number } | null = null;
+  const endPress = () => {
+    if (!press) return;
+    window.clearTimeout(press.timer);
+    press = null;
+  };
+  shield.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    if (presentMenu) {
+      presentMenu.remove();
+      presentMenu = null;
+      return;
+    }
+    const current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false, opened: false, timer: 0 };
+    current.timer = window.setTimeout(() => {
+      current.opened = true;
+      openPresentMenu(current.x, current.y);
+    }, PRESENT_LONG_PRESS_MS);
+    press = current;
+    try {
+      shield.setPointerCapture(event.pointerId);
+    } catch {
+      /* the pointer can already be inactive */
+    }
+  });
+  shield.addEventListener("pointermove", (event) => {
+    if (!press || event.pointerId !== press.id || press.moved) return;
+    if (Math.hypot(event.clientX - press.x, event.clientY - press.y) < 8) return;
+    press.moved = true;
+    window.clearTimeout(press.timer);
+  });
+  shield.addEventListener("pointerup", (event) => {
+    if (!press || event.pointerId !== press.id) return;
+    const done = press;
+    endPress();
+    if (done.opened) return;
+    const dx = event.clientX - done.x;
+    const dy = event.clientY - done.y;
+    if (Math.abs(dx) >= 64 && Math.abs(dx) > Math.abs(dy)) {
+      presentStep(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (Math.hypot(dx, dy) <= 8) presentStep(event.clientX < window.innerWidth / 2 ? -1 : 1);
+  });
+  shield.addEventListener("pointercancel", endPress);
+  shield.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    if (press) press.opened = true;
+    endPress();
+    openPresentMenu(event.clientX, event.clientY);
+  });
+  let wheeled = 0;
+  const onWheel = (event: WheelEvent) => {
+    if (Math.abs(event.deltaX) < 24 || Math.abs(event.deltaX) < Math.abs(event.deltaY)) return;
+    const now = performance.now();
+    if (now - wheeled < 450) return;
+    wheeled = now;
+    event.preventDefault();
+    presentStep(event.deltaX > 0 ? 1 : -1);
+  };
+  shield.addEventListener("wheel", onWheel, { passive: false });
+  const onKey = (event: KeyboardEvent) => {
+    if (!presenting) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      const edit =
+        event.code === "KeyZ" ||
+        event.code === "KeyY" ||
+        event.code === "KeyC" ||
+        event.code === "KeyV" ||
+        event.code === "KeyX" ||
+        event.code === "KeyG" ||
+        event.code === "KeyL";
+      if (!edit) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      leavePresentationMode();
+      return;
+    }
+    const forward = event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "PageDown" || event.key === " ";
+    const back = event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "PageUp" || event.key === "Backspace";
+    if (event.key === "Home") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const deck = presentDeck;
+      if (!deck || deck.selected === 0) return;
+      presentStep(-deck.selected);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const deck = presentDeck;
+      if (!deck) return;
+      presentStep(deck.pages.length - 1 - deck.selected);
+      return;
+    }
+    if (!forward && !back && event.key !== "Delete" && event.code !== "KeyI") return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (event.repeat || event.key === "Delete" || event.code === "KeyI") return;
+    presentStep(forward ? 1 : -1);
+  };
+  document.addEventListener("keydown", onKey, true);
+  stopPresentKeys = () => document.removeEventListener("keydown", onKey, true);
+  if (!replay) return;
+  const token = ++presentReplay;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (presenting && token === presentReplay) document.dispatchEvent(new Event(PAGE_ENTER_EVENT));
+    });
+  });
 }
 
 export function bindPresentation(
@@ -389,6 +619,8 @@ export function bindPresentation(
   railObserver?.disconnect();
   railObserver = null;
   thumbMirror += 1;
+  presentDeck = deck;
+  presentChange = onChange;
   const page = deck.pages[deck.selected];
   if (!page) return;
   const deckRoot = root.querySelector<HTMLElement>(".deck");
@@ -488,6 +720,11 @@ export function bindPresentation(
     remember();
     openDeckExport(deck, index);
   });
+  root.querySelector<HTMLButtonElement>("#studio-present")?.addEventListener("click", () => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    showPresent(true);
+  });
+  if (presenting) showPresent(false);
   startThumbMirror();
   paintMissingThumbs(root, deck, index);
   paintTypeThumbs(root, index);

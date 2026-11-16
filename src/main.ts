@@ -53,7 +53,7 @@ import {
   renderStudio,
   type StudioConfig,
 } from "./views/studio.ts";
-import { bindPresentation, releasePresentationMenu, renderPresentation } from "./views/presentation.ts";
+import { bindPresentation, leavePresentationMode, releasePresentationMenu, renderPresentation } from "./views/presentation.ts";
 import {
   clearPresentationDeck,
   defaultsWithPage,
@@ -305,6 +305,7 @@ function render(): void {
     route = { name: "studio", theme: null, card: route.name === "conference" ? route.card : null };
     history.replaceState(null, "", hrefFor(route));
   }
+  if (route.name !== "presentation") leavePresentationMode();
   app.innerHTML = shell(renderMain());
 
   app.querySelector("#index-retry")?.addEventListener("click", () => {
