@@ -1,5 +1,5 @@
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
-import { PAGE_ENTER_EVENT, PAGE_FILES_EVENT, presentationFileUrl } from "../shared/presentation-files.ts";
+import { PAGE_ENTER_EVENT, PAGE_FILES_EVENT, PRESENT_LAYOUT_EVENT, presentationFileUrl } from "../shared/presentation-files.ts";
 import { isPageMedia, uploadPageFiles, type PageFileSource } from "./presentation-project.ts";
 import type { CaptureRecord } from "../shared/index-types.ts";
 import {
@@ -1487,6 +1487,7 @@ async function paintForeignObject(
 }
 
 let previewObserver: ResizeObserver | null = null;
+let stopPresentFit: (() => void) | null = null;
 
 /** A scrollbar that floats over the content and shows only while scrolling. Returns its re-place function. */
 function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLElement): () => void {
@@ -1955,7 +1956,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
           ${LAYER_DISTRIBUTES.map(layerAlignButton).join("")}
           <span class="studio__align-divider" id="studio-image-adjust-divider" hidden></span>
           <button type="button" class="studio__zoom-btn" id="studio-image-adjust-btn" aria-label="이미지 수정" title="이미지 수정" aria-pressed="false" hidden><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M8 16v4"/></svg></button>
-          ${presentation ? `<span class="studio__align-divider" aria-hidden="true"></span><button type="button" class="studio__zoom-btn" id="studio-add-page" aria-label="페이지 추가" title="페이지 추가"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button><button type="button" class="studio__zoom-btn" id="studio-deck-export" aria-label="전체 다운로드" title="전체 다운로드"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg></button>` : ""}
+          ${presentation ? `<span class="studio__align-divider" aria-hidden="true"></span><button type="button" class="studio__zoom-btn" id="studio-add-page" aria-label="페이지 추가" title="페이지 추가"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button><button type="button" class="studio__zoom-btn" id="studio-deck-export" aria-label="전체 다운로드" title="전체 다운로드"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg></button><span class="studio__align-divider" aria-hidden="true"></span><button type="button" class="studio__zoom-btn" id="studio-present" aria-label="프레젠테이션" title="프레젠테이션"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5"/><path d="M15 4h5v5"/><path d="M20 15v5h-5"/><path d="M9 20H4v-5"/></svg></button>` : ""}
         </div>`;
   const panelToggle = presentation
     ? `<button type="button" class="studio__panel-toggle" id="studio-panel-toggle" aria-expanded="${controlsOpen ? "true" : "false"}" aria-controls="studio-controls" aria-label="${controlsOpen ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기"}" title="${controlsOpen ? "컨트롤 패널 접기" : "컨트롤 패널 펼치기"}"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg></button>`
@@ -2976,7 +2977,7 @@ export function bindStudio(
 
   const fitScaleFor = (cardWidth: number, cardHeight: number) => {
     const bounds = stage.getBoundingClientRect();
-    const pad = 20;
+    const pad = document.documentElement.classList.contains("is-presenting") ? 0 : 20;
     const fitScale = Math.min(
       Math.max(bounds.width - pad, 1) / cardWidth,
       Math.max(bounds.height - pad, 1) / cardHeight,
@@ -2987,7 +2988,9 @@ export function bindStudio(
   const updateScale = () => {
     const base = fitScaleFor(state.cardWidth, state.cardHeight);
     syncZoom();
-    const safeScale = base * previewZoom;
+    const presenting = document.documentElement.classList.contains("is-presenting");
+    const safeScale = presenting ? base : base * previewZoom;
+    if (presenting) stage.scrollTo(0, 0);
     fit.style.width = `${state.cardWidth * safeScale}px`;
     fit.style.height = `${state.cardHeight * safeScale}px`;
     scaler.style.width = `${state.cardWidth}px`;
@@ -5551,10 +5554,8 @@ export function bindStudio(
     enterHost = null;
     const layers = state.layers.filter((layer) => layer.enter === "once" || layer.enter === "loop");
     if (layers.length === 0 || !root.isConnected) {
-      if (enterSkip.size > 0) {
-        enterSkip.clear();
-        paint();
-      }
+      if (enterSkip.size > 0) enterSkip.clear();
+      if (root.isConnected) paint();
       return;
     }
     const loadFace = (layer: TextLayer) => {
@@ -8005,6 +8006,12 @@ export function bindStudio(
   previewObserver?.disconnect();
   previewObserver = new ResizeObserver(() => updateScale());
   previewObserver.observe(stage);
+  stopPresentFit?.();
+  const fitPresent = () => {
+    if (stage.isConnected) updateScale();
+  };
+  document.addEventListener(PRESENT_LAYOUT_EVENT, fitPresent);
+  stopPresentFit = () => document.removeEventListener(PRESENT_LAYOUT_EVENT, fitPresent);
 
   let sliding = false;
   const cardShot = (): HTMLCanvasElement | null => {

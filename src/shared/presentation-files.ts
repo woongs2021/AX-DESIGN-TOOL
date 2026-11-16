@@ -7,6 +7,8 @@ export const PRESENTATION_MEDIA_PREFIX = "/__presentation-media/";
 export const PAGE_FILES_EVENT = "ax-page-files";
 /** The open page's preview was clicked again, so its entrance plays once more. */
 export const PAGE_ENTER_EVENT = "ax-page-enter";
+/** Presentation mode started or ended, so the slide refits the screen. */
+export const PRESENT_LAYOUT_EVENT = "ax-present-layout";
 
 export function presentationFileSrc(pageId: string, name: string): string {
   return `${PRESENTATION_FILE_PREFIX}${pageId}/${name}`;

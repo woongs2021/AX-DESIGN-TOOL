@@ -255,6 +255,67 @@ html[data-mode="dark"] .nav-popover {
   display: none;
 }
 
+.present-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: transparent;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+
+html.is-presenting,
+html.is-presenting body {
+  height: 100%;
+  overflow: hidden;
+}
+
+html.is-presenting .top-nav,
+html.is-presenting .studio-devices,
+html.is-presenting .deck__rail-host,
+html.is-presenting .deck__splitter,
+html.is-presenting .studio__controls-wrap,
+html.is-presenting .studio__splitter,
+html.is-presenting .studio__bar,
+html.is-presenting .studio__note,
+html.is-presenting .studio__overlay,
+html.is-presenting .studio__loading {
+  display: none;
+}
+
+html.is-presenting .shell--studio,
+html.is-presenting .deck,
+html.is-presenting .deck__stage,
+html.is-presenting .studio-view,
+html.is-presenting .studio-device-frame,
+html.is-presenting .studio-device,
+html.is-presenting .studio,
+html.is-presenting .studio__preview,
+html.is-presenting .studio__stage {
+  height: 100vh;
+  min-height: 0;
+}
+
+html.is-presenting .deck {
+  display: block;
+}
+
+html.is-presenting .studio {
+  display: block;
+}
+
+html.is-presenting .studio__stage {
+  overflow: hidden;
+  background: var(--bg);
+}
+
+html.is-presenting .studio__stage-frame {
+  height: 100%;
+  min-height: 100%;
+  padding: 0;
+}
+
 .studio-menu__hint {
   color: color-mix(in srgb, var(--fg) 50%, transparent);
   font-size: 12px;
