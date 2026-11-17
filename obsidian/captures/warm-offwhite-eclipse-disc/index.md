@@ -4,6 +4,7 @@ title: "웜 오프화이트 이클립스"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-13-warm-offwhite-eclipse-disc-translation.png
 service: "Hermes studies"
 platform: web
 screenType: marketing

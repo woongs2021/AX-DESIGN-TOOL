@@ -4,6 +4,7 @@ title: "찢긴 버건디·올리브 종이 콜라주"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-11
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-31-torn-burgundy-olive-paper-collage.png
 service: "Hermes studies"
 platform: web
 screenType: detail

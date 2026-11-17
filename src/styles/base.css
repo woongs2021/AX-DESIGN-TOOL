@@ -1883,6 +1883,7 @@ html[data-mode="dark"] .deck .studio__fit {
 
 .studio__tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 20px;
 }
@@ -2571,6 +2572,20 @@ html[data-mode="dark"] .studio__export {
   min-height: 0;
   overflow: auto;
   background: color-mix(in srgb, var(--tint) 35%, var(--bg));
+}
+
+.studio__stage[data-pan="ready"],
+.studio__stage[data-pan="ready"] .studio__scaler canvas,
+.studio__stage[data-pan="ready"] .studio__overlay,
+.studio__stage[data-pan="ready"] .studio__overlay * {
+  cursor: grab;
+}
+
+.studio__stage[data-pan="dragging"],
+.studio__stage[data-pan="dragging"] .studio__scaler canvas,
+.studio__stage[data-pan="dragging"] .studio__overlay,
+.studio__stage[data-pan="dragging"] .studio__overlay * {
+  cursor: grabbing;
 }
 
 .studio__stage[data-loading="true"] {

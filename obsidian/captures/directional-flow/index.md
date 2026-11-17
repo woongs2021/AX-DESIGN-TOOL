@@ -4,6 +4,7 @@ title: "방향성 면 분할 — 대각과 수직 밴드"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-02-directional-flow-translation.png
 service: "Hermes studies"
 platform: web
 screenType: detail

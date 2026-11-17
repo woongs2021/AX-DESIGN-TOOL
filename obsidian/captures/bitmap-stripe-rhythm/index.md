@@ -4,6 +4,7 @@ title: "비트맵 스트라이프 리듬 — 네 열 가로 막대"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-17-bitmap-stripe-rhythm-surface.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

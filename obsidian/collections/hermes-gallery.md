@@ -1,7 +1,7 @@
 ---
 slug: hermes-gallery
 title: "Hermes 비주얼 스터디"
-description: "image-pick-hermes의 정지 스터디 35건."
+description: "Hermes-project-assets Midjourney 카탈로그 64건."
 captures:
   - capsule-pattern
   - directional-flow
@@ -38,8 +38,37 @@ captures:
   - ivory-blind-emboss-relief
   - torn-cobalt-black-paper-edge
   - diagonal-textile-stripe-bands
+  - offset-checker-grid
+  - citrus-arc-blocks
+  - pastel-rolling-ridges
+  - cobalt-diagonal-fold
+  - vermilion-spray-bloom
+  - coral-cyan-edge
+  - blue-brush-horizon
+  - striped-corner-geometry
+  - black-monolith-field
+  - midnight-diagonal-band
+  - ivory-crescent-layers
+  - red-blue-arch
+  - magenta-arc-repeat
+  - indigo-rainbow-arches
+  - watercolor-block-balance
+  - woven-color-lattice
+  - warm-horizontal-washes
+  - prism-sheet-crossing
+  - chromatic-glass-ribbons
+  - liquid-prism-channels
+  - graphite-fold-plane
+  - pastel-horizon-wash
+  - tactile-braille-grid
+  - vermilion-black-planes
+  - mono-grid-blocks
+  - monolithic-ring
+  - coral-soft-dunes
+  - blue-paper-planes
+  - screenprint-flower-bloom
 ---
 
 # Hermes 비주얼 스터디
 
-에르메스 번역 스터디로 모은 색면, 원반, 아치, 발광 링.
+Hermes-project-assets의 Midjourney 카탈로그 64건. 색면, 원반, 아치, 격자, 발광 면.

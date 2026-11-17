@@ -4,6 +4,7 @@ title: "웜 어스 오벌 — 세이지 세로 알"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-07-warm-earth-oval-surface-translation.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

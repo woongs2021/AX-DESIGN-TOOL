@@ -110,6 +110,31 @@ function renderSpiderDiagram(capture: CaptureRecord): string {
   `;
 }
 
+const RELEASE_DOWNLOAD = "https://github.com/woongs2021/Hermes-project-assets/releases/download/";
+
+function releaseDownloadUrl(capture: CaptureRecord): string | null {
+  const url = capture.sourceUrl;
+  return url?.startsWith(RELEASE_DOWNLOAD) ? url : null;
+}
+
+function sourceLabel(url: string): string {
+  if (url.startsWith(RELEASE_DOWNLOAD)) {
+    const tag = url.slice(RELEASE_DOWNLOAD.length).split("/")[0];
+    return tag ? `Release ${tag}` : url;
+  }
+  if (url.includes("/dna-archive/midjourney/")) return "공개 프리뷰";
+  return url;
+}
+
+function originalDownload(capture: CaptureRecord, slug: string): string {
+  const release = releaseDownloadUrl(capture);
+  if (release) {
+    return `<a class="button button--secondary" href="${escapeHtml(release)}" download>원본 다운로드</a>`;
+  }
+  const extension = capture.asset.originalName.split(".").pop();
+  return `<a class="button button--secondary" href="${escapeHtml(assetUrl(capture.asset.path))}" download="${escapeHtml(`${slug}.${extension}`)}">원본 다운로드</a>`;
+}
+
 function renderHashtags(capture: CaptureRecord): string {
   const keywords = [
     ...capture.tags,
@@ -156,7 +181,7 @@ export function renderCaptureDetail(
         </div>
         <div class="detail__actions">
           <a class="button button--secondary" href="${escapeHtml(hrefFor({ name: "studio", theme: slug, card: null }))}">이 테마로 만들기</a>
-          <a class="button button--secondary" href="${escapeHtml(assetUrl(capture.asset.path))}" download="${escapeHtml(`${slug}.${capture.asset.originalName.split(".").pop()}`)}">원본 다운로드</a>
+          ${originalDownload(capture, slug)}
           <button type="button" class="button button--secondary" data-pin-slug="${escapeHtml(slug)}" aria-pressed="${isPinned ? "true" : "false"}">
             ${isPinned ? "Unpin" : "Pin"}
           </button>
@@ -187,7 +212,7 @@ export function renderCaptureDetail(
         </p>
         <p class="detail__meta-line">
           ${escapeHtml(capture.screenType)} · ${escapeHtml(capture.tone)} · ${escapeHtml(capture.copyTone)} · ${escapeHtml(capture.capturedAt)}
-          ${capture.sourceUrl ? ` · <a href="${escapeHtml(capture.sourceUrl)}">${escapeHtml(capture.sourceUrl)}</a>` : ""}
+          ${capture.sourceUrl ? ` · <a href="${escapeHtml(capture.sourceUrl)}">${escapeHtml(sourceLabel(capture.sourceUrl))}</a>` : ""}
         </p>
       </section>
 

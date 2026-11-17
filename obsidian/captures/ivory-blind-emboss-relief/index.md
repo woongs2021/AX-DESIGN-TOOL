@@ -4,6 +4,7 @@ title: "아이보리 블라인드 엠보싱 면"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-11
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-33-ivory-blind-emboss-relief-surface.png
 service: "Hermes studies"
 platform: web
 screenType: detail

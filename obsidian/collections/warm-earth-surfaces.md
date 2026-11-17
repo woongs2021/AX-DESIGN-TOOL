@@ -15,6 +15,13 @@ captures:
   - warm-horizon-brush-field
   - torn-burgundy-olive-collage
   - ivory-blind-emboss-relief
+  - pastel-rolling-ridges
+  - blue-brush-horizon
+  - ivory-crescent-layers
+  - watercolor-block-balance
+  - warm-horizontal-washes
+  - pastel-horizon-wash
+  - coral-soft-dunes
 ---
 
 # 웜 어스 면

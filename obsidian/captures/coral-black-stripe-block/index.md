@@ -4,6 +4,7 @@ title: "코랄 블랙 스트라이프 블록"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-05
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-02-midjourney-23-coral-black-stripe-block-surface.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

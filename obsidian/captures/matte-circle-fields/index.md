@@ -4,6 +4,7 @@ title: "매트 원호 — 테라코타와 세이지"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-05-matte-circle-fields-translation.png
 service: "Hermes studies"
 platform: web
 screenType: detail

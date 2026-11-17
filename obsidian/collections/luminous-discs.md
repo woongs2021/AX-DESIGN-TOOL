@@ -9,6 +9,7 @@ captures:
   - coral-blue-luminous-ring
   - cyan-luminous-arc-edge
   - frosted-blue-glass-disc
+  - monolithic-ring
 ---
 
 # 발광 원반

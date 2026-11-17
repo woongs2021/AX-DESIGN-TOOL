@@ -4,6 +4,7 @@ title: "방사형 꽃잎 — 한 점에서 퍼지는 색면"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-18-floral-radial-signal-bloom.png
 service: "Hermes studies"
 platform: web
 screenType: marketing

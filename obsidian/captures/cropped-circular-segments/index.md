@@ -4,6 +4,7 @@ title: "잘린 원형 색 분할"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-05
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-27-cropped-circular-color-segment-surface.png
 service: "Hermes studies"
 platform: web
 screenType: detail

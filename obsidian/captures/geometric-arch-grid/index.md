@@ -4,6 +4,7 @@ title: "아치 크롭 — 어두운 곡선과 블루그레이 기단"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-03-geometric-arch-grid-translation.png
 service: "Hermes studies"
 platform: web
 screenType: marketing

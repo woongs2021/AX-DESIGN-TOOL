@@ -4,6 +4,7 @@ title: "앰비언트 그라데이션 — 틸과 피치"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney11-current-mockups-2026-11-14/midjourney-11-current-still_v2-4k.png
 service: "Hermes studies"
 platform: web
 screenType: marketing

@@ -12,7 +12,7 @@ summary: Hermes 비주얼 스터디에서 누적한 지식 페이지 목록.
 
 ## Services
 
-- [Hermes studies](services/hermes-studies.md) — image-pick-hermes 정지 스터디.
+- [Hermes studies](services/hermes-studies.md) — Hermes-project-assets Midjourney 카탈로그 64건.
 
 ## Comparisons
 

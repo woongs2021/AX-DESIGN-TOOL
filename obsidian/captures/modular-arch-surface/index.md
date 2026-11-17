@@ -4,6 +4,7 @@ title: "모듈 아치 그리드 — 머스타드 세로선"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-04-modular-arch-surface-translation.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

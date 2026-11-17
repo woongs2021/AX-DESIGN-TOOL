@@ -4,6 +4,7 @@ title: "모노크롬 건축 블록 — 수직 기둥과 사선 면"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-20-monochrome-architectural-block-surface.png
 service: "Hermes studies"
 platform: web
 screenType: detail

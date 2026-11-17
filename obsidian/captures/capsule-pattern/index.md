@@ -4,6 +4,7 @@ title: "캡슐 패턴 — 네이비 세로 캡슐"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-01-capsule-pattern-translation.png
 service: "Hermes studies"
 platform: web
 screenType: gallery
