@@ -3,6 +3,1050 @@
     {
       "appVersion": null,
       "asset": {
+        "bytes": 233032,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "2227d3581932d70115aeded3d92b75d1b26214b94ebcf80303147cc15162fd6b",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/blue-paper-planes/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/blue-paper-planes/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n왼쪽의 진한 파랑 사각형이 가장 앞에 있고, 오른쪽에는 아이보리 판이 세로로 서 있다. 틈으로 더 옅은 파랑이 보인다.\n\n## Color\n\n여러 단계의 파랑과 아이보리. 종이 결과 얇은 그림자가 있다.\n\n## Graphic asset\n\n겹친 판의 층으로 위계를 만드는 스터디다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "푸른 종이 판이 서로 다른 높이로 겹친다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "blue-paper-planes",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/64_blue_paper_planes_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "블루 종이 — 겹친 푸른 판",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 136563,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "6455652ab3eecc5925881343a89038e66e02005ec2bfeb378e6f3049211046ef",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/coral-soft-dunes/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/coral-soft-dunes/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n위는 하늘색이고, 언덕은 아래로 갈수록 붉고 가까워진다. 경계는 부드럽다.\n\n## Color\n\n하늘색, 피치, 코랄, 연한 빨강. 매트한 결이다.\n\n## Graphic asset\n\n겹친 능선을 수평으로 잘라 쓰는 색면 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "세 개의 코랄 능선이 하늘 아래에서 겹친다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "coral-soft-dunes",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/63_coral_soft_dunes_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "코랄 언덕 — 하늘 아래 붉은 능선",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 221689,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "ada7eef20c65f3cbd0af6aafe6b8fb0797914e760394f9f61ab6a512543c7b79",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/graphite-fold-plane/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/graphite-fold-plane/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n접힌 모서리는 왼쪽 위에서 오른쪽 아래로 내려온다. 위는 그래파이트, 아래는 밝은 회색이다.\n\n## Color\n\n그래파이트와 밝은 회색. 둘 다 미세한 입자이고 대비는 그림자가 만든다.\n\n## Graphic asset\n\n접힘 하나와 그림자로 깊이를 만드는 면 스터디다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "검은 면이 접히며 아래 흰 종이에 그림자를 떨어뜨린다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "graphite-fold-plane",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/57_graphite_fold_plane_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "그래파이트 접힘 — 검은 면의 그림자",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 211650,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "e316d252a05fe13faa1a2d7dbd8028c60bdb1e4f46e353de2230ea58c74c3bcb",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/mono-grid-blocks/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/mono-grid-blocks/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n막대는 세로와 가로로 화면을 넘고, 배경 격자는 구간마다 밀도가 다르다.\n\n## Color\n\n검정, 흰색, 회색 선. 막대는 평평하고 격자는 가늘다.\n\n## Graphic asset\n\n막대와 격자를 겹친 모노 패턴 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "검은 막대가 가는 선 격자 위에 불규칙하게 놓인다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "mono-grid-blocks",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/61_mono_grid_blocks_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "모노 그리드 — 검은 막대와 선 격자",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 188843,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "c97e376ede5b4cbf772ba27d29045d5f44ef2306546e04141f909c6874d006fd",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/monolithic-ring/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/monolithic-ring/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n고리는 화면 중심에 있고 밖으로 잘리지 않는다. 안쪽 원은 바깥과 같은 흰색이다.\n\n## Color\n\n검정과 흰색. 고리는 짧은 결이 있고 배경은 종이 질감이다.\n\n## Graphic asset\n\n하나의 링만 남기는 그래픽 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "두꺼운 검은 고리 하나가 흰 여백의 가운데에 있다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "monolithic-ring",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/62_monolithic_ring_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "모놀리식 링 — 흰 면 위의 검은 고리",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 214413,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "7dd5afdd0553bad6241e62082a137031bb6bb17b80c32a44511071e57fe503ad",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/pastel-horizon-wash/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/pastel-horizon-wash/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n위는 넓은 워시이고 아래는 흰 종이 위에 옅은 파랑과 베이지가 있다. 경계는 번진다.\n\n## Color\n\n하늘색, 살구, 연한 파랑, 아이보리.\n\n## Graphic asset\n\n수평 워시와 가는 선으로 된 그래픽이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "하늘색이 살구로 내려오고, 아래쪽 얇은 파랑 선이 수평선을 만든다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "pastel-horizon-wash",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/58_pastel_horizon_wash_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "파스텔 수평선 — 하늘과 살구 수채",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 208788,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "7537ffdebb047fca4a0f116613adfc9c890cb9da3123ebcbe486dffe4b7edacc",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/screenprint-flower-bloom/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/screenprint-flower-bloom/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n꽃술은 주황과 빨강이고, 배경은 시안과 아이보리 면이다. 가장자리에 인쇄 번짐이 있다.\n\n## Color\n\n분홍, 마젠타, 주황, 시안, 검정, 아이보리.\n\n## Graphic asset\n\n꽃 하나를 크게 크롭한 실크스크린 그래픽이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "큰 분홍 꽃이 화면을 채우고 검정 잎이 모서리에서 잘린다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "screenprint-flower-bloom",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/65_screenprint_flower_bloom_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "실크스크린 꽃 — 분홍 꽃과 검정 잎",
+      "tone": "playful",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 302205,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "c20c43b4ad8e045feedf04b2bd7235df58081aa3e7b3bd658f1145491bb1c585",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/tactile-braille-grid/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/tactile-braille-grid/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n점은 작은 격자이고, 밀도가 높은 곳이 형태가 된다. 색 변화는 거의 없다.\n\n## Color\n\n흰색과 옅은 그림자. 종이 결 위의 양각이다.\n\n## Graphic asset\n\n밀도 차이만으로 형태를 만드는 촉각 패턴이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "돋운 점이 오른쪽과 가운데 줄에 모이고 왼쪽 아래는 비어 있다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "tactile-braille-grid",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/59_tactile_braille_grid_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "점자 그리드 — 흰 면의 돋운 점",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 204617,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "1f037fcc19631a776b5895fa960dbc04c893f45f55dfa8300bf2107126754660",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/vermilion-black-planes/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/vermilion-black-planes/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n형태는 화면 가장자리에서 잘리고, 왼쪽과 오른쪽에 얇은 아이보리 여백이 있다.\n\n## Color\n\n버밀리온, 검정, 아이보리. 인쇄된 종이 결이다.\n\n## Graphic asset\n\n큰 평면과 날카로운 삼각형을 잘라 쓰는 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-14",
+      "copyTone": "restrained",
+      "insight": "큰 빨강 면 사이로 검정 삼각형이 끼어 든다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "vermilion-black-planes",
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-11-14/60_vermilion_black_planes_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "버밀리온 평면 — 빨강과 검정 삼각형",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 188039,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "32edb3071e0c0c64a874cbef96b6b40a0e25c8b4027b6d0e5c2cc3e82647b76d",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/black-monolith-field/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/black-monolith-field/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n아래는 옅은 푸른 바닥이고, 검은 면은 오른쪽과 아래로 잘린다. 왼쪽 모서리는 기울어 있다.\n\n## Color\n\n하늘색, 검정, 연한 파랑. 면은 매트하다.\n\n## Graphic asset\n\n큰 색면 하나를 프레임 안에 세워 두는 스터디다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "검은 덩어리가 오른쪽을 막고, 왼쪽 위에 하늘이 남는다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "black-monolith-field",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/44_black-monolith-field_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "블랙 모놀리스 — 파란 하늘 위의 검은 면",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 232902,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "2ecea5bb255eec48bdb2bc89deddd4aa0c4241d722328b91d34d6c33a932bcd3",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/blue-brush-horizon/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/blue-brush-horizon/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n위쪽은 비어 있고, 아래 1/3에 굵은 파랑 획이 화면을 가로지른다. 획 사이로 피치가 비친다.\n\n## Color\n\n피치와 파랑. 붓 결이 수평으로 남는다.\n\n## Graphic asset\n\n하나의 수평 획으로 위계를 만드는 그래픽이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "피치 들판 아래쪽에 푸른 붓질이 수평선을 만든다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "blue-brush-horizon",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/42_blue-brush-horizon_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "블루 브러시 — 피치 면 위의 수평선",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 138209,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "3a7b36a67ccfa68aa823417cb82c880ea1d77ac486489ca49642395f7d323af7",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/chromatic-glass-ribbons/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/chromatic-glass-ribbons/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n시안 면이 왼쪽을 차지하고, 주황과 마젠타 줄기가 오른쪽 아래로 모인다.\n\n## Color\n\n시안, 주황, 마젠타, 노랑, 파랑. 표면은 매끄럽고 반사가 길다.\n\n## Graphic asset\n\n흐르는 색 줄기를 크롭한 재질 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "굵은 색 줄기가 대각으로 흐르고 그 사이에 흰 하이라이트가 있다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "chromatic-glass-ribbons",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/55_chromatic-glass-ribbons_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "크로매틱 리본 — 유리빛 색 줄기",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 232583,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "d971d6f9871fa520ca026843ac4825fe772976ffcada4232f9ad93c3a5c261b2",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/citrus-arc-blocks/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/citrus-arc-blocks/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n왼쪽 위와 오른쪽 아래는 잘린 라임 원이고, 왼쪽 아래와 오른쪽 위는 검정 원호다. 흰 배경이 호 사이의 여백이다.\n\n## Color\n\n라임, 검정, 아이보리. 종이 결이 면 전체를 덮는다.\n\n## Graphic asset\n\n잘린 원호를 프레임으로 쓰는 그래픽 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "큰 원호 두 개가 흰 틈을 남기며 화면을 나눈다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "citrus-arc-blocks",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/37_citrus-arc-blocks_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "시트러스 아치 — 라임과 검정 원호",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 262343,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "a7185f21d5a02e6e9301b03c60c47f27e593c0a21b226738dc456a6d196cc6f3",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/cobalt-diagonal-fold/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/cobalt-diagonal-fold/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n왼쪽 위는 세로 주름이 있는 코발트 면이고, 오른쪽 아래는 넓은 아이보리 종이다. 경계는 왼쪽 아래에서 오른쪽 위로 올라간다.\n\n## Color\n\n코발트와 아이보리. 파랑은 골이 있고 아이보리는 짧은 종이 결이다.\n\n## Graphic asset\n\n두 재질을 대각으로 맞붙인 면 스터디다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "대각선 하나가 주름진 파랑과 매트한 아이보리를 가른다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "cobalt-diagonal-fold",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/39_cobalt-diagonal-fold_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "코발트 대각 — 주름진 파랑 면",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 213415,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "cf521c45fbd2596774eb86c8027d11953d56d6f49cf51261f897ca3d41884e93",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/coral-cyan-edge/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/coral-cyan-edge/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n왼쪽은 빈 아이보리이고, 오른쪽 가장자리에만 코랄 띠와 시안 면이 있다. 띠 사이에 얇은 흰 선이 있다.\n\n## Color\n\n아이보리, 코랄, 시안. 모두 종이 결이다.\n\n## Graphic asset\n\n가장자리 띠만 남기는 크롭 원판에 가깝다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "넓은 아이보리 옆에 코랄과 시안이 세로 띠로 붙는다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "coral-cyan-edge",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/41_coral-cyan-edge_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "코랄 가장자리 — 아이보리와 시안 띠",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 323845,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "99d0bd3ba616693bdc7946f97b5c09a3d2d33ad6c171e53ff18b59e965d7dbfb",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/indigo-rainbow-arches/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/indigo-rainbow-arches/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n호는 오른쪽에서 크게 열리고 왼쪽 아래에도 잘린 호가 있다. 선은 호보다 얇다.\n\n## Color\n\n인디고, 분홍, 시안. 종이 위에 인쇄된 결이다.\n\n## Graphic asset\n\n겹친 호를 크롭해 쓰는 그래픽 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "분홍 호가 인디고 위에서 겹치고, 시안 선이 가장자리를 따라간다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "indigo-rainbow-arches",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/49_indigo-rainbow-arches_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "인디고 무지개 — 분홍 호와 시안 선",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 120490,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "b6929a315d6a6f8602bdca30651107a06df08513ea2c0603ceac5080cf154c98",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/ivory-crescent-layers/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/ivory-crescent-layers/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n호는 왼쪽에서 들어와 오른쪽 위로 빠진다. 위쪽 면은 한 톤 어둡고, 호 아래는 부드러운 그림자가 있다.\n\n## Color\n\n아이보리와 베이지. 종이 결이고 대비는 낮다.\n\n## Graphic asset\n\n겹친 호의 두께와 그림자로 위계를 만드는 스터디다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "두꺼운 아이보리 원호가 같은 색 면 위에 그림자를 남긴다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "ivory-crescent-layers",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/46_ivory-crescent-layers_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "아이보리 초승 — 겹친 종이 원호",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 191805,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "7d6eb405508a381d57f140491f0297f3aff23d3c72389b1e144661bc1fc919e8",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/liquid-prism-channels/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/liquid-prism-channels/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n홈은 오른쪽 위에서 아래로 흐르고, 왼쪽은 비교적 넓은 시안 면이다. 검은 틈이 홈 사이에 있다.\n\n## Color\n\n시안, 마젠타, 금색, 파랑. 액체처럼 휘어진 반사다.\n\n## Graphic asset\n\n굽은 홈의 방향만 남기는 재질 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "굽은 홈이 파란 면 위에서 무지개 가장자리를 만든다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "liquid-prism-channels",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/56_liquid-prism-channels_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "액체 프리즘 — 굽은 무지개 홈",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 313642,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "2535da9172c934093262f24106275a4817d1af171fdadb6e9f2008894865c25f",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/magenta-arc-repeat/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/magenta-arc-repeat/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n호는 화면 가장자리에서 잘리고, 열은 어긋나 있다. 배경은 빈틈없이 채워진다.\n\n## Color\n\n마젠타, 연분홍, 시안. 짧은 입자 결이다.\n\n## Graphic asset\n\n반복 타일로 쓰기 좋은 아치 패턴이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "같은 호가 마젠타 위에서 분홍과 시안으로 번갈아 반복된다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "magenta-arc-repeat",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/48_magenta-arc-repeat_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "마젠타 아치 — 반복되는 분홍과 시안",
+      "tone": "playful",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 149130,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "c6675c06e128718cbaee421445e1886df8e5cb9f1ec1128c577dc7a35da8f9f0",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/midnight-diagonal-band/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/midnight-diagonal-band/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n위는 남색, 가운데는 검정, 아래는 연한 파랑이다. 두 경계가 같은 방향으로 기울어 있다.\n\n## Color\n\n남색, 검정, 연한 파랑. 결은 고르고 매트하다.\n\n## Graphic asset\n\n세 개의 대각 면으로 된 그래픽 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "넓은 검정 밴드가 남색과 연한 파랑을 대각으로 가른다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "midnight-diagonal-band",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/45_midnight-diagonal-band_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "미드나잇 대각 — 남색과 검정 밴드",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 59366,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "e4c28ef67ad0716187c7133592ccc3e73c1524d665bf33910616c5aa4dddc21c",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/offset-checker-grid/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/offset-checker-grid/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n정사각 흑백 칸이 대부분 체커로 맞물리고, 가운데 아래쪽 한 줄만 반 칸 어긋난다. 그 어긋남이 화면의 이음이 된다.\n\n## Color\n\n검정과 흰색만 있다. 면은 평평하고 질감이 거의 없다.\n\n## Graphic asset\n\n반복 패턴 원판이다. 어긋난 줄만 남기고 나머지는 타일로 잘라도 된다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "격자 한 줄이 반 칸 밀려, 반복이 경계에서 리듬으로 바뀐다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "offset-checker-grid",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/36_offset-checker-grid_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "어긋난 격자 — 흑백 체커",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 209405,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "2e9e46535ccca1ba5a10696e7e6d3db88e825697e52b49b805bbff08d2c71466",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/pastel-rolling-ridges/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/pastel-rolling-ridges/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n코랄, 시안, 피치 언덕이 위에서 아래로 포개진다. 능선은 화면 밖으로 잘리고 경계는 부드럽게 겹친다.\n\n## Color\n\n코랄, 시안, 피치, 연한 하늘. 입자 같은 결이 면에 있다.\n\n## Graphic asset\n\n풍경이라기보다 겹친 색 띠의 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "겹친 능선이 하늘 아래에서 수평으로 흐른다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "pastel-rolling-ridges",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/38_pastel-rolling-ridges_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "파스텔 능선 — 코랄과 시안 언덕",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 98978,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "8bd95facb2066c4898a3562aaedeb59a57df010ff38d09bc141c28c7facc6e98",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/prism-sheet-crossing/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/prism-sheet-crossing/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n막은 왼쪽 아래와 오른쪽 위로 달리고, 검은 틈이 모서리에 남는다. 하이라이트는 가늘다.\n\n## Color\n\n시안, 마젠타, 주황, 파랑, 검정. 유리처럼 반사된다.\n\n## Graphic asset\n\n재질 스터디다. 형태보다 교차하는 빛의 띠가 위계다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "두 장의 투명한 막이 대각으로 교차하며 무지개를 낸다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "prism-sheet-crossing",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/54_prism-sheet-crossing_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "프리즘 시트 — 교차하는 무지개 막",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 328077,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "b3af5b91fcbd647df9991615840cf18c2cc6e818c53c3d776477ef02d839cd28",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/red-blue-arch/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/red-blue-arch/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n빨강은 왼쪽과 아래에서 화면을 넘어오고, 파랑은 오른쪽 위 모서리에만 있다. 흰 여백이 둘을 분리한다.\n\n## Color\n\n빨강, 파랑, 아이보리. 입자가 있는 인쇄 면이다.\n\n## Graphic asset\n\n굵은 호 하나를 남기고 나머지는 프레임으로 잘리는 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "빨간 아치가 아래를 열고, 파란 원이 오른쪽 위에서 잘린다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "red-blue-arch",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/47_red-blue-arch_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "레드 블루 아치 — 흰 면 위의 굵은 호",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 258740,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "b05731024c37ca82a22080e5bc654e79feebb513446b1cacbd20cd0f5e0ad27a",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/striped-corner-geometry/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/striped-corner-geometry/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n왼쪽은 코랄, 검정, 아이보리, 빨강 줄이고 오른쪽 아래는 분홍 삼각형이다. 줄은 화면 위아래에서 잘린다.\n\n## Color\n\n코랄, 빨강, 분홍, 검정, 아이보리. 인쇄된 종이 결이다.\n\n## Graphic asset\n\n줄과 사선을 잘라 쓰는 패턴 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "세로 줄과 대각 면이 오른쪽 아래에서 만난다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "striped-corner-geometry",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/43_striped-corner-geometry_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "줄무늬 모서리 — 빨강과 분홍 면",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 175888,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "83f4ae54c6fec7a4d3ac18dece62fd70f137209ae97370947d4d1d5d8e274e59",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/vermilion-spray-bloom/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/vermilion-spray-bloom/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n형태는 화면 왼쪽에 붙고 오른쪽은 거의 비어 있다. 가장자리는 스프레이처럼 점차 끊긴다.\n\n## Color\n\n버밀리온과 검정. 검은 면은 미세한 입자이고 빨강은 가장자리에서 성긴다.\n\n## Graphic asset\n\n하나의 번짐을 중심에 두고 나머지를 여백으로 두는 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "붉은 안개가 왼쪽에서 나와 검은 여백으로 흩어진다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "vermilion-spray-bloom",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/40_vermilion-spray-bloom_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "버밀리온 스프레이 — 검은 면 위의 붉은 번짐",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 23538,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "8739e87695ab3a8caec9b64972559eaebf69f779b9d12c52c99c0568d553d4b8",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/warm-horizontal-washes/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/warm-horizontal-washes/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n띠의 경계는 곧지 않고 한쪽이 더 두껍다. 화면은 여백 없이 채워진다.\n\n## Color\n\n살구, 오렌지, 코랄, 분홍, 블루. 수채처럼 가장자리가 번진다.\n\n## Graphic asset\n\n수평 색 띠를 잘라 쓰는 워시 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "수평 색 띠가 위에서 아래로 살구, 코랄, 분홍을 지나 블루에서 멈춘다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "warm-horizontal-washes",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/52_warm-horizontal-washes_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "따뜻한 수평 워시 — 살구에서 블루",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 193793,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "c1cb82206e1df75204ead760db019428bea94f6ded980f6f003773fe0a58292f",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/watercolor-block-balance/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/watercolor-block-balance/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n위에는 옅은 베이지 사각형, 왼쪽에는 오렌지에서 피치로 번지는 면, 오른쪽 아래에는 파란 사각형이 있다.\n\n## Color\n\n오렌지, 피치, 블루, 아이보리. 가장자리는 물감처럼 흩어진다.\n\n## Graphic asset\n\n세 개의 불투명하지 않은 블록을 배치한 스터디다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "번진 오렌지 면과 파란 사각형이 흰 여백 안에서 균형을 맞춘다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "watercolor-block-balance",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/50_watercolor-block-balance_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "수채 블록 — 오렌지와 블루 면",
+      "tone": "calm",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
+        "bytes": 211007,
+        "durationSec": null,
+        "format": "jpeg",
+        "frameCount": null,
+        "hash": "d9e9937a90b0f8ad2965e88deca5d92a33bef419ab068cb4b3fb870173da966a",
+        "height": 1024,
+        "kind": "still",
+        "originalName": "capture.jpg",
+        "path": "assets/captures/woven-color-lattice/capture.jpg",
+        "posterPath": null,
+        "thumbPath": "assets/captures/woven-color-lattice/capture.thumb.webp",
+        "width": 1024
+      },
+      "body": "\n## Layout\n\n버건디와 머스터드 띠가 서로 위아래로 지나가고, 틈에 아이보리와 초록 사각형이 보인다.\n\n## Color\n\n버건디, 머스터드, 아이보리, 딥 그린. 직물처럼 짧은 결이 있다.\n\n## Graphic asset\n\n반복 직조 패턴 원판이다.\n\n## Typography\n\n글자가 없다. 위계는 형태 크기와 색의 대비로만 생긴다.\n\n## Interaction\n\n정지 이미지라 호버·전환·클릭 피드백은 보이지 않는다.\n",
+      "capturedAt": "2026-11-08",
+      "copyTone": "restrained",
+      "insight": "대각으로 교차하는 띠가 격자 구멍을 남긴다.",
+      "platform": "web",
+      "screenType": "gallery",
+      "service": "Hermes studies",
+      "slug": "woven-color-lattice",
+      "sourceUrl": "https://woongs2021.github.io/Hermes-project-webapp/assets/dna-archive/midjourney/2026-11-08/51_woven-color-lattice_manual_midjourney.jpg",
+      "tags": [
+        "color",
+        "gallery"
+      ],
+      "title": "직조 격자 — 버건디와 머스터드",
+      "tone": "editorial",
+      "uiPatterns": [
+        "card-grid"
+      ],
+      "visibility": "public"
+    },
+    {
+      "appVersion": null,
+      "asset": {
         "bytes": 13140727,
         "durationSec": null,
         "format": "png",
@@ -24,7 +1068,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "diagonal-textile-stripe-bands",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-35-diagonal-textile-stripe-bands.png",
       "tags": [
         "color",
         "density"
@@ -60,7 +1104,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "ivory-blind-emboss-relief",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-33-ivory-blind-emboss-relief-surface.png",
       "tags": [
         "color"
       ],
@@ -95,7 +1139,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "rounded-overprint-color-blocks",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-32-rounded-overprint-color-blocks.png",
       "tags": [
         "color"
       ],
@@ -130,7 +1174,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "torn-burgundy-olive-collage",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-31-torn-burgundy-olive-paper-collage.png",
       "tags": [
         "color"
       ],
@@ -165,7 +1209,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "torn-cobalt-black-paper-edge",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-34-torn-cobalt-black-paper-edge.png",
       "tags": [
         "color"
       ],
@@ -200,7 +1244,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "black-mountain-red-horizon",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-24-black-mountain-red-horizon-paper-surface.png",
       "tags": [
         "color"
       ],
@@ -235,7 +1279,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "coral-black-stripe-block",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-02-midjourney-23-coral-black-stripe-block-surface.png",
       "tags": [
         "color",
         "density"
@@ -271,7 +1315,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "cropped-circular-segments",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-27-cropped-circular-color-segment-surface.png",
       "tags": [
         "color"
       ],
@@ -306,7 +1350,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "deep-teal-pinch-light",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-25-deep-teal-pinch-light-field.png",
       "tags": [
         "color"
       ],
@@ -341,7 +1385,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "electric-blue-pinch-fold",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-28-electric-blue-pinch-fold-field.png",
       "tags": [
         "color"
       ],
@@ -376,7 +1420,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "textile-horizontal-bands",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-02-midjourney-21-textile-horizontal-band-system.png",
       "tags": [
         "color"
       ],
@@ -411,7 +1455,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "textile-vertical-bar-grid",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-29-textile-vertical-bar-grid-pattern.png",
       "tags": [
         "color",
         "density"
@@ -447,7 +1491,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "warm-amber-folded-surface",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-26-warm-amber-folded-surface.png",
       "tags": [
         "color"
       ],
@@ -482,7 +1526,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "warm-horizon-brush-field",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-30-warm-horizon-brush-field.png",
       "tags": [
         "color"
       ],
@@ -517,7 +1561,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "woven-modular-block-grid",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-02-midjourney-22-woven-modular-block-grid.png",
       "tags": [
         "color",
         "cards",
@@ -554,7 +1598,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "bitmap-stripe-rhythm",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-17-bitmap-stripe-rhythm-surface.png",
       "tags": [
         "color",
         "density"
@@ -590,7 +1634,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "floral-radial-bloom",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-18-floral-radial-signal-bloom.png",
       "tags": [
         "color"
       ],
@@ -625,7 +1669,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "iridescent-chrome-field",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-19-iridescent-chrome-material-field.jpg",
       "tags": [
         "color"
       ],
@@ -660,7 +1704,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "monochrome-architectural-block",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-20-monochrome-architectural-block-surface.png",
       "tags": [
         "color",
         "navigation"
@@ -696,7 +1740,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "ambient-blue-peach-gradient",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney11-current-mockups-2026-11-14/midjourney-11-current-still_v2-4k.png",
       "tags": [
         "color"
       ],
@@ -731,7 +1775,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "angular-shadow-surface",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-10-angular-shadow-surface-translation.png",
       "tags": [
         "color"
       ],
@@ -766,7 +1810,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "capsule-pattern",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-01-capsule-pattern-translation.png",
       "tags": [
         "color",
         "cards",
@@ -803,7 +1847,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "complete-circle-disc",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-06-complete-circle-disc-translation.png",
       "tags": [
         "color",
         "empty-state"
@@ -839,7 +1883,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "coral-blue-luminous-ring",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-14-coral-blue-luminous-ring-translation.png",
       "tags": [
         "color",
         "motion"
@@ -875,7 +1919,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "cyan-luminous-arc-edge",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-15-cyan-luminous-arc-edge-translation.png",
       "tags": [
         "color",
         "motion"
@@ -911,7 +1955,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "deep-blue-halo-disc",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-12-deep-blue-halo-disc-translation.png",
       "tags": [
         "color"
       ],
@@ -946,7 +1990,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "directional-flow",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-02-directional-flow-translation.png",
       "tags": [
         "color",
         "navigation"
@@ -982,7 +2026,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "frosted-blue-glass-disc",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-16-frosted-blue-glass-disc-translation.png",
       "tags": [
         "color"
       ],
@@ -1017,7 +2061,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "geometric-arch-grid",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-03-geometric-arch-grid-translation.png",
       "tags": [
         "color"
       ],
@@ -1052,7 +2096,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "matte-circle-fields",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-05-matte-circle-fields-translation.png",
       "tags": [
         "color"
       ],
@@ -1087,7 +2131,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "modular-arch-surface",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-04-modular-arch-surface-translation.png",
       "tags": [
         "color",
         "cards",
@@ -1124,7 +2168,7 @@
       "screenType": "detail",
       "service": "Hermes studies",
       "slug": "orbit-circle-signal",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-09-orbit-circle-signal-translation.png",
       "tags": [
         "color",
         "navigation"
@@ -1160,7 +2204,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "soft-circular-ring",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-08-soft-circular-ring-translation.png",
       "tags": [
         "color",
         "motion"
@@ -1196,7 +2240,7 @@
       "screenType": "gallery",
       "service": "Hermes studies",
       "slug": "warm-earth-oval",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-07-warm-earth-oval-surface-translation.png",
       "tags": [
         "color",
         "cards"
@@ -1232,7 +2276,7 @@
       "screenType": "marketing",
       "service": "Hermes studies",
       "slug": "warm-offwhite-eclipse-disc",
-      "sourceUrl": null,
+      "sourceUrl": "https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-13-warm-offwhite-eclipse-disc-translation.png",
       "tags": [
         "color"
       ],
@@ -1258,14 +2302,20 @@
         "woven-modular-block-grid",
         "coral-black-stripe-block",
         "textile-vertical-bar-grid",
-        "diagonal-textile-stripe-bands"
+        "diagonal-textile-stripe-bands",
+        "offset-checker-grid",
+        "cobalt-diagonal-fold",
+        "striped-corner-geometry",
+        "midnight-diagonal-band",
+        "woven-color-lattice",
+        "mono-grid-blocks"
       ],
       "description": "격자, 대각, 궤도 선으로 방향을 만드는 스터디.",
       "slug": "geometric-structures",
       "title": "기하 구조"
     },
     {
-      "body": "\n# Hermes 비주얼 스터디\n\n에르메스 번역 스터디로 모은 색면, 원반, 아치, 발광 링.\n",
+      "body": "\n# Hermes 비주얼 스터디\n\nHermes-project-assets의 Midjourney 카탈로그 64건. 색면, 원반, 아치, 격자, 발광 면.\n",
       "captures": [
         "capsule-pattern",
         "directional-flow",
@@ -1301,9 +2351,38 @@
         "rounded-overprint-color-blocks",
         "ivory-blind-emboss-relief",
         "torn-cobalt-black-paper-edge",
-        "diagonal-textile-stripe-bands"
+        "diagonal-textile-stripe-bands",
+        "offset-checker-grid",
+        "citrus-arc-blocks",
+        "pastel-rolling-ridges",
+        "cobalt-diagonal-fold",
+        "vermilion-spray-bloom",
+        "coral-cyan-edge",
+        "blue-brush-horizon",
+        "striped-corner-geometry",
+        "black-monolith-field",
+        "midnight-diagonal-band",
+        "ivory-crescent-layers",
+        "red-blue-arch",
+        "magenta-arc-repeat",
+        "indigo-rainbow-arches",
+        "watercolor-block-balance",
+        "woven-color-lattice",
+        "warm-horizontal-washes",
+        "prism-sheet-crossing",
+        "chromatic-glass-ribbons",
+        "liquid-prism-channels",
+        "graphite-fold-plane",
+        "pastel-horizon-wash",
+        "tactile-braille-grid",
+        "vermilion-black-planes",
+        "mono-grid-blocks",
+        "monolithic-ring",
+        "coral-soft-dunes",
+        "blue-paper-planes",
+        "screenprint-flower-bloom"
       ],
-      "description": "image-pick-hermes의 정지 스터디 35건.",
+      "description": "Hermes-project-assets Midjourney 카탈로그 64건.",
       "slug": "hermes-gallery",
       "title": "Hermes 비주얼 스터디"
     },
@@ -1315,7 +2394,8 @@
         "deep-blue-halo-disc",
         "coral-blue-luminous-ring",
         "cyan-luminous-arc-edge",
-        "frosted-blue-glass-disc"
+        "frosted-blue-glass-disc",
+        "monolithic-ring"
       ],
       "description": "원, 링, 헤일로가 중심인 스터디.",
       "slug": "luminous-discs",
@@ -1335,7 +2415,14 @@
         "cropped-circular-segments",
         "warm-horizon-brush-field",
         "torn-burgundy-olive-collage",
-        "ivory-blind-emboss-relief"
+        "ivory-blind-emboss-relief",
+        "pastel-rolling-ridges",
+        "blue-brush-horizon",
+        "ivory-crescent-layers",
+        "watercolor-block-balance",
+        "warm-horizontal-washes",
+        "pastel-horizon-wash",
+        "coral-soft-dunes"
       ],
       "description": "베이지, 테라코타, 세이지가 종이 질감으로 겹친 스터디.",
       "slug": "warm-earth-surfaces",
@@ -1344,30 +2431,30 @@
   ],
   "facets": {
     "platform": {
-      "web": 35
+      "web": 64
     },
     "screenType": {
       "detail": 15,
-      "gallery": 10,
+      "gallery": 39,
       "marketing": 10
     },
     "tag": {
       "cards": 4,
-      "color": 35,
+      "color": 64,
       "density": 5,
       "empty-state": 1,
-      "gallery": 2,
+      "gallery": 31,
       "motion": 3,
       "navigation": 3
     },
     "tone": {
-      "calm": 15,
-      "editorial": 15,
+      "calm": 27,
+      "editorial": 30,
       "informational": 1,
-      "playful": 4
+      "playful": 6
     },
     "uiPattern": {
-      "card-grid": 5,
+      "card-grid": 34,
       "data-table": 3,
       "hero-band": 21,
       "split-view": 6
@@ -1376,7 +2463,7 @@
   "target": "public",
   "version": 1,
   "wiki": {
-    "indexBody": "# Wiki index\n\nContent-oriented catalog for the public bundle. Internal-only pages are omitted.\n\n## Patterns\n\n- [캡슐 필드](patterns/capsule-fields.md) — 중심 캡슐과 모듈 아치가 여백과 격자 안에서 프레임으로 읽히는 패턴.\n- [발광 원반](patterns/luminous-discs.md) — 원반의 재질을 면 색이 아니라 가장자리 빛으로 만드는 패턴.\n\n## Services\n\n- [Hermes studies](services/hermes-studies.md) — image-pick-hermes에서 가져온 색면·원반·기하 스터디.\n\n## Comparisons\n\n- [웜 면과 발광 링](comparisons/warm-vs-luminous.md) — 종이 질감의 따뜻한 색면과, 어두운 배경 위 발광 링의 차이.\n\n## Questions\n\n- [글자 없는 위계](questions/hierarchy-without-type.md) — 글자가 없는 스터디에서 위계를 크기, 대비, 가장자리 중 무엇으로 읽을지.\n",
+    "indexBody": "# Wiki index\n\nContent-oriented catalog for the public bundle. Internal-only pages are omitted.\n\n## Patterns\n\n- [캡슐 필드](patterns/capsule-fields.md) — 중심 캡슐과 모듈 아치가 여백과 격자 안에서 프레임으로 읽히는 패턴.\n- [발광 원반](patterns/luminous-discs.md) — 원반의 재질을 면 색이 아니라 가장자리 빛으로 만드는 패턴.\n\n## Services\n\n- [Hermes studies](services/hermes-studies.md) — Hermes-project-assets Midjourney 카탈로그 64건. 색면·원반·기하 스터디.\n\n## Comparisons\n\n- [웜 면과 발광 링](comparisons/warm-vs-luminous.md) — 종이 질감의 따뜻한 색면과, 어두운 배경 위 발광 링의 차이.\n\n## Questions\n\n- [글자 없는 위계](questions/hierarchy-without-type.md) — 글자가 없는 스터디에서 위계를 크기, 대비, 가장자리 중 무엇으로 읽을지.\n",
     "logEntries": [
       {
         "date": "2026-11-14",
@@ -1717,33 +2804,62 @@
         "visibility": "public"
       },
       {
-        "body": "\n# Hermes studies\n\n제품 UI가 아니라 비주얼 스터디다. 색, 가장자리, 여백, 재질만 기록한다.\n\n## 관련 캡처\n\n- [[capsule-pattern]]\n- [[modular-arch-surface]]\n- [[coral-blue-luminous-ring]]\n- [[bitmap-stripe-rhythm]]\n- [[floral-radial-bloom]]\n- [[iridescent-chrome-field]]\n- [[monochrome-architectural-block]]\n- [[textile-horizontal-bands]]\n- [[woven-modular-block-grid]]\n- [[coral-black-stripe-block]]\n- [[black-mountain-red-horizon]]\n- [[deep-teal-pinch-light]]\n- [[warm-amber-folded-surface]]\n- [[cropped-circular-segments]]\n- [[electric-blue-pinch-fold]]\n- [[textile-vertical-bar-grid]]\n- [[warm-horizon-brush-field]]\n- [[torn-burgundy-olive-collage]]\n- [[rounded-overprint-color-blocks]]\n- [[ivory-blind-emboss-relief]]\n- [[torn-cobalt-black-paper-edge]]\n- [[diagonal-textile-stripe-bands]]\n",
+        "body": "\n# Hermes studies\n\n제품 UI가 아니라 비주얼 스터디다. 색, 가장자리, 여백, 재질만 기록한다.\n\n## 관련 캡처\n\n- [[capsule-pattern]]\n- [[modular-arch-surface]]\n- [[coral-blue-luminous-ring]]\n- [[bitmap-stripe-rhythm]]\n- [[floral-radial-bloom]]\n- [[iridescent-chrome-field]]\n- [[monochrome-architectural-block]]\n- [[textile-horizontal-bands]]\n- [[woven-modular-block-grid]]\n- [[coral-black-stripe-block]]\n- [[black-mountain-red-horizon]]\n- [[deep-teal-pinch-light]]\n- [[warm-amber-folded-surface]]\n- [[cropped-circular-segments]]\n- [[electric-blue-pinch-fold]]\n- [[textile-vertical-bar-grid]]\n- [[warm-horizon-brush-field]]\n- [[torn-burgundy-olive-collage]]\n- [[rounded-overprint-color-blocks]]\n- [[ivory-blind-emboss-relief]]\n- [[torn-cobalt-black-paper-edge]]\n- [[diagonal-textile-stripe-bands]]\n- [[offset-checker-grid]]\n- [[citrus-arc-blocks]]\n- [[pastel-rolling-ridges]]\n- [[cobalt-diagonal-fold]]\n- [[vermilion-spray-bloom]]\n- [[coral-cyan-edge]]\n- [[blue-brush-horizon]]\n- [[striped-corner-geometry]]\n- [[black-monolith-field]]\n- [[midnight-diagonal-band]]\n- [[ivory-crescent-layers]]\n- [[red-blue-arch]]\n- [[magenta-arc-repeat]]\n- [[indigo-rainbow-arches]]\n- [[watercolor-block-balance]]\n- [[woven-color-lattice]]\n- [[warm-horizontal-washes]]\n- [[prism-sheet-crossing]]\n- [[chromatic-glass-ribbons]]\n- [[liquid-prism-channels]]\n- [[graphite-fold-plane]]\n- [[pastel-horizon-wash]]\n- [[tactile-braille-grid]]\n- [[vermilion-black-planes]]\n- [[mono-grid-blocks]]\n- [[monolithic-ring]]\n- [[coral-soft-dunes]]\n- [[blue-paper-planes]]\n- [[screenprint-flower-bloom]]\n",
         "captureRefs": [
           "bitmap-stripe-rhythm",
+          "black-monolith-field",
           "black-mountain-red-horizon",
+          "blue-brush-horizon",
+          "blue-paper-planes",
           "capsule-pattern",
+          "chromatic-glass-ribbons",
+          "citrus-arc-blocks",
+          "cobalt-diagonal-fold",
           "coral-black-stripe-block",
           "coral-blue-luminous-ring",
+          "coral-cyan-edge",
+          "coral-soft-dunes",
           "cropped-circular-segments",
           "deep-teal-pinch-light",
           "diagonal-textile-stripe-bands",
           "electric-blue-pinch-fold",
           "floral-radial-bloom",
+          "graphite-fold-plane",
+          "indigo-rainbow-arches",
           "iridescent-chrome-field",
           "ivory-blind-emboss-relief",
+          "ivory-crescent-layers",
+          "liquid-prism-channels",
+          "magenta-arc-repeat",
+          "midnight-diagonal-band",
           "modular-arch-surface",
+          "mono-grid-blocks",
           "monochrome-architectural-block",
+          "monolithic-ring",
+          "offset-checker-grid",
+          "pastel-horizon-wash",
+          "pastel-rolling-ridges",
+          "prism-sheet-crossing",
+          "red-blue-arch",
           "rounded-overprint-color-blocks",
+          "screenprint-flower-bloom",
+          "striped-corner-geometry",
+          "tactile-braille-grid",
           "textile-horizontal-bands",
           "textile-vertical-bar-grid",
           "torn-burgundy-olive-collage",
           "torn-cobalt-black-paper-edge",
+          "vermilion-black-planes",
+          "vermilion-spray-bloom",
           "warm-amber-folded-surface",
           "warm-horizon-brush-field",
+          "warm-horizontal-washes",
+          "watercolor-block-balance",
+          "woven-color-lattice",
           "woven-modular-block-grid"
         ],
         "id": "services/hermes-studies",
-        "summary": "image-pick-hermes에서 가져온 색면·원반·기하 스터디.",
+        "summary": "Hermes-project-assets Midjourney 카탈로그 64건. 색면·원반·기하 스터디.",
         "title": "Hermes studies",
         "visibility": "public"
       }
