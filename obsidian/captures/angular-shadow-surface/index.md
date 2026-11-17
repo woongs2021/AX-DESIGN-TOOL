@@ -4,6 +4,7 @@ title: "각진 그림자 면 — 네이비 언덕과 피치 빛"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-10-angular-shadow-surface-translation.png
 service: "Hermes studies"
 platform: web
 screenType: detail

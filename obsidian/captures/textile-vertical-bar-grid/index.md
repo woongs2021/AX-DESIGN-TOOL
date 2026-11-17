@@ -4,6 +4,7 @@ title: "직물 세로 막대 그리드"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-05
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-29-textile-vertical-bar-grid-pattern.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

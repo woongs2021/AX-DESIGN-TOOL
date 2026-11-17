@@ -4,6 +4,7 @@ title: "딥 틸 핀치 라이트"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-05
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-05-midjourney-25-deep-teal-pinch-light-field.png
 service: "Hermes studies"
 platform: web
 screenType: detail

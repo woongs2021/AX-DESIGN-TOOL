@@ -4,6 +4,7 @@ title: "딥 블루 헤일로 원반"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-12-deep-blue-halo-disc-translation.png
 service: "Hermes studies"
 platform: web
 screenType: marketing

@@ -2,6 +2,7 @@ import { assetUrl, escapeHtml } from "../lib/dom.ts";
 import { PAGE_ENTER_EVENT, PAGE_FILES_EVENT, PRESENT_LAYOUT_EVENT, presentationFileUrl } from "../shared/presentation-files.ts";
 import { isPageMedia, uploadPageFiles, type PageFileSource } from "./presentation-project.ts";
 import type { CaptureRecord } from "../shared/index-types.ts";
+import { sortCaptures } from "../shared/filter.ts";
 import {
   BUILTIN_FONTS,
   CARD_MAX,
@@ -695,6 +696,23 @@ function drawCard(
   return paintCard(ctx, state, imageOf, hiddenId, background, skip);
 }
 
+/** Graphic-library captures shared with Conference and Presentation. */
+let graphicLibrary: StudioSource[] = [];
+
+export function syncGraphicLibrary(captures: CaptureRecord[]): void {
+  graphicLibrary = sortCaptures(captures).map((capture) => ({
+    src: capture.slug,
+    url: assetUrl(capture.asset.path),
+    thumb: assetUrl(capture.asset.thumbPath ?? capture.asset.path),
+    label: capture.title,
+    kind: "theme",
+  }));
+}
+
+function libraryHit(src: string): StudioSource | undefined {
+  return graphicLibrary.find((item) => item.src === src);
+}
+
 function studioSources(state: StudioState, config: StudioConfig): { srcUrl: (src: string) => string; still: string; videoUrl: string } {
   const sources = config.groups.flatMap((group) => group.items);
   const srcUrl = (src: string): string => {
@@ -703,7 +721,10 @@ function studioSources(state: StudioState, config: StudioConfig): { srcUrl: (src
     const media = presentationFileUrl(src);
     if (media) return media;
     const source =
-      sources.find((item) => item.src === src) ?? sources.find((item) => item.src === state.themeSlug) ?? sources[0];
+      sources.find((item) => item.src === src) ??
+      libraryHit(src) ??
+      sources.find((item) => item.src === state.themeSlug) ??
+      sources[0];
     return source?.url ?? "";
   };
   const record =
@@ -1755,15 +1776,20 @@ function markThemeInk(root: ParentNode): void {
   }
 }
 
-function themeOptions(config: StudioConfig, activeSrc: string): string {
-  const option = (src: string, image: string, label: string, kind: StudioSource["kind"] = "theme") => {
-    const selected = src === activeSrc;
-    const svg = /\.svg(?:$|[?#])/i.test(src) || /\.svg(?:$|[?#])/i.test(image) || /\.svg(?:$|[?#])/i.test(label);
-    const variant = kind === "theme" ? (svg ? "mark" : "") : kind;
-    const media = kind === "video"
-      ? `<video src="${escapeHtml(image)}" muted playsinline preload="metadata" draggable="false"></video>`
-      : `<img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" draggable="false" />`;
-    return `
+function sourceButton(
+  src: string,
+  image: string,
+  label: string,
+  activeSrc: string,
+  kind: StudioSource["kind"] = "theme",
+): string {
+  const selected = src === activeSrc;
+  const svg = /\.svg(?:$|[?#])/i.test(src) || /\.svg(?:$|[?#])/i.test(image) || /\.svg(?:$|[?#])/i.test(label);
+  const variant = kind === "theme" ? (svg ? "mark" : "") : kind;
+  const media = kind === "video"
+    ? `<video src="${escapeHtml(image)}" muted playsinline preload="metadata" draggable="false"></video>`
+    : `<img src="${escapeHtml(image)}" alt="${escapeHtml(label)}" draggable="false" />`;
+  return `
       <button
         type="button"
         class="studio__theme${variant ? ` studio__theme--${variant}` : ""}"
@@ -1777,7 +1803,11 @@ function themeOptions(config: StudioConfig, activeSrc: string): string {
         ${media}
       </button>
     `;
-  };
+}
+
+function themeOptions(config: StudioConfig, activeSrc: string): string {
+  const option = (src: string, image: string, label: string, kind: StudioSource["kind"] = "theme") =>
+    sourceButton(src, image, label, activeSrc, kind);
   const uploads = config.id === "presentation" ? [] : getUploads().map(
     (upload) => `
       <div class="studio__theme-item">
@@ -1798,6 +1828,17 @@ function themeOptions(config: StudioConfig, activeSrc: string): string {
             <span id="${labelId}">${escapeHtml(group.label)}</span>
             <div class="studio__themes" role="radiogroup" aria-labelledby="${labelId}">${[...items, ...(last ? [...uploads, add] : [])].join("")}</div>
           </div>`;
+    })
+    .join("");
+}
+
+function libraryOptions(activeSrc: string): string {
+  const hit = graphicLibrary.some((item) => item.src === activeSrc);
+  return graphicLibrary
+    .map((item, index) => {
+      const button = sourceButton(item.src, item.thumb, item.label, activeSrc, item.kind);
+      if (hit || index !== 0) return button;
+      return button.replace('tabindex="-1"', 'tabindex="0"');
     })
     .join("");
 }
@@ -1880,6 +1921,15 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
       </button>`;
   }).join("");
   const themes = themeOptions(config, image.src);
+  const showAssets = (config.id === "conference" || config.id === "presentation") && graphicLibrary.length > 0;
+  const assetsPanel = showAssets
+    ? `<div id="studio-panel-assets" role="tabpanel" aria-labelledby="studio-tab-assets" hidden>
+          <div class="studio__field">
+            <span id="studio-assets-label">그래픽 라이브러리</span>
+            <div class="studio__themes" id="studio-assets" role="radiogroup" aria-labelledby="studio-assets-label">${libraryOptions(image.src)}</div>
+          </div>
+        </div>`
+    : "";
   const backgroundField = config.conference
     ? `
           <div class="studio__field" id="studio-background-field">
@@ -1977,6 +2027,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
         <div class="studio__tabs" role="tablist" aria-label="컨트롤 패널">
           <button type="button" class="studio__tab" role="tab" id="studio-tab-design" aria-controls="studio-panel-design" aria-selected="${designSelected ? "true" : "false"}" tabindex="${designSelected ? "0" : "-1"}">Design</button>
           <button type="button" class="studio__tab" role="tab" id="studio-tab-code" aria-controls="studio-panel-code" aria-selected="${designSelected ? "false" : "true"}" tabindex="${designSelected ? "-1" : "0"}">Code</button>
+          ${showAssets ? `<button type="button" class="studio__tab" role="tab" id="studio-tab-assets" aria-controls="studio-panel-assets" aria-selected="false" tabindex="-1">Assets</button>` : ""}
         </div>
         <div class="studio__panel-host">
         <div class="studio__panel-scroll" id="studio-panel-scroll">
@@ -2312,6 +2363,7 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
           <button type="button" class="button button--secondary studio__copy" id="studio-copy">현재 디자인을 코드로 복사</button>
           <pre class="studio__export" id="studio-export"></pre>
         </div>
+        ${assetsPanel}
         </div>
         <div class="studio__scroll-thumb" id="studio-scroll-thumb" hidden></div>
         </div>
@@ -2845,10 +2897,13 @@ export function bindStudio(
     const media = presentationFileUrl(src);
     if (media) return media;
     const source =
-      sources.find((item) => item.src === src) ?? sources.find((item) => item.src === state.themeSlug) ?? sources[0];
+      sources.find((item) => item.src === src) ??
+      libraryHit(src) ??
+      sources.find((item) => item.src === state.themeSlug) ??
+      sources[0];
     return source?.url ?? "";
   };
-  const sourceOf = (src: string) => sources.find((item) => item.src === src);
+  const sourceOf = (src: string) => sources.find((item) => item.src === src) ?? libraryHit(src);
 
   /** The preset's background id, used to put a deleted background back. */
   const presetBackgroundId = (): string | null => {
@@ -3234,7 +3289,7 @@ export function bindStudio(
     void redraw();
   };
 
-  const showPanel = (panel: StudioState["panel"]) => {
+  const showPanel = (panel: StudioState["panel"] | "assets") => {
     if (panel !== "design") {
       setDropper(false);
       if (penEdit) commitPenEdit();
@@ -3242,16 +3297,23 @@ export function bindStudio(
       penDraft = null;
       delete canvas.dataset.pen;
     }
-    state.panel = panel;
+    if (panel !== "assets") state.panel = panel;
     const design = panel === "design";
+    const code = panel === "code";
+    const assets = panel === "assets";
     root.querySelector("#studio-panel-design")?.toggleAttribute("hidden", !design);
-    root.querySelector("#studio-panel-code")?.toggleAttribute("hidden", design);
-    const designTab = root.querySelector<HTMLButtonElement>("#studio-tab-design");
-    const codeTab = root.querySelector<HTMLButtonElement>("#studio-tab-code");
-    designTab?.setAttribute("aria-selected", design ? "true" : "false");
-    codeTab?.setAttribute("aria-selected", design ? "false" : "true");
-    if (designTab) designTab.tabIndex = design ? 0 : -1;
-    if (codeTab) codeTab.tabIndex = design ? -1 : 0;
+    root.querySelector("#studio-panel-code")?.toggleAttribute("hidden", !code);
+    root.querySelector("#studio-panel-assets")?.toggleAttribute("hidden", !assets);
+    for (const [id, selected] of [
+      ["#studio-tab-design", design],
+      ["#studio-tab-code", code],
+      ["#studio-tab-assets", assets],
+    ] as const) {
+      const tab = root.querySelector<HTMLButtonElement>(id);
+      if (!tab) continue;
+      tab.setAttribute("aria-selected", selected ? "true" : "false");
+      tab.tabIndex = selected ? 0 : -1;
+    }
     void redraw();
   };
 
@@ -4143,18 +4205,24 @@ export function bindStudio(
 
   root.querySelector("#studio-tab-design")?.addEventListener("click", () => showPanel("design"));
   root.querySelector("#studio-tab-code")?.addEventListener("click", () => showPanel("code"));
+  root.querySelector("#studio-tab-assets")?.addEventListener("click", () => showPanel("assets"));
   root.querySelector(".studio__tabs")?.addEventListener("keydown", (event) => {
     if (!(event instanceof KeyboardEvent)) return;
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>(".studio__tab")];
+    const current = tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true");
+    if (current < 0 || tabs.length === 0) return;
     event.preventDefault();
-    const next = state.panel === "design" ? "code" : "design";
-    showPanel(next);
-    root.querySelector<HTMLButtonElement>(next === "design" ? "#studio-tab-design" : "#studio-tab-code")?.focus();
+    const next = tabs[(current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+    if (!next) return;
+    const panel = next.id === "studio-tab-code" ? "code" : next.id === "studio-tab-assets" ? "assets" : "design";
+    showPanel(panel);
+    next.focus();
   });
 
   const themeGrid = root.querySelector<HTMLElement>("#studio-sources");
   const themeFile = root.querySelector<HTMLInputElement>("#studio-theme-file");
-  const themeButtons = () => [...root.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")];
+  const themeButtons = () => [...(themeGrid?.querySelectorAll<HTMLButtonElement>("[data-theme-slug]") ?? [])];
   const renderThemes = () => {
     if (themeGrid) themeGrid.innerHTML = themeOptions(config, panelImage().src);
     markThemeInk(root);
@@ -4240,7 +4308,7 @@ export function bindStudio(
     document.addEventListener(PAGE_FILES_EVENT, onPageFiles);
     stopPageFiles = () => document.removeEventListener(PAGE_FILES_EVENT, onPageFiles);
   }
-  themeGrid?.addEventListener("dragstart", (event) => {
+  const startThemeDrag = (event: DragEvent) => {
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-theme-slug]") : null;
     const src = button?.dataset.themeSlug;
     if (!button || !src || !event.dataTransfer) return;
@@ -4248,7 +4316,26 @@ export function bindStudio(
     event.dataTransfer.effectAllowed = "copy";
     const image = button.querySelector("img");
     if (image) event.dataTransfer.setDragImage(image, image.width / 2, image.height / 2);
+  };
+  themeGrid?.addEventListener("dragstart", startThemeDrag);
+  const assetGrid = root.querySelector<HTMLElement>("#studio-assets");
+  assetGrid?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-theme-slug]") : null;
+    if (button) pickTheme(button, false);
   });
+  assetGrid?.addEventListener("keydown", (event) => {
+    const key = event.key;
+    if (!["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(key)) return;
+    if (!(event.target instanceof Element && event.target.matches("[data-theme-slug]"))) return;
+    event.preventDefault();
+    const themes = [...assetGrid.querySelectorAll<HTMLButtonElement>("[data-theme-slug]")];
+    const index = themes.findIndex((button) => button === event.target);
+    const delta = key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1;
+    const next = themes[(index + delta + themes.length) % themes.length];
+    if (next) pickTheme(next, true);
+  });
+  assetGrid?.addEventListener("dragstart", startThemeDrag);
+  assetGrid?.addEventListener("dragend", () => delete stage.dataset.dropping);
 
   root.querySelector("#studio-copy")?.addEventListener("click", async () => {
     const text = designToCode(state, aspectOf, extraFonts());
@@ -6813,6 +6900,36 @@ export function bindStudio(
       unlockLayers(state, ids);
     });
   };
+  const fitSelection = () => {
+    const images = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image" && !isLayerLocked(state, layer.id) && Boolean(imageOf(layer)));
+    const rects = selectedLayers().filter((layer): layer is ShapeLayer => layer.kind === "shape" && layer.shape === "rect" && !isLayerLocked(state, layer.id));
+    if (images.length === 0 && rects.length === 0) return;
+    commitLayers(() => {
+      for (const layer of rects) {
+        const from = { x: layer.x, y: layer.y, width: layer.width, height: layer.height };
+        const nodes = layer.nodes && layer.nodes.length >= 2 ? structuredClone(layer.nodes) : null;
+        layer.x = 0;
+        layer.y = 0;
+        layer.width = state.cardWidth;
+        layer.height = state.cardHeight;
+        if (nodes) layer.nodes = transformNodes(nodes, from, layer);
+      }
+      for (const layer of images) {
+        const aspect = aspectOf(layer);
+        const oldW = Math.max(1, layer.width);
+        const oldH = Math.max(1, imageLayerHeight(layer, aspect));
+        const scale = Math.min(state.cardWidth / oldW, state.cardHeight / oldH);
+        layer.width = clampImageWidth(oldW * scale);
+        const height = imageLayerHeight(layer, aspect);
+        const slackX = state.cardWidth - layer.width;
+        const slackY = state.cardHeight - height;
+        const x = slackX <= 1 ? 0 : layer.x + oldW / 2 <= state.cardWidth / 2 ? 0 : state.cardWidth - layer.width;
+        const y = slackY <= 1 ? 0 : layer.y + oldH / 2 <= state.cardHeight / 2 ? 0 : state.cardHeight - height;
+        layer.x = clampImageOffset(x, state.cardWidth, layer.width);
+        layer.y = clampImageOffset(y, state.cardHeight, height);
+      }
+    });
+  };
 
   layerMenu?.remove();
   const shortcut = (key: string) => (IS_MAC ? `⌘${key}` : `Ctrl+${key}`);
@@ -6827,6 +6944,7 @@ export function bindStudio(
     { action: "back", label: "맨 밑으로 보내기" },
     { action: "crop", label: "크롭하기" },
     { action: "adjust", label: "수정" },
+    { action: "fit", label: "화면에 맞추기" },
     { action: "delete", label: "삭제", hint: IS_MAC ? "⌫" : "Delete" },
   ];
   const menu = document.createElement("div");
@@ -6904,6 +7022,16 @@ export function bindStudio(
     }
     const adjust = menuButton("adjust");
     if (adjust) adjust.hidden = !picked.some((layer) => layer.kind === "image");
+    const fit = menuButton("fit");
+    if (fit) {
+      const targets = picked.filter((layer) => layer.kind === "image" || (layer.kind === "shape" && layer.shape === "rect"));
+      fit.hidden = targets.length === 0;
+      fit.disabled = !targets.some((layer) => {
+        if (isLayerLocked(state, layer.id)) return false;
+        if (layer.kind === "shape") return true;
+        return layer.kind === "image" && Boolean(imageOf(layer));
+      });
+    }
     const remove = menuButton("delete");
     if (remove) {
       const dropBackground = backgroundOn && state.background != null;
@@ -6938,6 +7066,7 @@ export function bindStudio(
       const layer = singleImage();
       if (layer) startCrop(layer);
     } else if (action === "adjust") openImageAdjust();
+    else if (action === "fit") fitSelection();
   });
   menu.addEventListener("keydown", (event) => {
     if (event.key === "Escape" || event.key === "Tab") {
@@ -7714,8 +7843,56 @@ export function bindStudio(
     ArrowUp: { x: 0, y: -1 },
     ArrowDown: { x: 0, y: 1 },
   };
+  let spaceHeld = false;
+  let spacePan: { pointerId: number; x: number; y: number; left: number; top: number } | null = null;
+  const textTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement &&
+    (target.isContentEditable || target.matches("textarea, input, select"));
+  const endSpacePan = () => {
+    spaceHeld = false;
+    spacePan = null;
+    delete stage.dataset.pan;
+  };
+  stage.addEventListener("pointerdown", (event) => {
+    if (!spaceHeld || event.button !== 0 || document.documentElement.classList.contains("is-presenting")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    cancelLongPress();
+    spacePan = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, left: stage.scrollLeft, top: stage.scrollTop };
+    stage.dataset.pan = "dragging";
+    try {
+      stage.setPointerCapture(event.pointerId);
+    } catch {
+      /* the pointer can already be inactive */
+    }
+  }, true);
+  const moveSpacePan = (event: PointerEvent) => {
+    if (!spacePan || event.pointerId !== spacePan.pointerId) return;
+    stage.scrollLeft = spacePan.left - (event.clientX - spacePan.x);
+    stage.scrollTop = spacePan.top - (event.clientY - spacePan.y);
+  };
+  const upSpacePan = (event: PointerEvent) => {
+    if (!spacePan || event.pointerId !== spacePan.pointerId) return;
+    spacePan = null;
+    if (spaceHeld) stage.dataset.pan = "ready";
+    else delete stage.dataset.pan;
+  };
+  stage.addEventListener("pointermove", moveSpacePan);
+  stage.addEventListener("pointerup", upSpacePan);
+  stage.addEventListener("pointercancel", upSpacePan);
+  const onSpaceUp = (event: KeyboardEvent) => {
+    if (event.code === "Space") endSpacePan();
+  };
   const studioKeys = (event: KeyboardEvent) => {
     if (!canvas.isConnected || exporting) return;
+    if (event.code === "Space") {
+      if (document.documentElement.classList.contains("is-presenting") || editing || state.code.trim() || textTarget(event.target)) return;
+      event.preventDefault();
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+      spaceHeld = true;
+      if (!spacePan) stage.dataset.pan = "ready";
+      return;
+    }
     const mod = (event.metaKey || event.ctrlKey) && !event.altKey;
     // event.code keeps +/- and C/V working under a Korean IME and covers the numpad keys.
     const zoom =
@@ -7937,16 +8114,21 @@ export function bindStudio(
     if (lineAim || penDraft?.cursor) paint();
   };
   document.addEventListener("keydown", studioKeys);
+  document.addEventListener("keyup", onSpaceUp);
   document.addEventListener("keydown", onDrawShift);
   document.addEventListener("keyup", onDrawShift);
+  window.addEventListener("blur", endSpacePan);
   document.addEventListener("pointerdown", onDropperPointer, true);
   document.addEventListener("click", onDropperClick, true);
   stopStudioKeys = () => {
     document.removeEventListener("keydown", studioKeys);
+    document.removeEventListener("keyup", onSpaceUp);
     document.removeEventListener("keydown", onDrawShift);
     document.removeEventListener("keyup", onDrawShift);
+    window.removeEventListener("blur", endSpacePan);
     document.removeEventListener("pointerdown", onDropperPointer, true);
     document.removeEventListener("click", onDropperClick, true);
+    endSpacePan();
   };
 
   const panelToggle = root.querySelector<HTMLButtonElement>("#studio-panel-toggle");

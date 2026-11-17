@@ -4,6 +4,7 @@ title: "대각 직물 스트라이프 밴드"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-11
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-35-diagonal-textile-stripe-bands.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

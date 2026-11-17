@@ -2,6 +2,10 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-11-17] ingest | Midjourney 카탈로그 64건
+
+그래픽 라이브러리를 Hermes-project-assets의 Midjourney 카탈로그에 맞췄다. 기존 1–35의 원본 다운로드는 Release `midjourney-dna-archive-2026-10`으로 연결했다. 36–65를 더했다. 57–65의 원본은 Release `midjourney-dna-archive-2026-11-14`이고, 36–56은 Release 원본이 없어 공개 프리뷰를 라이브러리 이미지로 둔다.
+
 ## [2026-11-14] update | Phase 3 Presentation
 
 Presentation 탭(`#/presentation`)을 열었다. Conference와 같은 스튜디오로 3840 × 2160 슬라이드 덱을 편집한다. 유형 1·2·3, Shift 범위 선택과 블록 드래그·잘라내기/붙여넣기, 단일·전체 페이지를 `presentation-defaults.json`에 세팅하는 버튼, 디자인 시스템 색 스와치, 전체 내보내기(벡터 PDF·편집 가능 PPTX/Keynote·배경 영상 HTML)를 넣었다. 기본 덱 14장은 Slide Front 표지와 Instagram 연사 카드 네 장(김규영 멘토·이주원 감독·이보연 교수·박형걸 PM)을 앞에 두고, 이어서 기존 예시 페이지다. 레일을 스크롤한 뒤 프리뷰를 눌러도 스크롤이 움직이지 않게 고쳤다. 자세한 단계는 [docs/phase-3-presentation.md](../../docs/phase-3-presentation.md)에 있다.

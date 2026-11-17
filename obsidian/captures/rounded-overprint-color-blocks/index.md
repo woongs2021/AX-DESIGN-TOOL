@@ -4,6 +4,7 @@ title: "둥근 오버프린트 색면"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-11
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-09-midjourney-32-rounded-overprint-color-blocks.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

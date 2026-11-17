@@ -4,6 +4,7 @@ title: "소프트 링 — 코랄에서 블루로 번지는 고리"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-08-soft-circular-ring-translation.png
 service: "Hermes studies"
 platform: web
 screenType: marketing

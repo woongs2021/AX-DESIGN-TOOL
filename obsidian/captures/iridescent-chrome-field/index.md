@@ -4,6 +4,7 @@ title: "이리데센트 크롬 — 녹아 흐르는 금속면"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-28
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-28-midjourney-19-iridescent-chrome-material-field.jpg
 service: "Hermes studies"
 platform: web
 screenType: detail

@@ -51,6 +51,7 @@ import {
   conferenceStudioConfig,
   onlineStudioConfig,
   renderStudio,
+  syncGraphicLibrary,
   type StudioConfig,
 } from "./views/studio.ts";
 import { bindPresentation, leavePresentationMode, releasePresentationMenu, renderPresentation } from "./views/presentation.ts";
@@ -306,6 +307,7 @@ function render(): void {
     history.replaceState(null, "", hrefFor(route));
   }
   if (route.name !== "presentation") leavePresentationMode();
+  if (loadState.status === "ready") syncGraphicLibrary(loadState.index.captures);
   app.innerHTML = shell(renderMain());
 
   app.querySelector("#index-retry")?.addEventListener("click", () => {
@@ -363,8 +365,16 @@ function render(): void {
     const deck = presentationDeck;
     bindPresentation(app, deck, conference, {
       onLoadPreset: () => false,
-      onSetPageDefault: () => writePresentationDefaults(defaultsWithPage(deck, deck.selected, conference)),
-      onSetDeckDefault: () => writePresentationDefaults(deck.pages),
+      onSetPageDefault: async () => {
+        const ok = await writePresentationDefaults(defaultsWithPage(deck, deck.selected, conference));
+        if (ok) savePresentationDeck(deck);
+        return ok;
+      },
+      onSetDeckDefault: async () => {
+        const ok = await writePresentationDefaults(deck.pages);
+        if (ok) savePresentationDeck(deck);
+        return ok;
+      },
     }, () => {
       savePresentationDeck(deck);
       render();

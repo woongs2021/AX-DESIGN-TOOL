@@ -319,7 +319,7 @@
         "radius": 0,
         "code": "",
         "panel": "design",
-        "controlsWidth": 315,
+        "controlsWidth": 353,
         "layers": [
           {
             "id": "layer-mwjcc152-ylfsx8",
@@ -341,11 +341,11 @@
             "id": "layer-mwjdkj2k-l1hg0z",
             "kind": "shape",
             "shape": "rect",
-            "x": -121.5,
-            "y": -145,
-            "width": 4000,
-            "height": 2423,
-            "radius": 120,
+            "x": 0,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "radius": 0,
             "color": "#000000",
             "shadow": {
               "size": 0,
@@ -360,10 +360,12 @@
               "gradient": null
             },
             "blend": "normal",
+            "opacity": 70,
             "blurFrom": 0,
             "blurTo": 0,
             "gradient": null,
-            "opacity": 70
+            "inner": 0.38,
+            "nodes": null
           },
           {
             "id": "image",

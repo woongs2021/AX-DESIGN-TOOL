@@ -4,6 +4,7 @@ title: "시안 발광 아크 가장자리"
 asset: capture.png
 visibility: public
 capturedAt: 2026-09-27
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-09-26-midjourney-15-cyan-luminous-arc-edge-translation.png
 service: "Hermes studies"
 platform: web
 screenType: detail

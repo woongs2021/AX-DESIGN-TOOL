@@ -4,6 +4,7 @@ title: "직조 모듈 그리드 — 세로 기둥과 블록"
 asset: capture.png
 visibility: public
 capturedAt: 2026-10-05
+sourceUrl: https://github.com/woongs2021/Hermes-project-assets/releases/download/midjourney-dna-archive-2026-10/midjourney-dna-2026-10-02-midjourney-22-woven-modular-block-grid.png
 service: "Hermes studies"
 platform: web
 screenType: gallery

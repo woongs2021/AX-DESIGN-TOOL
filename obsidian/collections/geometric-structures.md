@@ -14,6 +14,12 @@ captures:
   - coral-black-stripe-block
   - textile-vertical-bar-grid
   - diagonal-textile-stripe-bands
+  - offset-checker-grid
+  - cobalt-diagonal-fold
+  - striped-corner-geometry
+  - midnight-diagonal-band
+  - woven-color-lattice
+  - mono-grid-blocks
 ---
 
 # 기하 구조
