@@ -38,6 +38,7 @@ import {
 
 const TYPE_LABEL: Record<PresentationType, string> = { 1: "유형 1", 2: "유형 2", 3: "유형 3" };
 const RAIL_KEY = "ax-presentation-rail";
+const RAIL_OPEN_KEY = "ax-presentation-rail-open";
 const RAIL_MIN = 160;
 const RAIL_DEFAULT = 188;
 const STAGE_MIN = 480;
@@ -46,6 +47,7 @@ let stopPageKeys: (() => void) | null = null;
 let stopPageClip: (() => void) | null = null;
 let stopPageMenu: (() => void) | null = null;
 let railObserver: ResizeObserver | null = null;
+let stopRailTogglePlace: (() => void) | null = null;
 /** Page list offset, kept across re-renders so a click does not move the list. */
 let railScroll = { top: 0, left: 0 };
 let thumbMirror = 0;
@@ -200,6 +202,14 @@ function readRailWidth(): number {
   return RAIL_DEFAULT;
 }
 
+function readRailOpen(): boolean {
+  try {
+    return localStorage.getItem(RAIL_OPEN_KEY) !== "closed";
+  } catch {
+    return true;
+  }
+}
+
 function readSampleScale(): number {
   try {
     const raw = localStorage.getItem(SAMPLE_KEY);
@@ -340,10 +350,12 @@ export function renderPresentation(deck: PresentationDeck, index: ConferenceInde
     .join("");
   const config = presentationStudioConfig(index, `presentation:${page.id}`, page.id);
   const rail = readRailWidth();
+  const railOpen = readRailOpen();
+  const railToggle = `<button type="button" class="deck__rail-toggle" id="deck-rail-toggle" aria-expanded="${railOpen ? "true" : "false"}" aria-controls="deck-rail" aria-label="${railOpen ? "페이지 프리뷰 접기" : "페이지 프리뷰 펼치기"}" title="${railOpen ? "페이지 프리뷰 접기" : "페이지 프리뷰 펼치기"}"><svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6"/></svg></button>`;
   return `
-    <div class="deck" style="--deck-rail:${rail}px">
+    <div class="deck" data-rail="${railOpen ? "open" : "closed"}" style="--deck-rail:${rail}px">
       <div class="deck__rail-host">
-        <aside class="deck__rail" aria-label="프레젠테이션 페이지">
+        <aside class="deck__rail" id="deck-rail" aria-label="프레젠테이션 페이지">
           <div class="deck__types" role="group" aria-label="페이지 유형">
             <div class="deck__types-row">${types}</div>
             ${sample}
@@ -353,7 +365,7 @@ export function renderPresentation(deck: PresentationDeck, index: ConferenceInde
         </aside>
         <div class="deck__scroll-thumb" hidden></div>
       </div>
-      <div class="deck__splitter" id="deck-splitter" role="separator" aria-orientation="vertical" aria-label="페이지 프리뷰 너비" aria-valuemin="${RAIL_MIN}" aria-valuenow="${rail}" tabindex="0"></div>
+      <div class="deck__splitter" id="deck-splitter" role="separator" aria-orientation="vertical" aria-label="페이지 프리뷰 너비" aria-valuemin="${RAIL_MIN}" aria-valuenow="${rail}" tabindex="0">${railToggle}</div>
       <div class="deck__stage">
         ${renderStudio(page.state, config)}
       </div>
@@ -618,6 +630,8 @@ export function bindPresentation(
   }
   railObserver?.disconnect();
   railObserver = null;
+  stopRailTogglePlace?.();
+  stopRailTogglePlace = null;
   thumbMirror += 1;
   presentDeck = deck;
   presentChange = onChange;
@@ -672,7 +686,44 @@ export function bindPresentation(
       }
     };
     applyRail(readRailWidth());
+    const railToggleButton = root.querySelector<HTMLButtonElement>("#deck-rail-toggle");
+    const syncRail = (open: boolean) => {
+      deckEl.dataset.rail = open ? "open" : "closed";
+      railToggleButton?.setAttribute("aria-expanded", open ? "true" : "false");
+      const label = open ? "페이지 프리뷰 접기" : "페이지 프리뷰 펼치기";
+      railToggleButton?.setAttribute("aria-label", label);
+      if (railToggleButton) railToggleButton.title = label;
+      try {
+        localStorage.setItem(RAIL_OPEN_KEY, open ? "open" : "closed");
+      } catch {
+        /* The rail still toggles for this view. */
+      }
+      if (open) applyRail(readRailWidth());
+      requestAnimationFrame(() => document.dispatchEvent(new Event(PRESENT_LAYOUT_EVENT)));
+    };
+    railToggleButton?.addEventListener("click", () => {
+      syncRail(deckEl.dataset.rail === "closed");
+    });
+    const placeRailToggle = () => {
+      const panel = root.querySelector<HTMLElement>("#studio-panel-toggle");
+      if (!railToggleButton || !panel) return;
+      const top = Math.round(panel.getBoundingClientRect().top - deckEl.getBoundingClientRect().top);
+      railToggleButton.style.top = `${Math.max(8, top)}px`;
+    };
+    placeRailToggle();
+    const placeObserver = new ResizeObserver(() => placeRailToggle());
+    const devices = root.querySelector<HTMLElement>(".studio-devices");
+    if (devices) placeObserver.observe(devices);
+    const onPlace = () => placeRailToggle();
+    window.addEventListener("resize", onPlace);
+    root.querySelector("#studio-panel-toggle")?.addEventListener("click", () => requestAnimationFrame(placeRailToggle));
+    stopRailTogglePlace = () => {
+      placeObserver.disconnect();
+      window.removeEventListener("resize", onPlace);
+    };
     railSplitter.addEventListener("pointerdown", (event) => {
+      if (event.target instanceof Element && event.target.closest("#deck-rail-toggle")) return;
+      if (deckEl.dataset.rail === "closed") return;
       if (deckEl.getBoundingClientRect().width < 768) return;
       try {
         railSplitter.setPointerCapture(event.pointerId);
@@ -696,6 +747,7 @@ export function bindPresentation(
       railSplitter.addEventListener("pointercancel", end);
     });
     railSplitter.addEventListener("keydown", (event) => {
+      if (deckEl.dataset.rail === "closed") return;
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       event.preventDefault();
       const current = Number(railSplitter.getAttribute("aria-valuenow")) || RAIL_DEFAULT;

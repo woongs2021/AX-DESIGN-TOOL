@@ -2,6 +2,10 @@
 
 Append-only timeline. Each entry starts with `## [YYYY-MM-DD] <operation> | <title>`.
 
+## [2026-11-18] update | 페이지 프리뷰 접기, 화면 밖 팬, 그림 붙여넣기
+
+Presentation 왼쪽 페이지 프리뷰도 툴 패널처럼 접고 다시 펼 수 있다. 접기 버튼은 펼쳤을 때와 접었을 때, 왼쪽과 오른쪽이 같은 28px다. 편집 화면에서 스페이스를 누른 채 드래그하면 카드가 화면 밖으로 움직이고, 가장자리에는 카드가 조금 남는다. 복사한 그림은 ⌘V(Windows는 Ctrl+V)로 편집 화면에 이미지 레이어로 붙는다. Presentation에서는 그 파일이 페이지 폴더에도 저장된다.
+
 ## [2026-11-17] ingest | Midjourney 카탈로그 64건
 
 그래픽 라이브러리를 Hermes-project-assets의 Midjourney 카탈로그에 맞췄다. 기존 1–35의 원본 다운로드는 Release `midjourney-dna-archive-2026-10`으로 연결했다. 36–65를 더했다. 57–65의 원본은 Release `midjourney-dna-archive-2026-11-14`이고, 36–56은 Release 원본이 없어 공개 프리뷰를 라이브러리 이미지로 둔다.

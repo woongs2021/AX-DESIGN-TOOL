@@ -1607,6 +1607,7 @@ html[data-mode="dark"] .deck .studio__fit {
 
 .deck__splitter {
   position: relative;
+  z-index: 4;
   cursor: col-resize;
   background: var(--studio-divider);
   touch-action: none;
@@ -1823,7 +1824,8 @@ html[data-mode="dark"] .deck .studio__fit {
   touch-action: none;
 }
 
-.studio__panel-toggle {
+.studio__panel-toggle,
+.deck__rail-toggle {
   position: absolute;
   top: 8px;
   left: 50%;
@@ -1841,23 +1843,35 @@ html[data-mode="dark"] .deck .studio__fit {
   cursor: pointer;
 }
 
-.studio[data-controls="closed"] .studio__panel-toggle {
+.studio[data-controls="closed"] .studio__panel-toggle,
+.deck[data-rail="closed"] .deck__rail-toggle {
   top: 16px;
   left: 16px;
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   transform: none;
-  box-shadow:
-    0 8px 20px color-mix(in srgb, var(--studio-ink-dark) 18%, transparent),
-    inset 0 0 0 var(--line-width) var(--line-color);
 }
 
-.studio[data-controls="closed"] .studio__panel-toggle svg {
+.studio[data-controls="closed"] .studio__panel-toggle svg,
+.deck[data-rail="closed"] .deck__rail-toggle svg {
   transform: rotate(180deg);
 }
 
 .studio[data-controls="closed"] {
   grid-template-columns: 0 6px minmax(0, 1fr);
+}
+
+.deck[data-rail="closed"] {
+  grid-template-columns: 0 6px minmax(0, 1fr);
+}
+
+.deck[data-rail="closed"] .deck__rail-host {
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.deck[data-rail="closed"] .studio__tabs {
+  padding-left: 28px;
 }
 
 .studio[data-controls="closed"] .studio__controls-wrap {
@@ -2571,7 +2585,13 @@ html[data-mode="dark"] .studio__export {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overflow-anchor: none;
+  scrollbar-width: none;
   background: color-mix(in srgb, var(--tint) 35%, var(--bg));
+}
+
+.studio__stage::-webkit-scrollbar {
+  display: none;
 }
 
 .studio__stage[data-pan="ready"],
@@ -3110,6 +3130,15 @@ html[data-mode="dark"] .studio__scaler canvas[data-copy="true"] {
   .deck__rail {
     height: auto;
     overflow: visible;
+  }
+
+  .deck[data-rail="closed"] {
+    grid-template-columns: 1fr;
+  }
+
+  .deck[data-rail="closed"] .deck__rail-host {
+    overflow: visible;
+    visibility: visible;
   }
 
   .deck__splitter {
