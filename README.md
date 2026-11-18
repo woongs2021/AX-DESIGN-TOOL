@@ -4,7 +4,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 아카이브된 디자인 작업물을 기반으로 **온라인 마케팅 브랜드 에셋**(인스타그램, 페이스북, 유튜브 커버, 쇼츠 등)을 만드는 정적 웹 툴이다. 디자인 이미지는 Obsidian Markdown vault에 아카이빙하고, 웹은 빌드된 JSON과 자산만 읽는다.
 
-현재 상태: **Phase 3 Presentation 구현**. 네비는 **Graphic Library / Online Studio / Conference / Presentation / History**다. 2026-11-14에 Presentation 탭을 열고, 3840 × 2160 슬라이드 덱·유형 1·2·3·다중 선택·앱 기본값 세팅·PDF·PPTX·Keynote·HTML(배경 영상) 내보내기를 넣었다. 기본 덱은 Slide Front 표지와 연사 4장을 포함한 14장이다. Phase 2 Conference는 2026-10-20에 Pages에 열었고, 2026-11-07에 Slide Front·L배너·MP4 길이 수정을 마쳤다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
+현재 상태: **Phase 3 Presentation 구현**. 네비는 **Graphic Library / Online Studio / Conference / Presentation / History**다. 2026-11-14에 Presentation 탭을 열고, 3840 × 2160 슬라이드 덱·유형 1·2·3·다중 선택·앱 기본값 세팅·PDF·PPTX·Keynote·HTML(배경 영상) 내보내기를 넣었다. 기본 덱은 Slide Front 표지와 연사 4장을 포함한 14장이다. 2026-11-18에는 페이지 프리뷰 접기, 화면 밖까지 이어지는 스페이스 팬, 복사한 그림 붙여넣기를 넣었다. Phase 2 Conference는 2026-10-20에 Pages에 열었고, 2026-11-07에 Slide Front·L배너·MP4 길이 수정을 마쳤다. `#/intake`, `#/design-system`, `#/stats`는 `#/studio`로 이동한다.
 
 ## Phase 요약
 
@@ -124,6 +124,7 @@ Pages: [https://woongs2021.github.io/AX-DESIGN-TOOL/](https://woongs2021.github.
 
 | 날짜 | 변경 |
 |---|---|
+| 2026-11-18 | Presentation 왼쪽 페이지 프리뷰를 툴 패널처럼 접고 펼 수 있다. 접기 버튼은 왼쪽·오른쪽, 펼침·접힘 모두 28px다. 스페이스를 누른 채 드래그하면 카드가 화면 밖까지 움직인다. 복사한 그림은 ⌘V(Windows는 Ctrl+V)로 편집 화면에 붙고, Presentation에서는 페이지 폴더에도 저장된다. |
 | 2026-11-14 | **Phase 3 Presentation**을 열었다. `#/presentation`에서 3840 × 2160 슬라이드 덱을 편집한다. 유형 1·2·3, Shift 범위 선택·블록 이동·잘라내기/붙여넣기, 단일·전체 페이지 앱 기본값 세팅(`presentation-defaults.json`), 디자인 시스템 색 스와치, 전체 내보내기(벡터 PDF·편집 가능 PPTX/Keynote·배경 영상 HTML)를 넣었다. 기본 덱 14장은 Slide Front 표지와 Instagram 연사 4장(김규영·이주원·이보연·박형걸)을 포함한다. 상세는 [Phase 3 문서](docs/phase-3-presentation.md). |
 | 2026-11-07 | Conference MP4가 원본 배경 동영상과 같은 5.03초, 151프레임으로 나온다. 실시간 녹화 대신 프레임마다 카드를 그려 정확한 시각으로 인코딩한다(Mediabunny). 무거운 카드에서 영상이 짧아지던 문제가 없어졌다. 내보내기는 Instagram 약 15초, Slide 약 26초가 걸린다. |
 | 2026-11-07 | 발표장 좌우 화면용 `Slide Front` 프리셋(2400 × 2400, Instagram 배경)을 더했다. L배너는 4500 × 1200mm 비율로 편집 3840 × 1024, 인쇄 17717 × 4724(100dpi)이고 다시 배치했다. 인스타그램 카드 4장의 상단 타이틀·학교 로고를 같은 위치로 맞췄고, 박형걸 PM 이력의 CDO·선행디자인을 고쳤다. 지금 레이아웃이 기본값이다. |

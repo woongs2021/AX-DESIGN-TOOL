@@ -192,6 +192,8 @@ import { addUpload, getUploads, removeUpload, uploadBySrc, uploadSrc } from "../
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.25;
+/** Pixels of the card that stay on screen at the end of a space pan. */
+const PAN_KEEP = 64;
 const NUDGE_STEP = 0.5;
 const NUDGE_SHIFT_STEP = 10;
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
@@ -1536,6 +1538,38 @@ function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement, host: HTMLE
 }
 
 const THEME_DRAG = "application/x-ax-studio-image";
+const PASTE_EXT: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+  "image/svg+xml": "svg",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+};
+
+/** Files on a paste. `files` wins when the browser fills it; screenshots often arrive only as items. */
+function clipboardFiles(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const listed = [...data.files];
+  if (listed.length > 0) return listed;
+  return [...data.items].flatMap((item) => {
+    if (item.kind !== "file") return [];
+    const file = item.getAsFile();
+    return file ? [file] : [];
+  });
+}
+
+/** A clipboard image often has no filename. The page folder only accepts a known extension. */
+function namedPasteFile(file: File, index: number): File | null {
+  const base = file.name.split(/[/\\]/).pop() ?? "";
+  if (/^(?!\.)[^/\\]+\.(png|jpe?g|webp|gif|svg|avif|mp4|webm|mov)$/i.test(base)) return file;
+  const ext = PASTE_EXT[file.type];
+  if (!ext) return null;
+  return new File([file], `paste-${Date.now().toString(36)}-${index}.${ext}`, { type: file.type });
+}
 const PRESET_SHAPE = 56;
 const PRESET_THUMBS: Record<string, string> = {
   "ig-feed-square": thumbIgFeedSquare,
@@ -3019,7 +3053,11 @@ export function bindStudio(
     const show = on && !holdSlide;
     imageLoading.hidden = !show;
     if (show) stage.dataset.loading = "true";
-    else delete stage.dataset.loading;
+    else {
+      delete stage.dataset.loading;
+      // Hiding the frame while loading clamps the scroll. Put the card back once it is visible.
+      if (stage.isConnected) updateScale();
+    }
   };
   const hasImage = () => imageLayers().some((layer) => imageOf(layer));
 
@@ -3040,20 +3078,84 @@ export function bindStudio(
     return Number.isFinite(fitScale) && fitScale > 0 ? fitScale : 1;
   };
 
-  const updateScale = () => {
+  const stageFrame = fit.parentElement instanceof HTMLElement ? fit.parentElement : fit;
+  /** False until the card has been centered once. Earlier frames still have scroll 0. */
+  let stagePlaced = false;
+  let stagePlaceRetry = false;
+  let placingStage = false;
+  /** Card point kept under the viewport center. Scroll resets while the frame is hidden, so this is stored apart from the DOM. */
+  let stageFocus = { x: 0.5, y: 0.5 };
+  const viewAnchor = () => {
+    const card = fit.getBoundingClientRect();
+    const box = stage.getBoundingClientRect();
+    if (card.width < 1 || card.height < 1) return stageFocus;
+    const cardLeft = card.left - box.left + stage.scrollLeft;
+    const cardTop = card.top - box.top + stage.scrollTop;
+    return {
+      x: (stage.scrollLeft + box.width / 2 - cardLeft) / card.width,
+      y: (stage.scrollTop + box.height / 2 - cardTop) / card.height,
+    };
+  };
+  const placeStage = (focus: { x: number; y: number }) => {
+    const card = fit.getBoundingClientRect();
+    const box = stage.getBoundingClientRect();
+    if (card.width < 1 || card.height < 1 || stage.clientWidth < 2 || stage.clientHeight < 2) return false;
+    const cardLeft = card.left - box.left + stage.scrollLeft;
+    const cardTop = card.top - box.top + stage.scrollTop;
+    const targetLeft = cardLeft + focus.x * card.width - stage.clientWidth / 2;
+    const targetTop = cardTop + focus.y * card.height - stage.clientHeight / 2;
+    placingStage = true;
+    stage.scrollLeft = targetLeft;
+    stage.scrollTop = targetTop;
+    placingStage = false;
+    return Math.abs(stage.scrollLeft - targetLeft) < 1.5 && Math.abs(stage.scrollTop - targetTop) < 1.5;
+  };
+  const updateScale = (anchor?: { x: number; y: number }) => {
+    if (anchor) stageFocus = anchor;
+    const focus = stageFocus;
     const base = fitScaleFor(state.cardWidth, state.cardHeight);
     syncZoom();
     const presenting = document.documentElement.classList.contains("is-presenting");
     const safeScale = presenting ? base : base * previewZoom;
-    if (presenting) stage.scrollTo(0, 0);
-    fit.style.width = `${state.cardWidth * safeScale}px`;
-    fit.style.height = `${state.cardHeight * safeScale}px`;
+    const cardW = state.cardWidth * safeScale;
+    const cardH = state.cardHeight * safeScale;
+    fit.style.width = `${cardW}px`;
+    fit.style.height = `${cardH}px`;
     scaler.style.width = `${state.cardWidth}px`;
     scaler.style.height = `${state.cardHeight}px`;
     scaler.style.transform = `scale(${safeScale})`;
     viewScale = safeScale;
+    if (presenting) {
+      stageFrame.style.width = "";
+      stageFrame.style.height = "";
+      placingStage = true;
+      stage.scrollTo(0, 0);
+      placingStage = false;
+    } else {
+      const roomX = Math.max(0, stage.clientWidth - PAN_KEEP);
+      const roomY = Math.max(0, stage.clientHeight - PAN_KEEP);
+      stageFrame.style.width = `${cardW + roomX * 2}px`;
+      stageFrame.style.height = `${cardH + roomY * 2}px`;
+      void stage.scrollWidth;
+      if (placeStage(focus)) stagePlaced = true;
+      else if (!stagePlaced && !stagePlaceRetry) {
+        stagePlaceRetry = true;
+        requestAnimationFrame(() => {
+          stagePlaceRetry = false;
+          if (stage.isConnected && !stagePlaced && !document.documentElement.classList.contains("is-presenting")) {
+            updateScale({ x: 0.5, y: 0.5 });
+          }
+        });
+      }
+    }
     syncOverlay();
   };
+  stage.addEventListener("scroll", () => {
+    if (placingStage || !stagePlaced || stage.dataset.loading === "true") return;
+    if (document.documentElement.classList.contains("is-presenting")) return;
+    if (stage.scrollWidth <= stage.clientWidth + 1 && stage.scrollHeight <= stage.clientHeight + 1) return;
+    stageFocus = viewAnchor();
+  }, { passive: true });
 
   zoomOut.addEventListener("click", () => {
     previewZoom = Math.max(ZOOM_MIN, previewZoom - ZOOM_STEP);
@@ -3065,8 +3167,7 @@ export function bindStudio(
   });
   root.querySelector("#studio-zoom-fit")?.addEventListener("click", () => {
     previewZoom = 1;
-    updateScale();
-    stage.scrollTo(0, 0);
+    updateScale({ x: 0.5, y: 0.5 });
   });
 
   const panelScroll = root.querySelector<HTMLElement>("#studio-panel-scroll");
@@ -6741,6 +6842,8 @@ export function bindStudio(
     layerClipboard = structuredClone(picked);
     layerClipboardOwner = state;
     clipKind = "layer";
+    // Drop any picture still on the system clipboard, so the next paste is this object.
+    void navigator.clipboard.writeText("\u200b").catch(() => undefined);
     clipboardGroups = (state.groups ?? [])
       .map((group) => group.filter((id) => selected.has(id)))
       .filter((group) => group.length >= 2)
@@ -7987,9 +8090,6 @@ export function bindStudio(
       if (event.code === "KeyC" && selected.size > 0) {
         event.preventDefault();
         copyLayers();
-      } else if (event.code === "KeyV" && layerClipboard.length > 0 && clipKind !== "page") {
-        event.preventDefault();
-        pasteLayers(lastPointer);
       }
       return;
     }
@@ -8120,6 +8220,78 @@ export function bindStudio(
   window.addEventListener("blur", endSpacePan);
   document.addEventListener("pointerdown", onDropperPointer, true);
   document.addEventListener("click", onDropperClick, true);
+  let pasteShift = 0;
+  let pasteAnchor = "";
+  const placePastedMedia = async (files: File[]) => {
+    const named = files.flatMap((file, index) => {
+      const next = namedPasteFile(file, index);
+      return next ? [next] : [];
+    });
+    if (named.length === 0) {
+      showToast("이 형식의 그림은 붙여 넣을 수 없습니다.");
+      return;
+    }
+    const anchor = lastPointer ? `${Math.round(lastPointer.x)}:${Math.round(lastPointer.y)}` : "center";
+    if (anchor !== pasteAnchor) {
+      pasteAnchor = anchor;
+      pasteShift = 0;
+    }
+    const base = lastPointer ?? { x: state.cardWidth / 2, y: state.cardHeight / 2 };
+    const at = { x: base.x + pasteShift, y: base.y + pasteShift };
+    pasteShift = (pasteShift + 24) % 240;
+    const pageId = config.pageId;
+    if (config.id === "presentation" && pageId) {
+      const media = named.filter(isPageMedia);
+      if (media.length === 0) {
+        showToast("이 형식의 그림은 붙여 넣을 수 없습니다.");
+        return;
+      }
+      const saved = await uploadPageFiles(pageId, media);
+      if (saved.length < media.length) showToast("파일을 페이지 폴더에 넣지 못했습니다.");
+      let offset = 0;
+      for (const item of saved) {
+        if (item.kind === "video") usePageVideo(item.src);
+        else {
+          await insertImage(item.src, { x: at.x + offset, y: at.y + offset });
+          offset += 24;
+        }
+      }
+      return;
+    }
+    const images = named.filter((file) => file.type.startsWith("image/"));
+    if (images.length === 0) {
+      showToast("이 형식의 그림은 붙여 넣을 수 없습니다.");
+      return;
+    }
+    const added = (await Promise.all(images.map((file) => addUpload(file)))).filter((item) => item !== null);
+    if (added.length < images.length) showToast("이미지를 저장하지 못했습니다.");
+    if (added.length === 0) return;
+    renderThemes();
+    let offset = 0;
+    for (const upload of added) {
+      await insertImage(uploadSrc(upload), { x: at.x + offset, y: at.y + offset });
+      offset += 24;
+    }
+  };
+  const onPaste = (event: ClipboardEvent) => {
+    if (!canvas.isConnected || exporting) return;
+    if (document.documentElement.classList.contains("is-presenting")) return;
+    const target = event.target;
+    if (textTarget(target) || editing) return;
+    if (target instanceof Element && target.closest(".deck__rail, .confirm-backdrop")) return;
+    const files = clipboardFiles(event.clipboardData);
+    if (files.length > 0 && !state.code.trim()) {
+      event.preventDefault();
+      void placePastedMedia(files);
+      return;
+    }
+    if (window.getSelection()?.toString()) return;
+    if (layerClipboard.length > 0 && clipKind !== "page") {
+      event.preventDefault();
+      pasteLayers(lastPointer);
+    }
+  };
+  document.addEventListener("paste", onPaste);
   stopStudioKeys = () => {
     document.removeEventListener("keydown", studioKeys);
     document.removeEventListener("keyup", onSpaceUp);
@@ -8128,6 +8300,7 @@ export function bindStudio(
     window.removeEventListener("blur", endSpacePan);
     document.removeEventListener("pointerdown", onDropperPointer, true);
     document.removeEventListener("click", onDropperClick, true);
+    document.removeEventListener("paste", onPaste);
     endSpacePan();
   };
 
