@@ -7,6 +7,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { backgroundIdFor, logoSlug, speakerSlug } from "../src/shared/conference.ts";
+import { GIT_MAX_FILE_BYTES } from "../src/shared/limits.ts";
 import { PRESENTATION_MEDIA_PREFIX, PRESENTATION_PROJECT_ROUTE, PRESENTATION_UPLOAD_ROUTE } from "../src/shared/presentation-files.ts";
 
 const PROJECT = join("presentation", "project 1", "pages");
@@ -279,6 +280,23 @@ function uniqueName(dir: string, name: string): string {
   return `${stem}-${index}${ext}`;
 }
 
+/** Deletes one image or video from the page folder and drops it from placed. */
+function removeFile(pageId: string, rawName: string): { name: string; keys: string[] } | null {
+  const name = safeFileName(rawName);
+  const folder = name ? readFolders().get(pageId) : null;
+  if (!name || !folder || !inside(pagesRoot(), folder.dir)) return null;
+  const file = join(folder.dir, name);
+  if (!existsSync(file) || !statSync(file).isFile()) return null;
+  const keys = [...sources().entries()].flatMap(([key, source]) => (basename(source) === name ? [key] : []));
+  rmSync(file);
+  const placed = folder.meta.placed.filter((item) => item !== name);
+  if (placed.length !== folder.meta.placed.length) {
+    folder.meta.placed = placed;
+    writeMeta(folder.dir, folder.meta);
+  }
+  return { name, keys };
+}
+
 /** Writes one image or video into the page folder and marks it placed. */
 function saveUpload(pageId: string, rawName: string, data: Buffer): { name: string; kind: "image" | "video" } | null {
   const name = safeFileName(rawName);
@@ -367,7 +385,7 @@ export function presentationProject(): Plugin {
           }
           try {
             const query = new URL(req.url ?? "", "http://localhost").searchParams;
-            const saved = saveUpload(query.get("page") ?? "", query.get("name") ?? "", await readBuffer(req, 80 * 1024 * 1024));
+            const saved = saveUpload(query.get("page") ?? "", query.get("name") ?? "", await readBuffer(req, GIT_MAX_FILE_BYTES));
             if (!saved) {
               res.statusCode = 400;
               res.end();
@@ -387,7 +405,24 @@ export function presentationProject(): Plugin {
           return;
         }
         try {
-          const body = JSON.parse(await readBody(req)) as { pages?: SyncPage[]; placed?: { id?: unknown; names?: unknown }[] };
+          const body = JSON.parse(await readBody(req)) as {
+            pages?: SyncPage[];
+            placed?: { id?: unknown; names?: unknown }[];
+            remove?: { id?: unknown; name?: unknown };
+          };
+          if (body.remove) {
+            const id = body.remove.id;
+            const name = body.remove.name;
+            const removed = typeof id === "string" && typeof name === "string" ? removeFile(id, name) : null;
+            if (!removed) {
+              res.statusCode = 404;
+              res.end();
+              return;
+            }
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(removed));
+            return;
+          }
           if (Array.isArray(body.placed)) {
             markPlaced(
               body.placed.flatMap((item) => {

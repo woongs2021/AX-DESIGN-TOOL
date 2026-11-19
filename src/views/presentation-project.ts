@@ -213,6 +213,29 @@ async function applyProject(deck: PresentationDeck, onChange: () => void): Promi
   if (page) publish(page.id);
 }
 
+/** Removes one image or video from the open page's folder and from the control panel. */
+export async function removePageFile(pageId: string, name: string): Promise<string[] | null> {
+  const run = pending.then(async () => {
+    const response = await fetch(PRESENTATION_PROJECT_ROUTE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remove: { id: pageId, name } }),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { keys?: unknown };
+    const keys = Array.isArray(body.keys) ? body.keys.filter((key): key is string => typeof key === "string") : [];
+    seen.delete(`${pageId}/${name}`);
+    const page = lastListing?.pages?.find((item) => item.id === pageId);
+    if (page?.files) {
+      page.files = page.files.filter((file) => file.name !== name);
+      publish(pageId);
+    }
+    return keys;
+  });
+  pending = run.then(() => undefined).catch(() => undefined);
+  return run;
+}
+
 /** Saves images and videos into the open page's folder and shows them in the control panel. */
 export async function uploadPageFiles(
   pageId: string,

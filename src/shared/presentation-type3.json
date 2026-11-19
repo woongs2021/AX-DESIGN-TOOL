@@ -1,0 +1,61 @@
+{
+  "type": 3,
+  "tone": null,
+  "role": "content",
+  "state": {
+    "presetId": "conf-slide",
+    "cardWidth": 3840,
+    "cardHeight": 2160,
+    "themeSlug": "",
+    "color": "#010102",
+    "radius": 0,
+    "code": "",
+    "panel": "design",
+    "controlsWidth": 360,
+    "layers": [
+      {
+        "id": "layer-mwnkvhbz-96bvt1",
+        "kind": "title",
+        "text": "Workflow : Late 2026",
+        "x": 112,
+        "y": 112,
+        "size": 200,
+        "fontId": "montserrat",
+        "color": "#fcfcff",
+        "gradient": null,
+        "blend": "normal",
+        "weight": 400,
+        "italic": false,
+        "underline": false,
+        "align": "left"
+      },
+      {
+        "id": "layer-mwnkvhbz-svbii9",
+        "kind": "title",
+        "text": "디자인 워크플로우 2026년 하반기",
+        "x": 112,
+        "y": 391.5,
+        "size": 92,
+        "fontId": "pretendard",
+        "color": "#fcfcff",
+        "gradient": null,
+        "blend": "normal",
+        "weight": 300,
+        "italic": false,
+        "underline": false,
+        "align": "left"
+      },
+      {
+        "id": "layer-mwnkxqwo-4nm3d0",
+        "kind": "image",
+        "src": "pres:page-0877f040-7710-42b1-a823-dc7560a84730/image.png",
+        "x": 271,
+        "y": 678,
+        "width": 3408,
+        "radius": 12,
+        "crop": null,
+        "blend": "normal"
+      }
+    ]
+  }
+}
