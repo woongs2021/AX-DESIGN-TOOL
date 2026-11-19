@@ -26,7 +26,7 @@ When the user asks to organize images in bulk, sort by page folder:
 1. Read the live deck in `localStorage['ax-presentation-deck']` on localhost. Do not bump `DECK_VERSION`. Do not click 모드 전환, 초기화, or 원.
 2. For each page, list image layers and the background. Copy each file that page uses into that page's folder. Match `conf:` ids to `phase 2-resources` (`[Speecher]`, `[SVG]`, `[Graphic_Resources] 2`). A file used on two pages is copied into both folders.
 3. Add those filenames to that folder's `placed` array so a reload does not lay them out a second time. A file that is not on the page yet stays out of `placed`. The editor then inserts it like a type 3 frame.
-4. Leave existing layer `src` values as they are unless the user asked to retarget them. `pres:<pageId>/<file>` is the folder source and works on localhost only.
+4. Leave existing layer `src` values as they are unless the user asked to retarget them. `pres:<pageId>/<file>` is the folder source. The dev server serves it on localhost, and `npm run build:site` copies the files the default deck uses into `presentation-media/` for the Pages site.
 5. Do not put page media back into the fixed Speecher or SVG control lists. Do not commit `image-pick/` or `dist/`. The `presentation/` folders are part of the repo.
 
 Images: png, jpg, jpeg, webp, gif, svg, avif. Videos: mp4, webm, mov. Skip `page.json` and dotfiles.

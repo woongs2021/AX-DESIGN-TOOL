@@ -122,7 +122,6 @@ body { display: grid; place-items: center; font-family: system-ui, sans-serif; }
 .enter-stage { position: absolute; left: 0; top: 0; z-index: 2; transform-origin: top left; pointer-events: none; }
 .media-stage { position: absolute; left: 0; top: 0; transform-origin: top left; pointer-events: none; }
 .slide .media-stage video { position: absolute; inset: auto; object-fit: fill; }
-[data-enter-text], [data-enter-object] { opacity: 0; }
 .count { position: fixed; right: 16px; bottom: 12px; color: white; opacity: 0; font-size: 13px; transition: opacity 0.3s; pointer-events: none; text-shadow: 0 1px 2px black; }
 body.is-moving .count { opacity: 0.7; }
 body.is-moving { cursor: default; }
@@ -183,6 +182,9 @@ const playBlur = (slide) => {
   const together = Object.assign({}, writing, { delay: 0, step: 0 });
   const token = String(Number(slide.dataset.enterRun || 0) + 1);
   slide.dataset.enterRun = token;
+  // Each visit plays the entrance again, as presentation mode does. A pass left running from the last visit stops first.
+  (slide.enterPlays || []).forEach((play) => play.pause());
+  slide.enterPlays = [];
   const nodes = [...slide.querySelectorAll("[data-enter-text], [data-enter-object]")];
   const grouped = new Map();
   const solos = [];
@@ -201,14 +203,10 @@ const playBlur = (slide) => {
     const rows = asRows ? list : list.filter((el) => el.hasAttribute("data-enter-object"));
     const plays = texts.map((el) => ProgressiveBlur.writeText(el, options));
     if (rows.length) plays.push(ProgressiveBlur.writeContent({ rows }, options));
+    slide.enterPlays.push(...plays);
     Promise.all(plays.map((play) => play.finished)).then(() => {
       if (slide.dataset.enterRun !== token || !slide.classList.contains("is-current")) return;
       const keep = list.filter((el) => el.getAttribute("data-enter-mode") === "loop" && el.isConnected);
-      list.forEach((el) => {
-        if (keep.includes(el)) return;
-        el.removeAttribute("data-enter-text");
-        el.removeAttribute("data-enter-object");
-      });
       if (keep.length) run(keep, options, asRows);
     });
   };

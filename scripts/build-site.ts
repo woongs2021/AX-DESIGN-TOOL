@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { GITHUB_PAGES_MAX_BYTES, GIT_MAX_FILE_BYTES } from "../src/shared/limits.ts";
+import { PRESENTATION_STATIC_DIR, parsePresentationFile } from "../src/shared/presentation-files.ts";
 import { stableStringify } from "../src/shared/stable-json.ts";
 import type { SiteIndex } from "../src/shared/index-types.ts";
 
@@ -38,6 +39,45 @@ run("npm", ["run", "build", "--", `--target=${target}`]);
 console.log(`\n==> Building UI with DATA_TARGET=${target}`);
 run("npm", ["run", "build:ui"], { DATA_TARGET: target });
 
+/** Copies the page-folder files the default deck uses next to the app, where presentationFileUrl looks off localhost. Returns their bytes. */
+function copyPresentationMedia(appDir: string): number {
+  const root = join("presentation", "project 1", "pages");
+  const folders = new Map<string, string>();
+  for (const name of existsSync(root) ? readdirSync(root) : []) {
+    const meta = join(root, name, "page.json");
+    if (!existsSync(meta)) continue;
+    const id = (JSON.parse(readFileSync(meta, "utf8")) as { id?: unknown }).id;
+    if (typeof id === "string") folders.set(id, join(root, name));
+  }
+  const deck = JSON.parse(readFileSync(join("src", "shared", "presentation-defaults.json"), "utf8")) as {
+    pages?: { state?: { layers?: { src?: unknown }[]; background?: { file?: unknown } } }[];
+  };
+  const srcs = new Set<string>();
+  for (const page of deck.pages ?? []) {
+    for (const layer of page.state?.layers ?? []) if (typeof layer.src === "string") srcs.add(layer.src);
+    if (typeof page.state?.background?.file === "string") srcs.add(page.state.background.file);
+  }
+  let bytes = 0;
+  for (const src of srcs) {
+    const file = parsePresentationFile(src);
+    if (!file) continue;
+    const folder = folders.get(file.pageId);
+    const from = folder ? join(folder, file.name) : "";
+    if (!from || !existsSync(from)) {
+      console.warn(`WARN: ${src} is on a default page but missing from its page folder`);
+      continue;
+    }
+    const to = join(appDir, PRESENTATION_STATIC_DIR, file.pageId, file.name.normalize("NFC"));
+    mkdirSync(dirname(to), { recursive: true });
+    copyFileSync(from, to);
+    bytes += statSync(to).size;
+  }
+  return bytes;
+}
+
+console.log("\n==> Copying presentation page files the default deck uses");
+const presentationMediaBytes = copyPresentationMedia("dist/app");
+
 const indexPath = join("dist/app/data/index.json");
 if (!existsSync(indexPath)) {
   console.error(`FAIL: ${indexPath} missing after site build`);
@@ -56,7 +96,7 @@ const report = existsSync(reportPath)
     })
   : null;
 
-const bundleBytes = report?.bundleBytes ?? report?.assetBytesCopied ?? 0;
+const bundleBytes = (report?.bundleBytes ?? report?.assetBytesCopied ?? 0) + presentationMediaBytes;
 
 if (report && report.oversizeFiles.length > 0) {
   console.error("FAIL: oversize files above Git 100MB limit:");
@@ -100,6 +140,7 @@ console.log(`\nOK: site ready in dist/app for target=${target}`);
 console.log(`captures: ${index.captures.length}`);
 if (report) {
   console.log(`asset bytes: ${report.assetBytesCopied}`);
+  console.log(`presentation media bytes: ${presentationMediaBytes}`);
   console.log(`bundle bytes: ${bundleBytes}`);
   console.log(
     `GitHub Pages remaining: ${GITHUB_PAGES_MAX_BYTES - bundleBytes}`,

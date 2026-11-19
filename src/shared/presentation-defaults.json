@@ -948,19 +948,12 @@
         "code": "",
         "panel": "design",
         "controlsWidth": 360,
-        "layers": [
-          {
-            "id": "layer-mwnmeb4c-jtfrhs",
-            "kind": "image",
-            "src": "pres:page-61e664bd-f763-4851-8e05-90fed561a850/꿈꾸던 어른이 되었나요.mp4",
-            "x": 843,
-            "y": 3,
-            "width": 2154,
-            "radius": 12,
-            "crop": null,
-            "blend": "normal"
-          }
-        ]
+        "layers": [],
+        "background": {
+          "id": "slide",
+          "mode": "video",
+          "file": "pres:page-61e664bd-f763-4851-8e05-90fed561a850/꿈꾸던 어른이 되었나요.mp4"
+        }
       }
     },
     {
