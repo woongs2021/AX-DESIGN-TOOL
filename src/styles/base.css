@@ -475,7 +475,8 @@ html[data-mode="dark"] .confirm-dialog {
   font-variant-numeric: tabular-nums;
 }
 
-.toast {
+.toast,
+.sound-hint {
   position: fixed;
   left: 50%;
   bottom: 28px;
@@ -489,7 +490,22 @@ html[data-mode="dark"] .confirm-dialog {
   transform: translateX(-50%);
 }
 
-html[data-mode="dark"] .toast {
+/* Above the present-mode shield, so a click on it turns sound on instead of the page. */
+.sound-hint {
+  z-index: 30;
+  border: 0;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* The editor's bottom bar sits where present mode has nothing. */
+html:not(.is-presenting) .sound-hint {
+  bottom: 96px;
+}
+
+html[data-mode="dark"] .toast,
+html[data-mode="dark"] .sound-hint {
   background: var(--studio-ink-dark);
   color: var(--fg);
   box-shadow:

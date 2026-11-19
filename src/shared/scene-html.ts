@@ -1,11 +1,11 @@
 /**
  * One HTML file that plays the deck as a presentation. Slides are SVG with live, selectable text;
- * background videos play behind them. Fonts, pictures, and videos are embedded, so the file works offline.
+ * background videos play behind them and video layers in place, with sound. Fonts, pictures, and videos are embedded, so the file works offline.
  */
 
 import blurSource from "../../presentation/progressive-blur.js?raw";
 import { faceCovers, loadFace, subsetTrueType, type LoadedFace } from "./font-files.ts";
-import type { SceneColor, SceneFill, SceneItem, SlideScene } from "./slides-pptx.ts";
+import type { SceneColor, SceneFill, SceneItem, SceneVideo, SlideScene } from "./slides-pptx.ts";
 
 const num = (value: number) => String(Math.round(value * 100) / 100);
 const paint = (color: SceneColor) => `#${color.hex}`;
@@ -92,6 +92,24 @@ function shapeSvg(item: Extract<SceneItem, { kind: "shape" }>, defs: string[], i
   return `<path d="${d}"${attrs}/>`;
 }
 
+/** A video layer in card pixels, inside a stage the player scales to the slide like the entrance text. */
+function videoLayerHtml(video: SceneVideo, id: string, width: number, height: number, mark: string): string {
+  const { box, full } = video;
+  const inset = [box.y - full.y, full.x + full.w - box.x - box.w, full.y + full.h - box.y - box.h, box.x - full.x].map((side) => `${num(Math.max(0, side))}px`);
+  const style = [
+    `left:${num(full.x)}px`,
+    `top:${num(full.y)}px`,
+    `width:${num(full.w)}px`,
+    `height:${num(full.h)}px`,
+    `clip-path:inset(${inset.join(" ")} round ${num(video.radius)}px)`,
+    video.opacity < 1 ? `opacity:${num(video.opacity)}` : "",
+  ]
+    .filter(Boolean)
+    .join(";");
+  const loop = video.play === "once" ? "" : " loop";
+  return `<div class="media-stage" data-w="${width}" style="width:${width}px;height:${height}px"><div${mark}><video data-video="${id}"${loop} playsinline preload="auto" style="${style}"></video></div></div>`;
+}
+
 const PLAYER_CSS = `
 html, body { margin: 0; height: 100%; background: black; overflow: hidden; }
 body { display: grid; place-items: center; font-family: system-ui, sans-serif; }
@@ -102,6 +120,8 @@ body { display: grid; place-items: center; font-family: system-ui, sans-serif; }
 .slide video { object-fit: cover; }
 .slide text { white-space: pre; }
 .enter-stage { position: absolute; left: 0; top: 0; z-index: 2; transform-origin: top left; pointer-events: none; }
+.media-stage { position: absolute; left: 0; top: 0; transform-origin: top left; pointer-events: none; }
+.slide .media-stage video { position: absolute; inset: auto; object-fit: fill; }
 [data-enter-text], [data-enter-object] { opacity: 0; }
 .count { position: fixed; right: 16px; bottom: 12px; color: white; opacity: 0; font-size: 13px; transition: opacity 0.3s; pointer-events: none; text-shadow: 0 1px 2px black; }
 body.is-moving .count { opacity: 0.7; }
@@ -125,9 +145,29 @@ const videoUrl = (id) => {
   return decoded.get(id);
 };
 const prepare = (slide) => {
-  const video = slide?.querySelector("video[data-video]");
-  if (video && !video.src) video.src = videoUrl(video.dataset.video);
+  slide?.querySelectorAll("video[data-video]").forEach((video) => {
+    if (!video.src) video.src = videoUrl(video.dataset.video);
+  });
 };
+const hearing = new Set();
+const playClip = (video) => {
+  hearing.add(video);
+  video.muted = false;
+  video.play().catch(() => {
+    if (!hearing.has(video)) return;
+    video.muted = true;
+    video.play().catch(() => {});
+  });
+};
+// Unmuting outside a gesture (a lone Shift, say) makes the browser pause the clip instead.
+const unlock = () => {
+  if (navigator.userActivation && !navigator.userActivation.isActive) return;
+  hearing.forEach((video) => {
+    if (!video.paused && video.muted) video.muted = false;
+  });
+};
+window.addEventListener("pointerdown", unlock, true);
+window.addEventListener("keydown", unlock, true);
 const fitStage = (stage) => {
   const slide = stage.closest(".slide");
   const width = Number(stage.dataset.w) || 1;
@@ -185,23 +225,26 @@ const playBlur = (slide) => {
     });
   });
 };
-window.addEventListener("resize", () => document.querySelectorAll(".enter-stage").forEach(fitStage));
+window.addEventListener("resize", () => document.querySelectorAll(".enter-stage, .media-stage").forEach(fitStage));
 let current = -1;
 const show = (next) => {
   next = Math.max(0, Math.min(slides.length - 1, next));
   if (next === current) return;
   slides.forEach((slide, at) => {
     slide.classList.toggle("is-current", at === next);
-    const video = slide.querySelector("video");
-    if (video && at !== next) video.pause();
+    if (at === next) return;
+    slide.querySelectorAll("video").forEach((video) => {
+      hearing.delete(video);
+      video.pause();
+    });
   });
   current = next;
   prepare(slides[next]);
-  const video = slides[next].querySelector("video");
-  if (video) {
+  slides[next].querySelectorAll(".media-stage").forEach(fitStage);
+  slides[next].querySelectorAll("video").forEach((video) => {
     video.currentTime = 0;
-    video.play().catch(() => {});
-  }
+    playClip(video);
+  });
   count.textContent = (next + 1) + " / " + slides.length;
   playBlur(slides[next]);
   try { history.replaceState(null, "", "#" + (next + 1)); } catch (e) {}
@@ -231,7 +274,7 @@ document.addEventListener("mousemove", () => {
 show((Number(location.hash.slice(1)) || 1) - 1);
 `;
 
-/** Fetches background videos, so it needs the same network access as the editor. */
+/** Fetches the videos, so it needs the same network access as the editor. */
 export async function scenesHtml(scenes: readonly SlideScene[], title: string): Promise<Blob> {
   if (scenes.length === 0) throw new Error("slides");
   const first = scenes[0];
@@ -247,13 +290,27 @@ export async function scenesHtml(scenes: readonly SlideScene[], title: string): 
   const videos = new Map<string, string>();
   const slides: string[] = [];
   let gradient = 0;
+  const videoId = (url: string) => {
+    let id = videos.get(url);
+    if (!id) {
+      id = `video-${videos.size + 1}`;
+      videos.set(url, id);
+    }
+    return id;
+  };
   for (const scene of scenes) {
     const defs: string[] = [];
-    const body: string[] = [];
+    let body: string[] = [];
+    /** Bottom to top: SVG runs, with each video layer between the items below and above it. */
+    const layers: ({ svg: string[] } | { html: string })[] = [];
     const enterTexts: string[] = [];
     const entered = (item: SceneItem) => enterMark(item, "object");
     for (const item of scene.items) {
-      if (item.kind === "picture") {
+      if (item.kind === "picture" && item.video) {
+        layers.push({ svg: body });
+        body = [];
+        layers.push({ html: videoLayerHtml(item.video, videoId(item.video.url), scene.width, scene.height, entered(item)) });
+      } else if (item.kind === "picture") {
         body.push(`<image${entered(item)} href="${dataUrl("image/png", item.png)}" x="${num(item.x)}" y="${num(item.y)}" width="${num(item.w)}" height="${num(item.h)}" preserveAspectRatio="none"/>`);
       } else if (item.kind === "line") {
         const { segment, color } = item;
@@ -309,25 +366,24 @@ export async function scenesHtml(scenes: readonly SlideScene[], title: string): 
         }
       }
     }
+    layers.push({ svg: body });
     const poster = dataUrl("image/jpeg", scene.background);
     let video = "";
     if (scene.video) {
-      let id = videos.get(scene.video);
-      if (!id) {
-        id = `video-${videos.size + 1}`;
-        videos.set(scene.video, id);
-      }
       const loop = scene.videoPlay === "once" ? "" : " loop";
-      video = `<video data-video="${id}" poster="${poster}" muted${loop} playsinline preload="auto"></video>`;
+      video = `<video data-video="${videoId(scene.video)}" poster="${poster}"${loop} playsinline preload="auto"></video>`;
     }
     const backdrop = video ? "" : `<image href="${poster}" width="${scene.width}" height="${scene.height}" preserveAspectRatio="none"/>`;
     const stage =
       enterTexts.length > 0
         ? `<div class="enter-stage" data-w="${scene.width}" data-h="${scene.height}" style="width:${scene.width}px;height:${scene.height}px">${enterTexts.join("")}</div>`
         : "";
-    slides.push(
-      `<section class="slide">${video}<svg viewBox="0 0 ${scene.width} ${scene.height}" xmlns="http://www.w3.org/2000/svg">${defs.length > 0 ? `<defs>${defs.join("")}</defs>` : ""}${backdrop}${body.join("")}</svg>${stage}</section>`,
-    );
+    const svg = (parts: string[], first: boolean) =>
+      `<svg viewBox="0 0 ${scene.width} ${scene.height}" xmlns="http://www.w3.org/2000/svg">${first && defs.length > 0 ? `<defs>${defs.join("")}</defs>` : ""}${first ? backdrop : ""}${parts.join("")}</svg>`;
+    const stack = layers
+      .map((layer, at) => ("html" in layer ? layer.html : at > 0 && layer.svg.length === 0 ? "" : svg(layer.svg, at === 0)))
+      .join("");
+    slides.push(`<section class="slide">${video}${stack}${stage}</section>`);
   }
 
   const faces = [...used.values()].map(({ face, gids }) => {

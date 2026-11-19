@@ -999,10 +999,17 @@ export function designToCode(
       }
       if (layer.crop) {
         const full = uncroppedRect(layer, ratio);
-        items.push(`  <div class="${name}"><div class="studio-crop"><img src="${src}" alt="" /></div></div>`);
+        const video = isVideoSrc(layer.src);
+        const loop = layer.play === "once" ? "" : " loop";
+        const inner = video
+          ? `<video src="${src}" muted${loop} autoplay playsinline></video>`
+          : `<img src="${src}" alt="" />`;
+        items.push(`  <div class="${name}"><div class="studio-crop">${inner}</div></div>`);
         rules.push(`  .studio-card .${name} { position: absolute; ${place} width: ${px(layer.width)}; height: ${px(imageLayerHeight(layer, ratio))}; ${corner}${fx} }`);
         rules.push(`  .studio-card .${name} .studio-crop { inset: 0; border-radius: inherit; }`);
-        rules.push(`  .studio-card .${name} img { left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)}; }`);
+        const spot = `left: ${px(full.x - layer.x)}; top: ${px(full.y - layer.y)}; width: ${px(full.w)};`;
+        if (video) rules.push(`  .studio-card .${name} video { position: absolute; ${spot} height: ${px(full.h)}; object-fit: fill; }`);
+        else rules.push(`  .studio-card .${name} img { ${spot} }`);
       } else if (isVideoSrc(layer.src)) {
         const loop = layer.play === "once" ? "" : " loop";
         items.push(`  <video class="${name}" src="${src}" muted${loop} autoplay playsinline></video>`);

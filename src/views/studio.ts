@@ -1,6 +1,6 @@
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
 import { PAGE_ENTER_EVENT, PAGE_FILES_EVENT, PRESENT_LAYOUT_EVENT, presentationFileUrl } from "../shared/presentation-files.ts";
-import { isPageMedia, uploadPageFiles, type PageFileSource } from "./presentation-project.ts";
+import { isPageMedia, removePageFile, uploadPageFiles, type PageFileSource } from "./presentation-project.ts";
 import type { CaptureRecord } from "../shared/index-types.ts";
 import { sortCaptures } from "../shared/filter.ts";
 import {
@@ -25,6 +25,7 @@ import {
   placeholderLayer,
   isMotionSrc,
   isUploadSrc,
+  UPLOAD_PREFIX,
   isVideoSrc,
   mediaPlayOf,
   TEXT_ALIGNS,
@@ -118,7 +119,7 @@ import {
 } from "../shared/conference.ts";
 import { readInstagramCard, readInstagramOrder, readStoredConferenceBaseline, writeInstagramCard, writeInstagramOrder } from "../studio-baseline.ts";
 import { cardPdf } from "../shared/card-pdf.ts";
-import type { SceneColor, SceneGeometry, SceneItem, ScenePathCmd, SlideScene } from "../shared/slides-pptx.ts";
+import type { SceneColor, SceneGeometry, SceneItem, ScenePathCmd, SceneVideo, SlideScene } from "../shared/slides-pptx.ts";
 import { GIF_LONG_EDGE, createGifEncoder, gifFrameDelays, gifSize } from "../shared/card-gif.ts";
 import { createPngEncoder, printStrips } from "../shared/print-png.ts";
 import {
@@ -274,12 +275,70 @@ function loadBlur(): Promise<ProgressiveBlurApi> {
   });
 }
 
-/** One muted element per URL, kept across renders so the file loads once. Looping follows the page. */
+const hearing = new Set<HTMLVideoElement>();
+const hearToken = new WeakMap<HTMLVideoElement, number>();
+const hintWatched = new WeakSet<HTMLVideoElement>();
+let soundHint: HTMLButtonElement | null = null;
+
+/** While a clip plays muted because the browser blocked its sound, says how to turn it on. */
+function syncSoundHint(): void {
+  const blocked = [...hearing].some((video) => video.muted && !video.paused);
+  if (!blocked) {
+    soundHint?.remove();
+    soundHint = null;
+    return;
+  }
+  if (soundHint) return;
+  // In body: present mode puts the whole page in full screen, so the hint shows there too.
+  soundHint = document.createElement("button");
+  soundHint.type = "button";
+  soundHint.className = "sound-hint";
+  soundHint.textContent = "소리가 꺼져 있어요 · 클릭하면 켜져요";
+  document.body.append(soundHint);
+}
+
+/** Plays with sound. A browser that blocks autoplay keeps the picture muted until the next click. */
+function playClip(video: HTMLVideoElement): void {
+  hearing.add(video);
+  if (!hintWatched.has(video)) {
+    hintWatched.add(video);
+    for (const type of ["play", "pause", "volumechange"]) video.addEventListener(type, syncSoundHint);
+  }
+  const token = (hearToken.get(video) ?? 0) + 1;
+  hearToken.set(video, token);
+  video.muted = false;
+  void video.play().catch(() => {
+    if (hearToken.get(video) !== token) return;
+    video.muted = true;
+    void video.play().catch(() => {});
+  });
+}
+
+function stopClip(video: HTMLVideoElement): void {
+  hearing.delete(video);
+  hearToken.set(video, (hearToken.get(video) ?? 0) + 1);
+  syncSoundHint();
+}
+
+if (typeof document !== "undefined") {
+  const unlock = () => {
+    // Unmuting outside a gesture (a lone Shift, say) makes the browser pause the clip instead.
+    if (navigator.userActivation && !navigator.userActivation.isActive) return;
+    for (const video of hearing) {
+      if (video.paused || !video.muted) continue;
+      video.muted = false;
+    }
+  };
+  // Window capture runs first, so present mode's key handling and stage pans cannot swallow the gesture.
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+}
+
+/** One element per URL, kept across renders so the file loads once. Looping follows the page. */
 function backgroundVideo(url: string): HTMLVideoElement {
   const cached = videoCache.get(url);
   if (cached) return cached;
   const video = document.createElement("video");
-  video.muted = true;
   video.playsInline = true;
   video.preload = "auto";
   video.src = url;
@@ -404,6 +463,8 @@ let layerClipboardOwner: StudioState | null = null;
 /** Which copy happened last, so a page paste does not swallow an object paste. */
 let clipKind: "page" | "layer" | null = null;
 let layerMenu: HTMLElement | null = null;
+let sourceMenu: HTMLElement | null = null;
+let closeSourceMenu: (() => void) | null = null;
 
 export function notePageClip(): void {
   clipKind = "page";
@@ -448,6 +509,57 @@ function sameStudio(a: StudioState, b: StudioState): boolean {
 const imageCache = new Map<string, HTMLImageElement>();
 const imageWaiters = new Map<string, Promise<HTMLImageElement>>();
 const dataUrlCache = new Map<string, Promise<string>>();
+
+/** First frame of a video, stored like a still so a dropped clip can sit at its own pixel size. */
+function captureVideoPoster(url: string): Promise<HTMLImageElement | null> {
+  const cached = imageCache.get(url);
+  if (cached?.complete && cached.naturalWidth > 0) return Promise.resolve(cached);
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    let settled = false;
+    const finish = (image: HTMLImageElement | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      video.onloadeddata = null;
+      video.onerror = null;
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+      resolve(image);
+    };
+    const timer = window.setTimeout(() => finish(null), 8000);
+    video.onerror = () => finish(null);
+    video.onloadeddata = () => {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (!width || !height) {
+        finish(null);
+        return;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        finish(null);
+        return;
+      }
+      ctx.drawImage(video, 0, 0, width, height);
+      const image = new Image();
+      image.onload = () => {
+        imageCache.set(url, image);
+        finish(image);
+      };
+      image.onerror = () => finish(null);
+      image.src = canvas.toDataURL("image/jpeg", 0.72);
+    };
+    video.src = url;
+  });
+}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   const cached = imageCache.get(url);
@@ -789,6 +901,9 @@ function enterGroupKey(state: StudioState, id: string): string | null {
 }
 
 export async function renderStudioScene(state: StudioState, config: StudioConfig): Promise<SlideScene> {
+  const { srcUrl, videoUrl } = studioSources(state, config);
+  const clips = state.layers.filter((layer): layer is ImageLayer => layer.kind === "image" && isVideoSrc(layer.src));
+  await Promise.all(clips.map((layer) => captureVideoPoster(srcUrl(layer.src))));
   const { imageOf, background } = await prepareStill(state, config);
   const width = state.cardWidth;
   const height = state.cardHeight;
@@ -957,7 +1072,25 @@ export async function renderStudioScene(state: StudioState, config: StudioConfig
     piece.width = right - left + 1;
     piece.height = bottom - top + 1;
     piece.getContext("2d")?.drawImage(canvas, left, top, piece.width, piece.height, 0, 0, piece.width, piece.height);
-    return { kind: "picture", name: layer.id, x: left, y: top, w: piece.width, h: piece.height, png: await encode(piece, "image/png") };
+    const video = layer.kind === "image" ? videoOf(layer) : null;
+    return { kind: "picture", name: layer.id, x: left, y: top, w: piece.width, h: piece.height, png: await encode(piece, "image/png"), ...(video ? { video } : {}) };
+  };
+  /** Same clips the editor plays as video: tinted or blurred ones stay still there too. */
+  const videoOf = (layer: ImageLayer): SceneVideo | null => {
+    if (!isVideoSrc(layer.src) || layer.tint || imageBlur(layer) > 0 || layerBlurBottom(layer) > 0) return null;
+    const url = srcUrl(layer.src);
+    const poster = imageOf(layer);
+    if (!url || !poster) return null;
+    const aspect = poster.naturalHeight / poster.naturalWidth;
+    const height = imageLayerHeight(layer, aspect);
+    return {
+      url,
+      play: mediaPlayOf(layer),
+      box: { x: layer.x, y: layer.y, w: layer.width, h: height },
+      full: uncroppedRect(layer, aspect),
+      radius: Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2)),
+      opacity: layerOpacity(layer) / 100,
+    };
   };
   const items: SceneItem[] = [];
   for (const layer of state.layers) {
@@ -973,7 +1106,6 @@ export async function renderStudioScene(state: StudioState, config: StudioConfig
     const enterGroup = enterGroupKey(state, layer.id);
     items.push(enterGroup ? { ...placed, enter: mode, enterGroup } : { ...placed, enter: mode });
   }
-  const { videoUrl } = studioSources(state, config);
   const videoPlay = videoUrl && state.background?.play === "once" ? "once" : undefined;
   return { width, height, background: backgroundJpeg, ...(videoUrl ? { video: videoUrl, ...(videoPlay ? { videoPlay } : {}) } : {}), items };
 }
@@ -1044,7 +1176,13 @@ function paintCard(
   const extras = extraFonts();
   const paintImage = (layer: ImageLayer): void => {
     const source = imageOf(layer);
-    if (!source) return;
+    if (!source) {
+      // A video or gif still has to be selectable before its first frame is decoded.
+      if (!isMotionSrc(layer.src)) return;
+      const height = imageLayerHeight(layer, 1);
+      hits.push({ id: layer.id, kind: "image", x: layer.x, y: layer.y, w: layer.width, h: height });
+      return;
+    }
     const height = imageLayerHeight(layer, source.naturalHeight / source.naturalWidth);
     if (visible(layer.id)) {
       const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2));
@@ -4346,6 +4484,56 @@ export function bindStudio(
     renderThemes();
     void redraw();
   };
+  const controlFileButton = (target: EventTarget | null): HTMLButtonElement | null => {
+    if (!(target instanceof Element)) return null;
+    const button = target.closest<HTMLButtonElement>("[data-theme-slug]");
+    if (!button || !themeGrid?.contains(button)) return null;
+    const src = button.dataset.themeSlug ?? "";
+    if (isUploadSrc(src)) return button;
+    const pageId = config.pageId;
+    if (pageId && src.startsWith(`pres:${pageId}/`)) return button;
+    return null;
+  };
+  const deletePageFile = async (src: string) => {
+    const pageId = config.pageId;
+    if (!pageId || !src.startsWith(`pres:${pageId}/`)) return;
+    const name = src.slice(`pres:${pageId}/`.length);
+    if (!name || name.includes("/") || name.includes("\\")) return;
+    const keys = await removePageFile(pageId, name);
+    if (!keys) {
+      showToast("파일을 지우지 못했습니다.");
+      return;
+    }
+    const group = config.groups.find((item) => item.id === "page");
+    if (group) {
+      const index = group.items.findIndex((item) => item.src === src);
+      if (index >= 0) group.items.splice(index, 1);
+      sources = config.groups.flatMap((item) => item.items);
+    }
+    renderThemes();
+    root.querySelector<HTMLButtonElement>("#studio-theme-add")?.focus();
+    const drop = new Set([src, ...keys]);
+    const backgroundKey = state.background
+      ? `${state.background.mode === "video" ? "bgv" : "bg"}:${state.background.id}`
+      : "";
+    const used =
+      state.layers.some((layer) => layer.kind === "image" && drop.has(layer.src)) ||
+      state.background?.file === src ||
+      (backgroundKey !== "" && drop.has(backgroundKey));
+    if (!used) return;
+    commitLayers(() => {
+      state.layers = state.layers.filter((layer) => !(layer.kind === "image" && drop.has(layer.src)));
+      selected.clear();
+      pruneGroups(state);
+      if (state.background && (state.background.file === src || drop.has(backgroundKey))) delete state.background;
+      backgroundOn = false;
+    });
+  };
+  const deleteControlFile = (button: HTMLButtonElement) => {
+    const src = button.dataset.themeSlug ?? "";
+    if (isUploadSrc(src)) return deleteUpload(src.slice(UPLOAD_PREFIX.length));
+    return deletePageFile(src);
+  };
   themeGrid?.addEventListener("click", (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const remove = target?.closest<HTMLButtonElement>("[data-upload-remove]");
@@ -4361,6 +4549,13 @@ export function bindStudio(
     if (button) pickTheme(button, false);
   });
   themeGrid?.addEventListener("keydown", (event) => {
+    const removable = controlFileButton(event.target);
+    if (removable && (event.key === "Delete" || event.key === "Backspace") && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      void deleteControlFile(removable);
+      return;
+    }
     const key = event.key;
     if (!["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown"].includes(key)) return;
     if (!(event.target instanceof Element && event.target.matches("[data-theme-slug]"))) return;
@@ -4370,6 +4565,69 @@ export function bindStudio(
     const delta = key === "ArrowLeft" || key === "ArrowUp" ? -1 : 1;
     const next = themes[(index + delta + themes.length) % themes.length];
     if (next) pickTheme(next, true);
+  });
+  closeSourceMenu?.();
+  sourceMenu?.remove();
+  const controlMenu = document.createElement("div");
+  controlMenu.className = "nav-popover studio-menu";
+  controlMenu.setAttribute("role", "menu");
+  controlMenu.setAttribute("aria-label", "컨트롤 이미지 메뉴");
+  controlMenu.hidden = true;
+  controlMenu.innerHTML = `<button type="button" class="nav-popover__item" role="menuitem" data-source-action="delete">삭제</button>`;
+  document.body.append(controlMenu);
+  sourceMenu = controlMenu;
+  let controlTarget: HTMLButtonElement | null = null;
+  const onControlOutside = (event: PointerEvent) => {
+    if (event.target instanceof Node && controlMenu.contains(event.target)) return;
+    closeControlMenu();
+  };
+  function closeControlMenu() {
+    if (controlMenu.hidden) return;
+    controlTarget = null;
+    controlMenu.hidden = true;
+    document.removeEventListener("pointerdown", onControlOutside, true);
+  }
+  closeSourceMenu = closeControlMenu;
+  const openControlMenu = (button: HTMLButtonElement, clientX: number, clientY: number) => {
+    controlTarget = button;
+    controlMenu.hidden = false;
+    const margin = 8;
+    const { width, height } = controlMenu.getBoundingClientRect();
+    const left = clientX + width + margin > window.innerWidth ? clientX - width : clientX;
+    const top = clientY + height + margin > window.innerHeight ? clientY - height : clientY;
+    controlMenu.style.left = `${Math.max(margin, left)}px`;
+    controlMenu.style.top = `${Math.max(margin, top)}px`;
+    document.addEventListener("pointerdown", onControlOutside, true);
+    controlMenu.querySelector<HTMLButtonElement>("[data-source-action]")?.focus();
+  };
+  themeGrid?.addEventListener("contextmenu", (event) => {
+    const button = controlFileButton(event.target);
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openControlMenu(button, event.clientX, event.clientY);
+  });
+  controlMenu.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-source-action]") : null;
+    const target = controlTarget;
+    if (!button || button.disabled || !target) return;
+    closeControlMenu();
+    if (button.dataset.sourceAction === "delete") void deleteControlFile(target);
+  });
+  controlMenu.addEventListener("keydown", (event) => {
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      event.stopPropagation();
+      const target = controlTarget;
+      closeControlMenu();
+      if (target) void deleteControlFile(target);
+      return;
+    }
+    if (event.key !== "Escape" && event.key !== "Tab") return;
+    event.preventDefault();
+    const target = controlTarget;
+    closeControlMenu();
+    target?.focus();
   });
   if (config.id === "presentation" && themeFile) {
     themeFile.accept = "image/*,video/mp4,video/webm,video/quicktime,.svg,.mov";
@@ -4541,7 +4799,7 @@ export function bindStudio(
       }
     }
     if (videoPaused) video.pause();
-    else if (restart || !once || !video.ended) void video.play().catch(() => {});
+    else if (restart || !once || !video.ended) playClip(video);
     if (stopVideoLoop) return;
     let frame = 0;
     let shown = -1;
@@ -5474,19 +5732,29 @@ export function bindStudio(
     const source = imageOf(layer);
     const aspect = source && source.naturalWidth > 0 ? source.naturalHeight / source.naturalWidth : 1;
     const height = imageLayerHeight(layer, aspect);
+    const radius = Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2));
+    const full = uncroppedRect(layer, aspect);
     el.style.position = "absolute";
-    el.style.left = `${layer.x}px`;
-    el.style.top = `${layer.y}px`;
-    el.style.width = `${layer.width}px`;
-    el.style.height = `${height}px`;
-    el.style.borderRadius = `${Math.max(0, Math.min(layer.radius, layer.width / 2, height / 2))}px`;
+    el.style.left = `${full.x}px`;
+    el.style.top = `${full.y}px`;
+    el.style.width = `${full.w}px`;
+    el.style.height = `${full.h}px`;
     el.style.opacity = String(layerOpacity(layer) / 100);
     el.style.pointerEvents = "none";
     el.style.objectFit = "fill";
+    const crop = layer.crop;
+    if (crop) {
+      const right = Math.max(0, (1 - crop.x - crop.w) * 100);
+      const bottom = Math.max(0, (1 - crop.y - crop.h) * 100);
+      el.style.clipPath = `inset(${crop.y * 100}% ${right}% ${bottom}% ${crop.x * 100}% round ${radius}px)`;
+      el.style.borderRadius = "0px";
+    } else {
+      el.style.clipPath = "none";
+      el.style.borderRadius = `${radius}px`;
+    }
   };
   const startVideoPlayer = (layer: ImageLayer, url: string, once: boolean): MotionPlayer => {
     const video = document.createElement("video");
-    video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
     video.src = url;
@@ -5496,6 +5764,7 @@ export function bindStudio(
       once,
       el: video,
       stop() {
+        stopClip(video);
         video.pause();
         video.removeAttribute("src");
         video.load();
@@ -5510,7 +5779,7 @@ export function bindStudio(
         } catch {
           /* the file can still be loading */
         }
-        void video.play().catch(() => {});
+        playClip(video);
       },
     };
     return player;
@@ -5582,7 +5851,6 @@ export function bindStudio(
       (layer): layer is ImageLayer =>
         layer.kind === "image" &&
         isMotionSrc(layer.src) &&
-        !layer.crop &&
         !layer.tint &&
         imageBlur(layer) <= 0 &&
         layerBlurBottom(layer) <= 0 &&
@@ -5633,6 +5901,60 @@ export function bindStudio(
       placeMotion(player.el, layer);
       motionSkip.add(layer.id);
     }
+    placeAboveMotion();
+  };
+  const abovePlates: HTMLCanvasElement[] = [];
+  let aboveSkip = new Set<string>();
+  /** Layers above a playing video stay above it. The video element would otherwise cover the whole card. */
+  const placeAboveMotion = () => {
+    aboveSkip = new Set();
+    if (!motionHost) return;
+    const nodes: HTMLElement[] = [];
+    let slice: StudioLayer[] = [];
+    let seen = false;
+    let plateIndex = 0;
+    const flush = () => {
+      if (!seen || slice.length === 0) {
+        slice = [];
+        return;
+      }
+      let plate = abovePlates[plateIndex];
+      if (!plate) {
+        plate = document.createElement("canvas");
+        plate.dataset.above = "true";
+        plate.style.position = "absolute";
+        plate.style.inset = "0";
+        plate.style.width = "100%";
+        plate.style.height = "100%";
+        plate.style.pointerEvents = "none";
+        abovePlates.push(plate);
+      }
+      plateIndex += 1;
+      drawCard(plate, { ...state, color: "transparent", layers: slice }, imageOf, editing?.id ?? cropping?.id, null, 1);
+      nodes.push(plate);
+      slice = [];
+    };
+    for (const layer of state.layers) {
+      if (motionSkip.has(layer.id)) {
+        flush();
+        seen = true;
+        const player = motionPlayers.get(layer.id);
+        if (player) nodes.push(player.el);
+        continue;
+      }
+      if (!seen) continue;
+      aboveSkip.add(layer.id);
+      slice.push(layer);
+    }
+    flush();
+    abovePlates.length = plateIndex;
+    const same =
+      motionHost.childNodes.length === nodes.length && nodes.every((node, index) => motionHost?.childNodes[index] === node);
+    if (same) return;
+    nodes.forEach((node, index) => {
+      if (motionHost?.childNodes[index] !== node) motionHost?.insertBefore(node, motionHost.childNodes[index] ?? null);
+    });
+    while (motionHost.childNodes.length > nodes.length) motionHost.lastChild?.remove();
   };
   paint = () => {
     if (penEdit) {
@@ -5644,7 +5966,8 @@ export function bindStudio(
     const restartMotion = overlayEpoch !== motionEpoch;
     if (restartMotion) overlayEpoch = motionEpoch;
     syncMotion(restartMotion);
-    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id, backgroundPaint(), 1, motionSkip);
+    const paintSkip = new Set([...motionSkip, ...aboveSkip]);
+    hits = drawCard(canvas, state, imageOf, editing?.id ?? cropping?.id, backgroundPaint(), 1, paintSkip);
     paintCropGhost();
     paintDragStroke();
     paintPenChrome();
@@ -5707,6 +6030,38 @@ export function bindStudio(
     image.style.height = `${height}px`;
     return image;
   };
+  /** How far CSS sits below canvas textBaseline "top", for this font at this size. */
+  const enterTextShift = (font: string, size: number): number => {
+    const probe = document.createElement("canvas").getContext("2d");
+    if (!probe) return 0;
+    probe.font = font;
+    probe.textBaseline = "top";
+    const canvasBaseline = -(probe.measureText("Hg").alphabeticBaseline ?? -size * 0.8);
+    const host = document.createElement("div");
+    host.style.position = "absolute";
+    host.style.visibility = "hidden";
+    host.style.font = font;
+    const row = document.createElement("div");
+    row.style.lineHeight = `${size}px`;
+    row.style.whiteSpace = "pre";
+    const word = document.createElement("span");
+    word.style.display = "inline-block";
+    const letter = document.createElement("span");
+    letter.style.display = "inline-block";
+    letter.textContent = "Hg";
+    const marker = document.createElement("span");
+    marker.style.display = "inline-block";
+    marker.style.width = "0";
+    marker.style.height = "0";
+    marker.style.verticalAlign = "baseline";
+    word.append(letter);
+    row.append(word, marker);
+    host.append(row);
+    document.body.append(host);
+    const shift = marker.getBoundingClientRect().top - row.getBoundingClientRect().top - canvasBaseline;
+    host.remove();
+    return shift;
+  };
   const enterText = (layer: TextLayer): HTMLElement => {
     const el = document.createElement("div");
     const probe = document.createElement("canvas").getContext("2d");
@@ -5717,19 +6072,23 @@ export function bindStudio(
     const lines = wrapText(layer.text.trim(), maxText, (value) => probe?.measureText(value).width ?? value.length * layer.size);
     const widths = lines.map((line) => probe?.measureText(line).width ?? 0);
     const width = Math.max(layer.size, ...widths, 0);
+    const lineHeight = Math.round(layer.size * 1.25);
     el.style.position = "absolute";
     el.style.left = `${layer.x}px`;
-    el.style.top = `${layer.y}px`;
+    el.style.top = `${layer.y - enterTextShift(font, layer.size)}px`;
     el.style.width = `${width}px`;
     el.style.font = font;
-    el.style.lineHeight = `${Math.round(layer.size * 1.25)}px`;
     el.style.color = layer.color;
     el.style.textAlign = layer.align;
-    el.style.whiteSpace = "pre";
-    if (layer.underline) el.style.textDecoration = "underline";
-    lines.forEach((line, index) => {
-      if (index > 0) el.appendChild(document.createElement("br"));
-      el.appendChild(document.createTextNode(line));
+    lines.forEach((line) => {
+      const row = document.createElement("div");
+      // The canvas em box starts at the line top. A taller line box would drop the glyphs below the canvas text.
+      row.style.lineHeight = `${layer.size}px`;
+      row.style.height = `${lineHeight}px`;
+      row.style.whiteSpace = "pre";
+      if (layer.underline) row.style.textDecoration = "underline";
+      row.textContent = line;
+      el.append(row);
     });
     return el;
   };
@@ -7003,8 +7362,16 @@ export function bindStudio(
       unlockLayers(state, ids);
     });
   };
+  const imageMediaSize = (layer: ImageLayer): { width: number; height: number } | null => {
+    const image = imageOf(layer);
+    if (image) return { width: image.naturalWidth, height: image.naturalHeight };
+    const el = motionPlayers.get(layer.id)?.el;
+    if (el instanceof HTMLVideoElement && el.videoWidth > 0) return { width: el.videoWidth, height: el.videoHeight };
+    if (el instanceof HTMLCanvasElement && el.width > 0 && el.height > 0) return { width: el.width, height: el.height };
+    return null;
+  };
   const fitSelection = () => {
-    const images = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image" && !isLayerLocked(state, layer.id) && Boolean(imageOf(layer)));
+    const images = selectedLayers().filter((layer): layer is ImageLayer => layer.kind === "image" && !isLayerLocked(state, layer.id) && Boolean(imageMediaSize(layer)));
     const rects = selectedLayers().filter((layer): layer is ShapeLayer => layer.kind === "shape" && layer.shape === "rect" && !isLayerLocked(state, layer.id));
     if (images.length === 0 && rects.length === 0) return;
     commitLayers(() => {
@@ -7018,18 +7385,19 @@ export function bindStudio(
         if (nodes) layer.nodes = transformNodes(nodes, from, layer);
       }
       for (const layer of images) {
-        const aspect = aspectOf(layer);
-        const oldW = Math.max(1, layer.width);
-        const oldH = Math.max(1, imageLayerHeight(layer, aspect));
-        const scale = Math.min(state.cardWidth / oldW, state.cardHeight / oldH);
-        layer.width = clampImageWidth(oldW * scale);
-        const height = imageLayerHeight(layer, aspect);
-        const slackX = state.cardWidth - layer.width;
-        const slackY = state.cardHeight - height;
-        const x = slackX <= 1 ? 0 : layer.x + oldW / 2 <= state.cardWidth / 2 ? 0 : state.cardWidth - layer.width;
-        const y = slackY <= 1 ? 0 : layer.y + oldH / 2 <= state.cardHeight / 2 ? 0 : state.cardHeight - height;
-        layer.x = clampImageOffset(x, state.cardWidth, layer.width);
-        layer.y = clampImageOffset(y, state.cardHeight, height);
+        const media = imageMediaSize(layer);
+        if (!media || media.width < 1 || media.height < 1) continue;
+        const scale = Math.max(state.cardWidth / media.width, state.cardHeight / media.height);
+        const full = {
+          x: (state.cardWidth - media.width * scale) / 2,
+          y: (state.cardHeight - media.height * scale) / 2,
+          w: media.width * scale,
+          h: media.height * scale,
+        };
+        layer.crop = cropFromBox(full, { x: 0, y: 0, w: state.cardWidth, h: state.cardHeight });
+        layer.x = 0;
+        layer.y = 0;
+        layer.width = clampImageWidth(state.cardWidth);
       }
     });
   };
@@ -7132,7 +7500,7 @@ export function bindStudio(
       fit.disabled = !targets.some((layer) => {
         if (isLayerLocked(state, layer.id)) return false;
         if (layer.kind === "shape") return true;
-        return layer.kind === "image" && Boolean(imageOf(layer));
+        return layer.kind === "image" && Boolean(imageMediaSize(layer));
       });
     }
     const remove = menuButton("delete");
@@ -7798,19 +8166,22 @@ export function bindStudio(
     paint();
   });
 
-  const insertImage = async (src: string, at: Point) => {
+  const insertImage = async (src: string, at: Point, placement: "frame" | "native" = "frame") => {
     const url = srcUrl(src);
-    const image = url ? await loadImage(url).catch(() => null) : null;
+    const video = sourceOf(src)?.kind === "video" || isVideoSrc(src);
+    const image = url ? (video ? await captureVideoPoster(url) : await loadImage(url).catch(() => null)) : null;
     const aspect = image && image.naturalWidth > 0 ? image.naturalHeight / image.naturalWidth : 1;
     if (editing) closeEditor(true);
     if (cropping) endCrop(true);
     const kind = sourceOf(src)?.kind;
     const wanted =
-      kind === "speaker"
-        ? state.cardHeight / 2 / aspect
-        : kind === "logo"
-          ? Math.min(state.cardWidth / 4, (state.cardHeight * 0.8) / aspect)
-          : state.cardWidth / 2;
+      placement === "native" && image
+        ? image.naturalWidth
+        : kind === "speaker"
+          ? state.cardHeight / 2 / aspect
+          : kind === "logo"
+            ? Math.min(state.cardWidth / 4, (state.cardHeight * 0.8) / aspect)
+            : state.cardWidth / 2;
     const radius = kind === "speaker" || kind === "logo" ? 0 : IMAGE_RADIUS_DEFAULT;
     commitLayers(() => {
       const width = clampImageWidth(wanted);
@@ -7850,11 +8221,8 @@ export function bindStudio(
         if (saved.length < files.length) showToast("파일을 페이지 폴더에 넣지 못했습니다.");
         let offset = 0;
         for (const item of saved) {
-          if (item.kind === "video") usePageVideo(item.src);
-          else {
-            await insertImage(item.src, { x: at.x + offset, y: at.y + offset });
-            offset += 24;
-          }
+          await insertImage(item.src, { x: at.x + offset, y: at.y + offset }, "native");
+          offset += 24;
         }
       })();
       return;
@@ -7863,8 +8231,7 @@ export function bindStudio(
     const src = event.dataTransfer?.getData(THEME_DRAG);
     if (!src) return;
     event.preventDefault();
-    if (sourceOf(src)?.kind === "video") usePageVideo(src);
-    else void insertImage(src, cardPoint(event));
+    void insertImage(src, cardPoint(event), "native");
   });
   themeGrid?.addEventListener("dragend", () => delete stage.dataset.dropping);
 
@@ -8250,11 +8617,8 @@ export function bindStudio(
       if (saved.length < media.length) showToast("파일을 페이지 폴더에 넣지 못했습니다.");
       let offset = 0;
       for (const item of saved) {
-        if (item.kind === "video") usePageVideo(item.src);
-        else {
-          await insertImage(item.src, { x: at.x + offset, y: at.y + offset });
-          offset += 24;
-        }
+        await insertImage(item.src, { x: at.x + offset, y: at.y + offset }, "native");
+        offset += 24;
       }
       return;
     }
@@ -8269,7 +8633,7 @@ export function bindStudio(
     renderThemes();
     let offset = 0;
     for (const upload of added) {
-      await insertImage(uploadSrc(upload), { x: at.x + offset, y: at.y + offset });
+      await insertImage(uploadSrc(upload), { x: at.x + offset, y: at.y + offset }, "native");
       offset += 24;
     }
   };

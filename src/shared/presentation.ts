@@ -23,6 +23,7 @@ import {
 import type { LinearGradient, ShapeLayer } from "./studio-shapes.ts";
 import PRESENTATION_DEFAULTS from "./presentation-defaults.json";
 import TYPE1_TEMPLATE from "./presentation-type1.json";
+import TYPE3_TEMPLATE from "./presentation-type3.json";
 
 export const PRESENTATION_DECK_KEY = "ax-presentation-deck";
 /** Dev server route that rewrites presentation-defaults.json. */
@@ -428,13 +429,14 @@ export function createBlankPage(tone: PresentationTone): PresentationPage {
   };
 }
 
-/** A fresh page in one of the three predictable layouts. Type 1 copies the saved page 2 design. */
+/** A fresh page in one of the three predictable layouts. Type 1 copies the saved divider. Type 3 copies the saved page 7 design. */
 export function createTypedPage(type: PresentationType, index: ConferenceIndex | null, tone: PresentationTone): PresentationPage {
-  if (type === 1) {
-    const page = structuredClone(TYPE1_TEMPLATE) as PresentationPage;
+  if (type === 1 || type === 3) {
+    const page = structuredClone(type === 1 ? TYPE1_TEMPLATE : TYPE3_TEMPLATE) as PresentationPage;
     page.id = `page-${crypto.randomUUID()}`;
     page.name = "";
     page.thumb = "";
+    if (type === 3) page.tone = tone;
     return page;
   }
   const spec = SPECS.find((item) => item.id === TYPE_EXAMPLE[type]) ?? SPECS[0];

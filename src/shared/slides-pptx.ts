@@ -83,11 +83,22 @@ export type SceneItem =
       w: number;
       h: number;
       png: Uint8Array;
+      /** A video layer. The HTML player plays it in place; PDF and PowerPoint keep png, its first frame. */
+      video?: SceneVideo;
       /** Progressive-blur entrance. once plays one pass. loop repeats while the slide stays open. */
       enter?: "once" | "loop";
       /** Layers that share this key blur in together. */
       enterGroup?: string;
     };
+/** Card pixels. box is what shows; full is the whole frame, larger than box when the layer is cropped. */
+export type SceneVideo = {
+  url: string;
+  play: "once" | "loop";
+  box: { x: number; y: number; w: number; h: number };
+  full: { x: number; y: number; w: number; h: number };
+  radius: number;
+  opacity: number;
+};
 /** background is the card color and background photo as JPEG. video is the background video's URL; background then holds one of its frames. videoPlay once plays a single pass. Absent loops. */
 export type SlideScene = { width: number; height: number; background: Uint8Array; video?: string; videoPlay?: "once" | "loop"; items: SceneItem[] };
 
