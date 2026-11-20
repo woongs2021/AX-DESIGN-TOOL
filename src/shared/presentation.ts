@@ -216,6 +216,18 @@ export function createPresentationDeck(index: ConferenceIndex | null): Presentat
 
 let defaultPages: unknown = PRESENTATION_DEFAULTS.pages;
 
+/** Which built-in deck a browser save was made against, so a deployed site can tell an old save from its own deck. */
+const DEFAULTS_STAMP = stampOf(JSON.stringify(PRESENTATION_DEFAULTS.pages));
+
+function stampOf(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let at = 0; at < text.length; at += 1) {
+    hash ^= text.charCodeAt(at);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 /** The deck set with “기본값으로 세팅”, or the built-in pages when none is set. */
 export function defaultPresentationDeck(index: ConferenceIndex | null): PresentationDeck {
   const deck = parseDeck({ version: DECK_VERSION, selected: 0, pages: structuredClone(defaultPages) }, false);
@@ -226,7 +238,9 @@ export function loadPresentationDeck(index: ConferenceIndex | null): Presentatio
   try {
     const raw = localStorage.getItem(PRESENTATION_DECK_KEY);
     const parsed = raw ? (JSON.parse(raw) as unknown) : null;
-    const deck = parseDeck(parsed);
+    // A deployed site shows each deploy's deck: a save made against older defaults gives way. The dev server keeps the working copy.
+    const stale = !import.meta.env?.DEV && (parsed as { defaults?: unknown } | null)?.defaults !== DEFAULTS_STAMP;
+    const deck = stale ? null : parseDeck(parsed);
     if (deck) return deck;
   } catch {
     /* A broken save falls back to the default pages. */
@@ -315,6 +329,7 @@ export function removePresentationPages(deck: PresentationDeck, ats: readonly nu
 export function savePresentationDeck(deck: PresentationDeck): void {
   const body = {
     version: DECK_VERSION,
+    defaults: DEFAULTS_STAMP,
     selected: deck.selected,
     pages: deck.pages.map(storedPage),
   };
