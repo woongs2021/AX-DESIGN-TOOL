@@ -1659,11 +1659,27 @@ html[data-mode="dark"] .deck .studio__fit {
 }
 
 .studio-devices {
+  position: relative;
   display: flex;
   justify-content: center;
   gap: 8px;
   padding: 8px 16px;
   background: var(--studio-divider);
+}
+
+.studio-devices__group {
+  display: flex;
+  gap: 8px;
+}
+
+/* Conference: the event review sits at the right end of the bar, the devices stay centered. */
+.studio-devices__review {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  min-height: 36px;
+  padding: 8px 16px;
+  transform: translateY(-50%);
 }
 
 .top-nav:has(+ .shell--studio) {
@@ -3359,5 +3375,192 @@ html[data-mode="dark"] .studio__scaler canvas[data-copy="true"] {
 
   .nav-popover__item {
     min-height: 48px;
+  }
+}
+
+/* Event review (Conference → 행사 후기): a blog post in a reading column; the lead photo runs wider. */
+.review__header,
+.review__body {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.review__header {
+  margin-bottom: 32px;
+}
+
+.review__kicker {
+  margin: 24px 0 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.review__title {
+  margin-bottom: 12px;
+  word-break: keep-all;
+}
+
+.review__subtitle {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 18px;
+}
+
+.review__lead {
+  max-width: 1040px;
+  margin: 0 auto 48px;
+}
+
+.review__body p {
+  margin: 0 0 20px;
+  font-size: 17px;
+  line-height: 1.85;
+  word-break: keep-all;
+}
+
+.review__body .review__intro {
+  font-size: 19px;
+}
+
+.review__facts {
+  display: grid;
+  gap: 10px;
+  margin: 32px 0 56px;
+  padding: 20px 24px;
+  border: var(--line-width) solid var(--line-color);
+  border-radius: 12px;
+}
+
+.review__facts div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.review__facts dt {
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+.review__facts dd {
+  margin: 0;
+  font-size: 15px;
+  word-break: keep-all;
+}
+
+.review__section {
+  margin-top: 64px;
+}
+
+.review__body .review__session {
+  margin: 0 0 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.review .review__heading {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.review__body .review__speaker {
+  margin: 0 0 24px;
+  color: var(--fg-muted);
+  font-size: 15px;
+}
+
+.review__figure {
+  margin: 32px 0;
+}
+
+.review__lead .review__figure,
+.review__pair .review__figure {
+  margin: 0;
+}
+
+.review__figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 24px;
+}
+
+/* Entrance, once per visit (bindReview adds review--animate): photos rise into place, titles write in. */
+.review--animate [data-reveal="rise"] {
+  opacity: 0;
+  transform: translateY(40px);
+  transition:
+    opacity 0.9s ease,
+    transform 1.1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.review--animate [data-reveal="rise"].is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+.review--animate .review__pair [data-reveal="rise"] + [data-reveal="rise"] {
+  transition-delay: 0.12s;
+}
+
+.review--animate [data-reveal="text"]:not(.is-revealed) {
+  opacity: 0;
+}
+
+.review__figure figcaption {
+  margin-top: 10px;
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.review__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 32px 0;
+}
+
+.review__quote {
+  margin: 32px 0;
+  padding: 4px 0 4px 20px;
+  border-left: 3px solid var(--primary);
+}
+
+.review__body .review__quote p {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.review__quote cite {
+  color: var(--fg-muted);
+  font-size: 14px;
+  font-style: normal;
+}
+
+.review__footer {
+  margin-top: 64px;
+  padding-top: 24px;
+  border-top: var(--line-width) solid var(--line-color);
+}
+
+@media (max-width: 767px) {
+  .review__pair {
+    grid-template-columns: 1fr;
+  }
+
+  .review__facts div {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 }

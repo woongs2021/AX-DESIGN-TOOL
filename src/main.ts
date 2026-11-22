@@ -45,6 +45,7 @@ import {
 import { bindCaptureDetail, renderCaptureDetail } from "./views/capture.ts";
 import { renderHistory } from "./views/history.ts";
 import { renderNotFound } from "./views/placeholders.ts";
+import { bindReview, renderReview } from "./views/review.ts";
 import {
   bindStudio,
   clearSpeakerDeck,
@@ -218,7 +219,7 @@ function shell(mainHtml: string): string {
   const studio = route.name === "studio" || route.name === "conference" || route.name === "presentation";
   const showConference = loadState.status === "ready" && loadState.conference;
   const conference = showConference
-    ? navLink("Conference", hrefFor({ name: "conference", card: null }), route.name === "conference")
+    ? navLink("Conference", hrefFor({ name: "conference", card: null }), route.name === "conference" || route.name === "review")
     : "";
   const presentation = showConference
     ? navLink("Presentation", hrefFor({ name: "presentation" }), route.name === "presentation")
@@ -289,6 +290,8 @@ function renderMain(): string {
       syncPresentationMode(deck, readStoredMode());
       return renderPresentation(deck, loadState.conference);
     }
+    case "review":
+      return renderReview();
     case "history":
       return renderHistory(index);
     case "notfound":
@@ -347,6 +350,8 @@ function render(): void {
       render();
     });
   }
+
+  if (route.name === "review") bindReview(app);
 
   if (route.name === "studio" && studioState) {
     bindEditor(app, studioState, onlineStudioConfig(loadState.index.captures), {
