@@ -3771,10 +3771,13 @@ export function bindStudio(
 
     iframe.hidden = true;
     canvas.hidden = false;
-    const urls = [...new Set([...imageLayers().map((layer) => srcUrl(layer.src)), backgroundStill()].filter(Boolean))];
+    // A background video starts loading now, ahead of the layer images. Its still only stands in until the first frame, so the page does not wait for it.
+    const videoUrl = backgroundVideoUrl();
+    if (videoUrl) backgroundVideo(videoUrl);
+    const urls = [...new Set([...imageLayers().map((layer) => srcUrl(layer.src)), videoUrl ? "" : backgroundStill()].filter(Boolean))];
     setImageLoading(urls.some((url) => !imageReady(url)));
     await Promise.all(urls.map((url) => loadImage(url).catch(() => null)));
-    if (token !== drawToken) return;
+    if (token !== drawToken || !canvas.isConnected) return;
     clampLayout();
     exportCode.textContent = designToCode(state, aspectOf, extraFonts());
     if (enterOnShow) {
@@ -4778,6 +4781,8 @@ export function bindStudio(
   };
 
   syncVideoLoop = () => {
+    // The videos and the frame loop are shared. A page that was left (its canvas replaced) must not pause the open page's video or stop its loop.
+    if (!canvas.isConnected) return;
     const url = backgroundVideoUrl();
     for (const [key, other] of videoCache) if (key !== url) other.pause();
     if (!url || state.code.trim() || exporting) {
