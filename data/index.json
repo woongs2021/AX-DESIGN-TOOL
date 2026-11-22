@@ -2468,6 +2468,11 @@
       {
         "date": "2026-11-22",
         "operation": "update",
+        "title": "소리 버튼"
+      },
+      {
+        "date": "2026-11-22",
+        "operation": "update",
         "title": "배경 영상 페이지 첫 로딩"
       },
       {
