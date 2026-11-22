@@ -1,4 +1,5 @@
 import { assetUrl, escapeHtml } from "../lib/dom.ts";
+import { hrefFor } from "../router.ts";
 import { PAGE_ENTER_EVENT, PAGE_FILES_EVENT, PRESENT_LAYOUT_EVENT, presentationFileUrl } from "../shared/presentation-files.ts";
 import { isPageMedia, removePageFile, uploadPageFiles, type PageFileSource } from "./presentation-project.ts";
 import type { CaptureRecord } from "../shared/index-types.ts";
@@ -253,7 +254,7 @@ function stopEnter(): void {
 const blurUrl = new URL("../../presentation/progressive-blur.js", import.meta.url).href;
 let blurApi: ProgressiveBlurApi | null = null;
 
-function loadBlur(): Promise<ProgressiveBlurApi> {
+export function loadBlur(): Promise<ProgressiveBlurApi> {
   if (blurApi) return Promise.resolve(blurApi);
   if (window.ProgressiveBlur) {
     blurApi = window.ProgressiveBlur;
@@ -2216,7 +2217,9 @@ export function renderStudio(state: StudioState, config: StudioConfig): string {
     ${
       presentation
         ? `<div class="studio-devices studio-devices--tools">${alignBar}</div>`
-        : `<div class="studio-devices" role="group" aria-label="디바이스 뷰">${deviceButtons}</div>`
+        : `<div class="studio-devices"><div class="studio-devices__group" role="group" aria-label="디바이스 뷰">${deviceButtons}</div>${
+            config.id === "conference" ? `<a class="button button--secondary studio-devices__review" href="${hrefFor({ name: "review" })}">행사 후기</a>` : ""
+          }</div>`
     }
     <div class="studio-device-frame">
     <div class="studio-device" id="studio-device" data-device="${device}" data-framed="${presentation || device === largestDevice() ? "false" : "true"}">

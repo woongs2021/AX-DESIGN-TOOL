@@ -3,6 +3,7 @@ export type Route =
   | { name: "capture"; slug: string }
   | { name: "studio"; theme: string | null; card: string | null }
   | { name: "conference"; card: string | null }
+  | { name: "review" }
   | { name: "presentation" }
   | { name: "history" }
   | { name: "notfound"; path: string };
@@ -36,6 +37,7 @@ export function parseHash(hash = window.location.hash): Route {
   if (path === "/" || path === "/gallery") return { name: "archive" };
   if (path === "/history") return { name: "history" };
   if (path === "/conference") return { name: "conference", card: readSlugParam(query, "card") };
+  if (path === "/conference/review") return { name: "review" };
   if (path === "/presentation") return { name: "presentation" };
   if (path === "/studio" || isLegacyStudioHash(hash)) {
     return {
@@ -66,6 +68,8 @@ export function hrefFor(route: Route): string {
     }
     case "conference":
       return route.card ? `#/conference?card=${route.card}` : "#/conference";
+    case "review":
+      return "#/conference/review";
     case "presentation":
       return "#/presentation";
     case "history":
