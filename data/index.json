@@ -2468,6 +2468,11 @@
       {
         "date": "2026-11-22",
         "operation": "update",
+        "title": "행사 후기 페이지"
+      },
+      {
+        "date": "2026-11-22",
+        "operation": "update",
         "title": "소리 버튼"
       },
       {
