@@ -277,36 +277,61 @@ function loadBlur(): Promise<ProgressiveBlurApi> {
 
 const hearing = new Set<HTMLVideoElement>();
 const hearToken = new WeakMap<HTMLVideoElement, number>();
-const hintWatched = new WeakSet<HTMLVideoElement>();
-let soundHint: HTMLButtonElement | null = null;
+const soundWatched = new WeakSet<HTMLVideoElement>();
+let soundButton: HTMLButtonElement | null = null;
+let soundButtonOn: boolean | null = null;
+/** The viewer turned sound off with the sound button. Clips start muted until they turn it back on. */
+let soundOff = false;
 
-/** While a clip plays muted because the browser blocked its sound, says how to turn it on. */
-function syncSoundHint(): void {
-  const blocked = [...hearing].some((video) => video.muted && !video.paused);
-  if (!blocked) {
-    soundHint?.remove();
-    soundHint = null;
-    return;
-  }
-  if (soundHint) return;
-  // In body: present mode puts the whole page in full screen, so the hint shows there too.
-  soundHint = document.createElement("button");
-  soundHint.type = "button";
-  soundHint.className = "sound-hint";
-  soundHint.textContent = "소리가 꺼져 있어요 · 클릭하면 켜져요";
-  document.body.append(soundHint);
+const speakerOnIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+const speakerOffIcon = `<svg class="studio__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 5 6"/><path d="m21 9-5 6"/></svg>`;
+
+/** True once the browser shows the clip has a sound track. Silent clips get no sound button. */
+function hasAudio(video: HTMLVideoElement): boolean {
+  const clip = video as HTMLVideoElement & { audioTracks?: { length: number }; mozHasAudio?: boolean; webkitAudioDecodedByteCount?: number };
+  return (clip.audioTracks?.length ?? 0) > 0 || clip.mozHasAudio === true || (clip.webkitAudioDecodedByteCount ?? 0) > 0;
 }
 
-/** Plays with sound. A browser that blocks autoplay keeps the picture muted until the next click. */
+/** A speaker button while a playing clip has sound. It shows whether sound is on and turns it on or off. */
+function syncSoundButton(): void {
+  const audible = [...hearing].filter((video) => !video.paused && hasAudio(video));
+  if (audible.length === 0) {
+    soundButton?.remove();
+    soundButton = null;
+    soundButtonOn = null;
+    return;
+  }
+  if (!soundButton) {
+    // In body: present mode puts the whole page in full screen, so the button shows there too.
+    soundButton = document.createElement("button");
+    soundButton.type = "button";
+    soundButton.className = "sound-toggle";
+    soundButton.addEventListener("click", () => {
+      soundOff = [...hearing].some((video) => !video.paused && !video.muted && hasAudio(video));
+      for (const video of hearing) video.muted = soundOff;
+      syncSoundButton();
+    });
+    document.body.append(soundButton);
+  }
+  const on = audible.some((video) => !video.muted);
+  if (on === soundButtonOn) return;
+  soundButtonOn = on;
+  const label = on ? "소리 끄기" : "소리 켜기";
+  soundButton.innerHTML = on ? speakerOnIcon : speakerOffIcon;
+  soundButton.setAttribute("aria-label", label);
+  soundButton.title = label;
+}
+
+/** Plays with sound unless the viewer turned it off. A browser that blocks autoplay keeps the picture muted until the next click. */
 function playClip(video: HTMLVideoElement): void {
   hearing.add(video);
-  if (!hintWatched.has(video)) {
-    hintWatched.add(video);
-    for (const type of ["play", "pause", "volumechange"]) video.addEventListener(type, syncSoundHint);
+  if (!soundWatched.has(video)) {
+    soundWatched.add(video);
+    for (const type of ["play", "pause", "volumechange", "timeupdate"]) video.addEventListener(type, syncSoundButton);
   }
   const token = (hearToken.get(video) ?? 0) + 1;
   hearToken.set(video, token);
-  video.muted = false;
+  video.muted = soundOff;
   void video.play().catch(() => {
     if (hearToken.get(video) !== token) return;
     video.muted = true;
@@ -317,13 +342,15 @@ function playClip(video: HTMLVideoElement): void {
 function stopClip(video: HTMLVideoElement): void {
   hearing.delete(video);
   hearToken.set(video, (hearToken.get(video) ?? 0) + 1);
-  syncSoundHint();
+  syncSoundButton();
 }
 
 if (typeof document !== "undefined") {
-  const unlock = () => {
+  const unlock = (event: Event) => {
+    // The sound button decides for itself; unmuting here first would make its click read "on" and turn sound off.
+    if (event.target instanceof Element && event.target.closest(".sound-toggle")) return;
     // Unmuting outside a gesture (a lone Shift, say) makes the browser pause the clip instead.
-    if (navigator.userActivation && !navigator.userActivation.isActive) return;
+    if (soundOff || (navigator.userActivation && !navigator.userActivation.isActive)) return;
     for (const video of hearing) {
       if (video.paused || !video.muted) continue;
       video.muted = false;

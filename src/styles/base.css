@@ -475,8 +475,7 @@ html[data-mode="dark"] .confirm-dialog {
   font-variant-numeric: tabular-nums;
 }
 
-.toast,
-.sound-hint {
+.toast {
   position: fixed;
   left: 50%;
   bottom: 28px;
@@ -490,22 +489,36 @@ html[data-mode="dark"] .confirm-dialog {
   transform: translateX(-50%);
 }
 
-/* Above the present-mode shield, so a click on it turns sound on instead of the page. */
-.sound-hint {
+/* Above the present-mode shield, so a click turns sound on or off instead of the page. */
+.sound-toggle {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
   z-index: 30;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 0;
-  font: inherit;
-  font-size: 14px;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
   cursor: pointer;
 }
 
+.sound-toggle .studio__icon {
+  width: 22px;
+  height: 22px;
+}
+
 /* The editor's bottom bar sits where present mode has nothing. */
-html:not(.is-presenting) .sound-hint {
+html:not(.is-presenting) .sound-toggle {
   bottom: 96px;
 }
 
 html[data-mode="dark"] .toast,
-html[data-mode="dark"] .sound-hint {
+html[data-mode="dark"] .sound-toggle {
   background: var(--studio-ink-dark);
   color: var(--fg);
   box-shadow:
